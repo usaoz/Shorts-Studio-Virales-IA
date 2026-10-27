@@ -6670,6 +6670,9 @@ def iniciar_aplicacion_gui() -> None:
 
     btn_auto_1clic.configure(command=ejecutar_flujo_1_clic)
     root.after(200, vaciar_cola_logs)
+    root.deiconify()
+    root.lift()
+    root.focus_force()
     root.mainloop()
 
 
