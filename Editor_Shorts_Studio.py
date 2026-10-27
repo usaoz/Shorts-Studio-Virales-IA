@@ -4057,27 +4057,57 @@ def iniciar_aplicacion_gui() -> None:
     import webbrowser
     import customtkinter as ctk
 
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Mateo.EditorShortsStudio.BlueIcon.v2")
+    except Exception:
+        pass
+
     ctk.set_appearance_mode("dark")
     ctk.set_default_color_theme("blue")
 
     root = ctk.CTk()
-    root.title("Editor Shorts Studio")
+    root.title("Shorts Studio")
     root.geometry("860x790")
     root.minsize(800, 680)
     root.configure(fg_color="#0b0d13")
-    try:
-        import ctypes
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Mateo.EditorShortsStudio.App")
-    except Exception:
-        pass
-    for _ico_cand in (BASE_DIR / "icono_ctk_azul.ico", BASE_DIR / "icono_shorts_studio.ico"):
-        if _ico_cand.exists():
+
+    _ico_azul = BASE_DIR / "icono_ctk_azul.ico"
+    if _ico_azul.exists():
+        def _forzar_icono_azul() -> None:
             try:
-                root.iconbitmap(str(_ico_cand))
-                root.after(200, lambda ic=str(_ico_cand): root.iconbitmap(ic))
+                root.wm_iconbitmap(default=str(_ico_azul))
+                root.iconbitmap(str(_ico_azul))
             except Exception:
                 pass
-            break
+            try:
+                from PIL import Image, ImageTk
+                im_ico = Image.open(_ico_azul)
+                photo_ico = ImageTk.PhotoImage(im_ico)
+                root._icono_tk_ref = photo_ico  # type: ignore[attr-defined]
+                root.wm_iconphoto(True, photo_ico)
+            except Exception:
+                pass
+            try:
+                import ctypes
+                IMAGE_ICON = 1
+                LR_LOADFROMFILE = 0x00000010
+                WM_SETICON = 0x0080
+                ICON_SMALL = 0
+                ICON_BIG = 1
+                hwnd = ctypes.windll.user32.GetParent(root.winfo_id()) or root.winfo_id()
+                hicon_big = ctypes.windll.user32.LoadImageW(None, str(_ico_azul), IMAGE_ICON, 48, 48, LR_LOADFROMFILE)
+                hicon_sm = ctypes.windll.user32.LoadImageW(None, str(_ico_azul), IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
+                if hicon_big:
+                    ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, hicon_big)
+                if hicon_sm:
+                    ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hicon_sm)
+            except Exception:
+                pass
+
+        _forzar_icono_azul()
+        root.after(220, _forzar_icono_azul)
+        root.after(600, _forzar_icono_azul)
 
     cola_logs: "queue.Queue[str]" = queue.Queue()
     editando_lock = threading.Lock()
