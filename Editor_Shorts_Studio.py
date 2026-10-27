@@ -4059,7 +4059,7 @@ def iniciar_aplicacion_gui() -> None:
 
     try:
         import ctypes
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Mateo.EditorShortsStudio.BlueIcon.v2")
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Mateo.ShortsStudio.App")
     except Exception:
         pass
 
@@ -4072,42 +4072,23 @@ def iniciar_aplicacion_gui() -> None:
     root.minsize(800, 680)
     root.configure(fg_color="#0b0d13")
 
-    _ico_azul = BASE_DIR / "icono_ctk_azul.ico"
-    if _ico_azul.exists():
-        def _forzar_icono_azul() -> None:
-            try:
-                root.wm_iconbitmap(default=str(_ico_azul))
-                root.iconbitmap(str(_ico_azul))
-            except Exception:
-                pass
-            try:
-                from PIL import Image, ImageTk
-                im_ico = Image.open(_ico_azul)
-                photo_ico = ImageTk.PhotoImage(im_ico)
-                root._icono_tk_ref = photo_ico  # type: ignore[attr-defined]
-                root.wm_iconphoto(True, photo_ico)
-            except Exception:
-                pass
-            try:
-                import ctypes
-                IMAGE_ICON = 1
-                LR_LOADFROMFILE = 0x00000010
-                WM_SETICON = 0x0080
-                ICON_SMALL = 0
-                ICON_BIG = 1
-                hwnd = ctypes.windll.user32.GetParent(root.winfo_id()) or root.winfo_id()
-                hicon_big = ctypes.windll.user32.LoadImageW(None, str(_ico_azul), IMAGE_ICON, 48, 48, LR_LOADFROMFILE)
-                hicon_sm = ctypes.windll.user32.LoadImageW(None, str(_ico_azul), IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
-                if hicon_big:
-                    ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, hicon_big)
-                if hicon_sm:
-                    ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hicon_sm)
-            except Exception:
-                pass
+    _ico_app = BASE_DIR / "icono_shorts_studio.ico"
+    if not _ico_app.exists():
+        _ico_app = BASE_DIR / "icono_ctk_azul.ico"
 
-        _forzar_icono_azul()
-        root.after(220, _forzar_icono_azul)
-        root.after(600, _forzar_icono_azul)
+    if _ico_app.exists():
+        try:
+            root.iconbitmap(str(_ico_app))
+        except Exception:
+            pass
+        try:
+            from PIL import Image, ImageTk
+            im_ico = Image.open(_ico_app)
+            photo_ico = ImageTk.PhotoImage(im_ico)
+            root._icono_tk_ref = photo_ico  # type: ignore[attr-defined]
+            root.wm_iconphoto(True, photo_ico)
+        except Exception:
+            pass
 
     cola_logs: "queue.Queue[str]" = queue.Queue()
     editando_lock = threading.Lock()
