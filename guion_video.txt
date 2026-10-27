@@ -1,0 +1,16 @@
+TITULO_SUPERIOR: Padre e Hijo Fabrican Bomba Lego
+TITULO_YOUTUBE: ¡Cuando el agua se corta en plena ducha! 🚿😂 #shorts
+DESCRIPCION_YOUTUBE: Un padre y su hijo construyen una bomba hidráulica con bloques para que regrese el agua. ¡Una solución hilarante! #shorts #humor #fail #viral
+ESTADO_PUBLICACION: privado
+SCHEDULE: 2026-10-27 22:30
+PARA_NINOS: no
+MODO_ENCUADRE: full
+VOLUMEN_VIDEO_ORIGINAL: 0.16
+ARCHIVO_SALIDA: auto
+
+[GUION]
+TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
+00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | izquierda | ninguno | ¡Este padre se está bañando tranquilamente cuando de repente el agua deja de salir por completo! ¡Qué gran problema!
+00:05 - 00:10 | zoom_in | whoosh+xp_Error | enojo:izquierda | ninguna | ninguno | ¡Corre desesperado al río para construir una rueda hidráulica con bloques amarillos! ¡Tiene que recuperar el flujo de agua rápidamente!
+00:10 - 00:15 | alerta_roja | riser_suction | diablo:derecha | ninguna | izquierda:grande | ¡Mientras tanto su hijo activa rápidamente la máquina en la orilla para enviar agua! ¡Cada segundo cuenta antes de que se seque!
+00:15 - 00:20 | temblor | punch+cartoon_laugh | risa:izquierda | derecha | ninguno | ¡El ingenioso sistema funciona a la perfección y el agua vuelve a fluir para terminar el baño! ¡Una locura total!

@@ -1,0 +1,30 @@
+# Archivos temporales, salidas y caché
+temp_build/
+output_shorts/
+__pycache__/
+*.pyc
+*.pyo
+
+# Credenciales privadas y estado personal del usuario (NUNCA subir a GitHub)
+client_secrets*.json
+token_youtube*.json
+gemini_api_key.txt
+apis_google/
+cuentas_youtube/
+cuota_api_diaria.json
+ultimo_schedule.json
+videos_usados.json
+
+# Videos descargados de prueba
+video_input.*
+*.mp4
+*.mkv
+*.mov
+*.avi
+*.webm
+
+# Configuración de editor y logs
+.env
+*.log
+.vscode/
+.idea/
