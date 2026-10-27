@@ -4082,11 +4082,18 @@ def iniciar_aplicacion_gui() -> None:
         except Exception:
             pass
         try:
-            from PIL import Image, ImageTk
-            im_ico = Image.open(_ico_app)
-            photo_ico = ImageTk.PhotoImage(im_ico)
-            root._icono_tk_ref = photo_ico  # type: ignore[attr-defined]
-            root.wm_iconphoto(True, photo_ico)
+            import ctypes
+            user32 = ctypes.windll.user32
+            root.update_idletasks()
+            top_hwnd = user32.GetParent(root.winfo_id())
+            if not top_hwnd:
+                top_hwnd = int(root.wm_frame(), 16) if root.wm_frame() else root.winfo_id()
+            h_big = user32.LoadImageW(None, str(_ico_app), 1, 32, 32, 0x10)
+            h_small = user32.LoadImageW(None, str(_ico_app), 1, 16, 16, 0x10)
+            if h_big:
+                user32.SendMessageW(top_hwnd, 0x80, 1, h_big)
+            if h_small:
+                user32.SendMessageW(top_hwnd, 0x80, 0, h_small)
         except Exception:
             pass
 
@@ -5309,6 +5316,10 @@ def iniciar_aplicacion_gui() -> None:
                 pass
             try:
                 root.deiconify()
+                root.state("normal")
+                root.attributes("-topmost", True)
+                root.update()
+                root.attributes("-topmost", False)
                 root.lift()
                 root.focus_force()
             except Exception:
@@ -6705,9 +6716,18 @@ if __name__ == "__main__":
             import ctypes
             _mutex_handle = ctypes.windll.kernel32.CreateMutexW(None, False, "Local\\MateoEditorShortsStudioSingleInstance")
             if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+                sig_f = TEMP_DIR / "mostrar_ventana.signal"
                 TEMP_DIR.mkdir(parents=True, exist_ok=True)
-                (TEMP_DIR / "mostrar_ventana.signal").write_text("1", encoding="utf-8")
-                sys.exit(0)
+                sig_f.write_text("1", encoding="utf-8")
+                import time
+                for _ in range(6):
+                    time.sleep(0.2)
+                    if not sig_f.exists():
+                        sys.exit(0)
+                try:
+                    sig_f.unlink()
+                except Exception:
+                    pass
         except SystemExit:
             raise
         except Exception:
