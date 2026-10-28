@@ -367,7 +367,14 @@ def cargar_guion_video(ruta_guion: Path) -> ConfigGuion:
                 if k_up in ("TITULO_SUPERIOR", "TITULO"):
                     config.titulo_superior = "" if v_str.lower() in ("ninguno", "none", "-", "vacio") else v_str
                 elif k_up in ("TITULO_YOUTUBE", "YOUTUBE_TITULO"):
-                    config.titulo_youtube = v_str
+                    t_yt = v_str
+                    tiene_emoji = any(ord(char) > 0x1F300 for char in t_yt)
+                    if not tiene_emoji and t_yt:
+                        if "#shorts" in t_yt.lower():
+                            t_yt = re.sub(r"(?i)#shorts", "😱🔥 #shorts", t_yt).strip()
+                        else:
+                            t_yt = f"{t_yt} 😱🔥"
+                    config.titulo_youtube = t_yt
                 elif k_up in ("DESCRIPCION_YOUTUBE", "YOUTUBE_DESCRIPCION", "DESCRIPCION"):
                     config.descripcion_youtube = v_str
                 elif k_up in ("ESTADO_PUBLICACION", "MODO_PUBLICACION", "PRIVACIDAD"):

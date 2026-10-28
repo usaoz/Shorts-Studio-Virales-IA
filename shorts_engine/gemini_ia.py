@@ -181,7 +181,7 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
    - Apunta y persigue automáticamente al objeto, persona o acción clave en esa zona del video.
    - Opciones: `auto` (para que la visión artificial detecte y siga el sujeto/objeto principal en movimiento), `izquierda`, `derecha`, `centro`, `arriba`, `abajo`, o bien la coordenada porcentual exacta `X,Y` (ej: `28,45` si el sujeto está a la izquierda, `72,50` a la derecha), o `ninguna`.
    - **FRECUENCIA MODERADA**: usa la flecha solo en **1 o 2 bloques clave del guion como máximo**, dejando el resto en `ninguna`. No pongas flechas en bloques seguidos.
-   - **NUNCA uses flecha en el último bloque**: El editor añade automáticamente al final un outro freeze-frame de 0.7 segundos con la flecha animada apuntando al botón de Like y sonido de campana.
+   - **NUNCA uses flecha en el último bloque**: El último bloque debe concluir el video con su acción y desenlace real de forma limpia, sin flechas.
 6. CIRCULO (`circulo_rojo.png`):
    - Rodea el objeto o revelación más impactante del video: usa `auto`, `izquierda`, `derecha`, `centro` (opcional `:grande`), coordenada `X,Y`, o `ninguno`.
    - **LÍMITE ESTRICTO**: usa el círculo en **1 bloque COMO MÁXIMO** en todo el guion. En todos los demás escribe `ninguno`.
@@ -192,7 +192,7 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
 PLANTILLA DE ENTREGA OBLIGATORIA:
 ================================================================================
 TITULO_SUPERIOR: [Nombre corto de 4-5 palabras para el archivo MP4, ej: Abuela Venganza Epica Troleo]
-TITULO_YOUTUBE: [Título viral llamativo y #shorts, ej: ¡La mejor venganza de la abuela! #shorts]
+TITULO_YOUTUBE: [Título viral llamativo con 1 o 2 emojis llamativos obligatorios y #shorts, ej: ¡La mejor venganza de la abuela! 🤣💥 #shorts]
 DESCRIPCION_YOUTUBE: [Descripción atrapante de 2 oraciones + pregunta a la audiencia + 4 o 5 hashtags hiper-específicos del nicho real del video (ej: si es de perros #shorts #perros #mascotas #viral; si es de autos #shorts #autos #carreras #viral; etc.)]
 ESTADO_PUBLICACION: privado
 SCHEDULE: auto
@@ -250,7 +250,7 @@ def generar_guion_con_gemini_flash(
     schedule_str: str = "auto",
     modo_privacidad: str = "privado",
     contexto_titulo_orig: str = "",
-    modelo_preferido: str = "gemini-3.5-flash-lite",
+    modelo_preferido: str = "gemini-3.8-flash",
     progreso_cb: Optional[object] = None,
     contexto_feedback: str = "",
     auto_auditoria_retrospectiva: bool = False,
@@ -332,10 +332,12 @@ def generar_guion_con_gemini_flash(
         f"- Recuerda usar FLECHA como máximo en 2 bloques clave de todo el guion y CIRCULO como máximo en 1 bloque.\n"
     )
 
+    modelos_saturados_sesion: Set[str] = set()
+
     def _consultar_ia_robusta(
         texto_prompt: str,
-        timeout_max: float = 40.0,
-        priorizar_mejor_ia: bool = False,
+        timeout_max: float = 30.0,
+        priorizar_mejor_ia: bool = True,
     ) -> str:
         partes_v: List[object] = []
         if video_bytes:
@@ -348,42 +350,38 @@ def generar_guion_con_gemini_flash(
             texto_prompt,
         ]
 
-        if priorizar_mejor_ia:
-            # Para la Auto-Auditoría Crítica y Re-edición: priorizar siempre la mejor IA de razonamiento
-            candidatos_base: List[Tuple[str, List[object], float]] = [
-                ("gemini-3.8-flash", partes_v, timeout_max),
-                ("gemini-3.6-flash", partes_v, timeout_max),
-                ("gemini-3.5-flash-lite", partes_v, timeout_max),
-                ("gemini-3.8-flash", partes_m, min(30.0, timeout_max)),
-                ("gemini-3.6-flash", partes_m, min(30.0, timeout_max)),
-                ("gemini-3.5-flash-lite", partes_m, min(30.0, timeout_max)),
-            ]
-        else:
-            candidatos_base: List[Tuple[str, List[object], float]] = [
-                (modelo_preferido, partes_v, timeout_max),
-                ("gemini-3.5-flash-lite", partes_v, timeout_max),
-                ("gemini-flash-lite-latest", partes_v, timeout_max),
-                ("gemini-3.6-flash", partes_v, timeout_max),
-                ("gemini-3.8-flash", partes_v, timeout_max),
-                ("gemini-3.5-flash-lite", partes_m, min(30.0, timeout_max)),
-                ("gemini-flash-lite-latest", partes_m, min(30.0, timeout_max)),
-                ("gemini-3.6-flash", partes_m, min(30.0, timeout_max)),
-            ]
+        # Jerarquía estricta de mayor a menor potencia:
+        # Siempre intenta usar la IA más poderosa primero (3.8 -> 3.6 -> 3.5 -> latest -> 2.5)
+        # El segundo que recibe error o no responde pasa de inmediato al modelo inferior.
+        jerarquia_modelos = [
+            "gemini-3.8-flash",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-flash-lite-latest",
+            "gemini-2.5-flash",
+        ]
+
+        # Prioridad 1: Intentar con video comprimido directo, en orden de potencia
         plan_intentos: List[Tuple[str, List[object], float]] = []
-        vistos: Set[Tuple[str, int]] = set()
-        for m, c, t in candidatos_base:
-            k_id = (m, len(c))
-            if k_id not in vistos:
-                vistos.add(k_id)
-                plan_intentos.append((m, c, t))
+        for mod in jerarquia_modelos:
+            if mod in modelos_saturados_sesion:
+                continue
+            plan_intentos.append((mod, partes_v, timeout_max))
+
+        # Prioridad 2: Respaldo con mosaico liviano si falló el video en los modelos disponibles
+        for mod in jerarquia_modelos:
+            if mod in modelos_saturados_sesion and mod == "gemini-3.8-flash":
+                continue
+            plan_intentos.append((mod, partes_m, min(22.0, timeout_max)))
 
         ultimo_err: Optional[Exception] = None
         for mod, cont_env, t_lim in plan_intentos:
+            print(f"[*] Consultando modelo IA: {mod}...")
             def _call(m=mod, cnt=cont_env, tl=t_lim):
                 cli = genai.Client(
                     api_key=key_limpia,
                     http_options=types.HttpOptions(
-                        timeout=max(20000, int(tl * 1000)),
+                        timeout=max(18000, int(tl * 1000)),
                         retry_options=types.HttpRetryOptions(attempts=1),
                     ),
                 )
@@ -393,23 +391,30 @@ def generar_guion_con_gemini_flash(
             ex_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
             fut = ex_pool.submit(_call)
             try:
-                res_txt = fut.result(timeout=t_lim + 1.5)
+                res_txt = fut.result(timeout=t_lim + 1.0)
                 ex_pool.shutdown(wait=False, cancel_futures=True)
                 if res_txt and len(res_txt) > 80:
+                    print(f"[+] Modelo '{mod}' respondió con éxito.")
                     return res_txt
             except Exception as e:
                 ultimo_err = e
                 ex_pool.shutdown(wait=False, cancel_futures=True)
                 err_msg_corto = str(e) or repr(e)
                 if "429" in err_msg_corto or "RESOURCE_EXHAUSTED" in err_msg_corto:
-                    print(f"[!] {mod} sin cuota disponible en Free Tier, pasando al siguiente...")
+                    modelos_saturados_sesion.add(mod)
+                    print(f"[!] '{mod}' sin cuota (429/saturado), pasando inmediatamente al modelo inferior...")
+                elif "503" in err_msg_corto or "UNAVAILABLE" in err_msg_corto:
+                    print(f"[!] '{mod}' ocupado/no disponible (503), pasando inmediatamente al modelo inferior...")
+                elif "TimeoutError" in type(e).__name__ or "timeout" in err_msg_corto.lower():
+                    print(f"[!] '{mod}' no respondió en {t_lim:.0f}s, pasando inmediatamente al modelo inferior...")
                 else:
-                    print(f"[!] {mod} con demora ({err_msg_corto[:70]}), pasando al siguiente...")
+                    print(f"[!] '{mod}' no respondió ({err_msg_corto[:60]}), pasando inmediatamente al modelo inferior...")
 
-        if ultimo_err:
-            det = str(ultimo_err) if str(ultimo_err).strip() else f"Tiempo límite agotado ({repr(ultimo_err)})"
-            raise RuntimeError(f"No se pudo obtener respuesta de Gemini: {det}")
-        return ""
+        det_err = str(ultimo_err) if (ultimo_err and str(ultimo_err).strip()) else "Sin respuesta"
+        raise RuntimeError(
+            f"Todos los modelos de Gemini (3.8, 3.6, 3.5, 2.5) están sin cuota o no responden (429/503/timeout). "
+            f"Por favor verifica tu API Key o cuota en Google AI Studio. Detalle: {det_err}"
+        )
 
     def _limpiar_bloque(texto_raw: str) -> str:
         t = texto_raw.strip()
@@ -482,7 +487,9 @@ def generar_guion_con_gemini_flash(
         f"2. CADENCIA DE VOZ VIRAL (¡RÁPIDA Y ENÉRGICA!): Escribe EXACTAMENTE entre 15 y 17 palabras por cada bloque de 5 segundos (~3.2 palabras/segundo) para que la narración fluya con ritmo acelerado y atrapante, sin silencios muertos ni arrastrar las palabras.\n"
         f"3. EFECTOS Y FLECHAS CON SENTIDO: Usa FLECHA únicamente si hay un detalle crucial o acción oculta que señalar (máx 1 o 2 bloques en todo el video, NUNCA en el último bloque). Si no hay un objeto clave en movimiento o detalle sutil, pon 'ninguna'. Cero flechas es mucho mejor que una flecha apuntando a un lugar irrelevante.\n"
         f"4. REMATE VIRAL POTENTE: El remate final del guion debe ser memorable, ingenioso o hilarante. Aunque el video original sea simple o modesto, la narración debe elevarlo dándole un remate épico, irónico o cómico que cierre con máxima fuerza.\n"
-        f"5. HASHTAGS DE NICHO REAL: En DESCRIPCION_YOUTUBE, escribe una descripción atractiva de 2 oraciones, pregunta para debate en comentarios, y 4 o 5 hashtags hiper-específicos del nicho (ej: #shorts #perros #mascotas #viral; #shorts #autos #carreras #viral; etc.).\n\n"
+        f"5. HASHTAGS DE NICHO REAL: En DESCRIPCION_YOUTUBE, escribe una descripción atractiva de 2 oraciones, pregunta para debate en comentarios, y 4 o 5 hashtags hiper-específicos del nicho (ej: #shorts #perros #mascotas #viral; #shorts #autos #carreras #viral; etc.).\n"
+        f"6. TÍTULO CON EMOJIS OBLIGATORIOS: En TITULO_YOUTUBE incluye SIEMPRE 1 o 2 emojis llamativos acordes a la temática (ej: 😱, 🔥, 🤣, 💥, 🤯) y el hashtag #shorts al final.\n"
+        f"7. COBERTURA TOTAL HASTA EL ÚLTIMO SEGUNDO: El último bloque temporal DEBE terminar en el segundo exacto 00:{dur_redondeada:02d}, cerrando con el remate del video sin dejar segundos finales sin narrar.\n\n"
         f"Entrega ÚNICAMENTE el bloque de guion final estructurado con la plantilla obligatoria:"
     )
 
@@ -506,6 +513,24 @@ def generar_guion_con_gemini_flash(
 
     if not texto_respuesta or "[GUION]" not in texto_respuesta:
         texto_respuesta = guion_final or fb_raw or ""
+
+    # Asegurar que el título siempre tenga al menos un emoji viral
+    if texto_respuesta and "TITULO_YOUTUBE:" in texto_respuesta:
+        lineas_corregidas = []
+        for ln in texto_respuesta.splitlines():
+            if ln.strip().upper().startswith("TITULO_YOUTUBE:"):
+                partes_t = ln.split(":", 1)
+                t_val = partes_t[1].strip() if len(partes_t) > 1 else ""
+                tiene_emo = any(ord(c) > 0x1F300 for c in t_val)
+                if not tiene_emo and t_val:
+                    if "#shorts" in t_val.lower():
+                        t_val = re.sub(r"(?i)#shorts", "😱🔥 #shorts", t_val).strip()
+                    else:
+                        t_val = f"{t_val} 😱🔥"
+                lineas_corregidas.append(f"TITULO_YOUTUBE: {t_val}")
+            else:
+                lineas_corregidas.append(ln)
+        texto_respuesta = "\n".join(lineas_corregidas)
 
     # --- PASADA 4: AUTO-AUDITORÍA Y RE-EDICIÓN EN RETROSPECTIVA (Hasta 3 Rondas con la Mejor IA) ---
     if auto_auditoria_retrospectiva and texto_respuesta and "[GUION]" in texto_respuesta:

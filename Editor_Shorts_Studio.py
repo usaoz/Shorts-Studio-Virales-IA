@@ -966,19 +966,7 @@ def iniciar_aplicacion_gui() -> None:
     )
     lbl_contador_editados.pack(side="right", padx=(8, 0))
 
-    btn_abrir_carpeta_edit = ctk.CTkButton(
-        editado_header_right,
-        text="Abrir Carpeta",
-        command=lambda: abrir_carpeta_salida(),
-        height=30,
-        corner_radius=12,
-        fg_color=INPUT_BG,
-        hover_color="#1c2438",
-        border_width=1,
-        border_color=CARD_BORDER,
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-    )
-    btn_abrir_carpeta_edit.pack(side="right", padx=(8, 0))
+
 
     def _renderizar_lista_videos_editados() -> None:
         for w in filas_editados_container.winfo_children():
@@ -1820,35 +1808,16 @@ def iniciar_aplicacion_gui() -> None:
             selected_color=PURPLE_MAIN,
         ).pack(fill="x", padx=18, pady=(0, 14))
 
-        # 2. Cerebro IA (Argon 4 / Gemini), Voz y Encuadre
+        # 2. Cerebro IA, Voz del Narrador y Encuadre
         card_cfg = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
         card_cfg.pack(fill="x", padx=24, pady=(0, 8))
-
-        ctk.CTkLabel(
-            card_cfg,
-            text="Modelo de IA para Guiones",
-            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-            text_color=TEXT_MAIN,
-        ).pack(anchor="w", padx=18, pady=(10, 4))
-
-        ctk.CTkOptionMenu(
-            card_cfg,
-            variable=modelo_ia_var,
-            values=list(MAPA_MODELOS_IA.keys()),
-            command=_guardar_memoria,
-            corner_radius=14,
-            height=32,
-            font=ctk.CTkFont(family="Segoe UI", size=12),
-            fg_color="#1e2436",
-            button_color="#2d354d",
-        ).pack(fill="x", padx=18, pady=(0, 8))
 
         ctk.CTkLabel(
             card_cfg,
             text="Voz del Narrador IA",
             font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             text_color=TEXT_MAIN,
-        ).pack(anchor="w", padx=18, pady=(2, 4))
+        ).pack(anchor="w", padx=18, pady=(10, 4))
 
         ctk.CTkOptionMenu(
             card_cfg,
@@ -4591,7 +4560,7 @@ def iniciar_aplicacion_gui() -> None:
             cant_cola = len(links_a_procesar)
         horarios_lote_plan = calcular_lista_horarios_actual()
         es_custom_activo = "Personalizado" in modo_contenido_var.get()
-        pref_modelo_ia = MAPA_MODELOS_IA.get(modelo_ia_var.get(), "gemini-3.6-flash")
+        pref_modelo_ia = "gemini-3.8-flash" 
         if solo_guardar_override is not None:
             solo_guardar = bool(solo_guardar_override)
         else:
@@ -4877,7 +4846,7 @@ def iniciar_aplicacion_gui() -> None:
                         else:
                             _actualizar_milestone_actual("activo", f"Reel {num_actual}: Título con IA...")
                             root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}GENERANDO TÍTULO CON IA..."))
-                            _set_subprogreso(0.45, f"{pref_lote}Analizando video para título viral ({pref_modelo_ia})...", CYAN_ACCENT)
+                            _set_subprogreso(0.45, f"{pref_lote}Analizando video para título viral con IA...", CYAN_ACCENT)
                             try:
                                 generar_guion_con_gemini_flash(
                                     ruta_video=ruta_final,

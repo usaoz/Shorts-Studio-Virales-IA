@@ -1119,51 +1119,9 @@ async def editar_video_con_guion(
         archivos_audio_seg.append(ruta_mix_wav)
         datos_segmentos.append([seg, total_frames_seg, dur_seg_exacta, palabras_sub, rms_env])
 
-    # 2.5 Generar Outro automático de 0.7 segundos con llamada visual al Like (campana ding, flecha y texto neón, sin voz)
-    dur_outro_seg = 0.7
-    total_frames_outro = int(round(FPS * dur_outro_seg))
-
-    print(f"[*] Configurando Outro final de {dur_outro_seg}s con sonido de campana (ding) y texto luminoso (sin voz)...")
-
-    # Subtítulos sincronizados para los 0.7 segundos: ¡DEJA TU LIKE!
-    palabras_sub_outro = [
-        PalabraSubtitulo(texto="¡DEJA", inicio_seg=0.00, fin_seg=0.22),
-        PalabraSubtitulo(texto="TU", inicio_seg=0.22, fin_seg=0.44),
-        PalabraSubtitulo(texto="LIKE!", inicio_seg=0.44, fin_seg=dur_outro_seg, forzar_destaque=True),
-    ]
-
-    # Generar pista de audio para el Outro con sonido de campana (ding)
-    ruta_mix_outro_wav = TEMP_DIR / "seg_outro_mix.wav"
-    sr_audio = gestor_sfx.sr
-    n_samples_outro = int(round(sr_audio * dur_outro_seg))
-    mezcla_outro = np.zeros(n_samples_outro, dtype=np.float32)
-
-    ding_pcm = gestor_sfx.obtener_pcm("ding")
-    if ding_pcm is not None and len(ding_pcm) > 0:
-        n_copiar = min(n_samples_outro, len(ding_pcm))
-        mezcla_outro[:n_copiar] = ding_pcm[:n_copiar] * 0.85
-    else:
-        pop_pcm = gestor_sfx.obtener_pcm("pop")
-        if pop_pcm is not None and len(pop_pcm) > 0:
-            n_copiar = min(n_samples_outro, len(pop_pcm))
-            mezcla_outro[:n_copiar] = pop_pcm[:n_copiar] * 0.85
-
-    # Fade-out suave en los últimos ~60ms para transición limpia
-    fade_samples = min(int(sr_audio * 0.06), n_samples_outro // 4)
-    if fade_samples > 0:
-        mezcla_outro[-fade_samples:] *= np.linspace(1.0, 0.0, fade_samples, dtype=np.float32)
-
-    mezcla_outro = np.clip(mezcla_outro, -0.98, 0.98)
-    pcm_outro_bytes = (mezcla_outro * 32767).astype(np.int16).tobytes()
-
-    with wave.open(str(ruta_mix_outro_wav), "w") as wf_out:
-        wf_out.setnchannels(1)
-        wf_out.setsampwidth(2)
-        wf_out.setframerate(sr_audio)
-        wf_out.writeframes(pcm_outro_bytes)
-
-    archivos_audio_seg.append(ruta_mix_outro_wav)
-    rms_env_outro = calcular_envolvente_rms(ruta_mix_outro_wav, FPS)
+    # 2.5 El video se reproduce íntegro al 100% hasta el último fotograma real sin cortes ni freeze frame difuminado
+    dur_outro_seg = 0.0
+    total_frames_outro = 0
 
     _notificar_prog(0.38, "Masterizando pista de audio final con música de fondo...")
 

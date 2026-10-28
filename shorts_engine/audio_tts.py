@@ -491,12 +491,12 @@ async def generar_voz_y_timestamps_segmento(
 
                 # Ajuste exacto de tempo (sin cambiar el tono) para que la voz LLENE su tramo real de video
                 # de corrido (sin huecos de silencio al final) y nunca lo exceda.
-                factor_atempo = 1.0
+                # Ritmo dinámico, rápido y enérgico para YouTube Shorts:
+                # Base de 1.12x para que nunca hable lento. Si el texto necesita más espacio se acelera hasta 1.28x.
+                factor_atempo = 1.12
                 if dur_objetivo_seg and dur_objetivo_seg > 0.5 and dur_cruda > 0.15:
                     dur_ideal_voz = max(0.35, dur_objetivo_seg - 0.06)
-                    # NUNCA ralentizar la voz por debajo de 1.0x (evita lentitud o pesadez).
-                    # Si el texto es largo, acelera suavemente hasta máx 1.18x (enérgico y natural).
-                    factor_atempo = float(np.clip(dur_cruda / dur_ideal_voz, 1.0, 1.18))
+                    factor_atempo = float(np.clip(dur_cruda / dur_ideal_voz, 1.12, 1.28))
 
                 if abs(factor_atempo - 1.0) > 0.012 and palabras_raw:
                     for p_w in palabras_raw:

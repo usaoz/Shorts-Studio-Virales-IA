@@ -1,8 +1,8 @@
-TITULO_SUPERIOR: Pihu Genio Escuela Comedia
-TITULO_YOUTUBE: ¡La niña más inteligente del planeta! #shorts
-DESCRIPCION_YOUTUBE: Pihu sorprende a todo el mundo con su increíble intelecto cuando el resto parece haber perdido el juicio. ¿Tú podrías resolver este reto tan fácil en segundos? #shorts #comedy #funny #viral #humor
+TITULO_SUPERIOR: Arte de Sandia y Arroz
+TITULO_YOUTUBE: ¡Increíbles esculturas de comida que su padre ignora por completo! #shorts
+DESCRIPCION_YOUTUBE: Esta talentosa niña crea impresionantes esculturas con sandía y arroz que sorprenden a todos. ¿Crees que su padre debería valorar más su gran esfuerzo artístico? #shorts #arte #comida #manualidades #viral
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-29 13:00
+SCHEDULE: 2026-10-28 20:30
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
@@ -10,9 +10,7 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | cash_ting | sorprendido:derecha | centro | ninguno | ¡Esta niña suma dos billetes de cinco y deja a su madre completamente congelada de la impresión!
-00:05 - 00:10 | zoom_in | whoosh | risa:izquierda | ninguna | centro:grande | ¡La mamá verifica la suma en la calculadora y anuncia por megáfono que tiene una genio total!
-00:10 - 00:15 | alerta_roja | riser_suction | sorprendido:derecha | ninguna | ninguno | ¡Al día siguiente en la escuela la maestra pide leer tres letras y nadie es capaz de responder!
-00:15 - 00:20 | temblor | crowd_shocked | sorprendido:izquierda | izquierda | ninguno | ¡Pihu dice el abecedario de memoria y la profesora casi se desmaya del asombro frente a todos!
-00:20 - 00:25 | brillo_epico | ding | risa:derecha | ninguna | ninguno | ¡La maestra le toma las manos agradecida mientras la niña no entiende por qué todos actúan tan raro!
-00:25 - 00:28 | flash | kids_yeyy | fiesta:izquierda | ninguna | ninguno | ¡Al final le entregan un enorme trofeo dorado coronándola como campeona absoluta!
+00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | auto | ninguno | ¡Esta talentosa niña convierte una simple sandía en un tierno perrito con sus propias manos!
+00:05 - 00:10 | zoom_in | cartoon_laugh | risa:izquierda | ninguna | ninguno | ¡Muy orgullosa le muestra su obra maestra a su padre para ver su gran reacción con él!
+00:10 - 00:15 | flash | party_horn | fiesta:derecha | ninguna | centro:grande | ¡Pero su padre simplemente se come la escultura de sandía sin dudar un solo instante!
+00:15 - 00:22 | temblor | error | enojo:izquierda | ninguna | ninguno | ¡Ella continúa creando increíbles tortugas y figuras de arroz que dejan a todos sin palabras mientras su padre prefiere ignorarla!
