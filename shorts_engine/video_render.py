@@ -1212,12 +1212,14 @@ async def editar_video_con_guion(
     pista_musica = seleccionar_musica_fondo(tono_efectivo)
 
     if pista_musica and pista_musica.exists():
-        vol_bgm = max(0.18, min(0.40, getattr(config, "volumen_musica", VOLUMEN_MUSICA_FONDO)))
+        # Volumen óptimo: presente en todo momento pero con ducking sutil cuando la voz habla
+        vol_bgm = max(0.24, min(0.38, getattr(config, "volumen_musica", 0.30)))
         fade_start = max(0.5, dur_total_audio - 0.4)
-        print(f"[*] Música de fondo elegida: '{pista_musica.name}' (tono: '{tono_efectivo}', volumen: {vol_bgm:.2f}).")
+        print(f"[*] Música de fondo con ducking sutil: '{pista_musica.name}' (tono: '{tono_efectivo}', volumen: {vol_bgm:.2f}).")
         filter_str = (
             f"[1:a]volume={vol_bgm:.2f},afade=t=out:st={fade_start:.2f}:d=0.4[bgm];"
-            f"[0:a][bgm]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.98:level=disabled[aout]"
+            f"[bgm][0:a]sidechaincompress=threshold=0.10:ratio=1.8:attack=100:release=350[bgm_duck];"
+            f"[0:a][bgm_duck]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.98:level=disabled[aout]"
         )
         res_mix = subprocess.run(
             [
@@ -1301,6 +1303,7 @@ async def editar_video_con_guion(
         )
 
         ultimo_frame_lienzo: Optional[Image.Image] = None
+        frame_portada_candidato: Optional[Image.Image] = None
 
         try:
             # 5. Renderizar segmento por segmento con seguimiento de objetivos (Optical Flow) y subtítulos luminosos
@@ -1444,6 +1447,13 @@ async def editar_video_con_guion(
                             f"Detalles:\n{err_txt}"
                         )
 
+                    # Capturar fotograma de portada de alto CTR (prioriza círculo/flecha o segundo 2 inicial)
+                    if frame_portada_candidato is None:
+                        if (seg.circulo or seg.flecha) and f_idx == total_frames_seg // 2:
+                            frame_portada_candidato = lienzo.copy()
+                        elif idx_seg == 0 and f_idx == min(total_frames_seg - 1, int(round(FPS * 2.0))):
+                            frame_portada_candidato = lienzo.copy()
+
                     if idx_seg == len(datos_segmentos) - 1 and f_idx == total_frames_seg - 1:
                         ultimo_frame_lienzo = lienzo.copy()
 
@@ -1553,6 +1563,15 @@ async def editar_video_con_guion(
                 except Exception:
                     pass
                 raise RuntimeError(f"FFmpeg finalizó con código {proceso_ffmpeg.returncode}.\nDetalles:\n{err_txt}")
+
+            # Guardar fotograma clave de portada (miniatura para YouTube Shorts)
+            if frame_portada_candidato is not None:
+                try:
+                    ruta_portada = OUTPUT_DIR / f"portada_{ruta_mp4_final.stem}.jpg"
+                    frame_portada_candidato.convert("RGB").save(str(ruta_portada), "JPEG", quality=95)
+                    print(f"[+] Fotograma clave de portada guardado: {ruta_portada.name}")
+                except Exception as e_portada:
+                    print(f"[!] No se pudo guardar fotograma de portada: {e_portada}")
 
             return ruta_mp4_final
         finally:

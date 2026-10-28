@@ -11,7 +11,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 from .config import (
-    BASE_DIR, DEFAULT_VIDEO_INPUT, WIN_NO_WINDOW, WIN_STARTUPINFO
+    BASE_DIR, DEFAULT_VIDEO_INPUT, WIN_NO_WINDOW, WIN_STARTUPINFO,
+    HORARIOS_PICO_POR_DIA, HORARIOS_PICO_OPTIMOS
 )
 
 # ==============================================================================
@@ -482,14 +483,7 @@ def buscar_short_viral_en_canal(
     return None
 
 
-HORARIOS_PICO_OPTIMOS: Dict[int, List[str]] = {
-    1: ["19:00"],
-    2: ["13:00", "20:00"],
-    3: ["12:30", "17:30", "21:00"],
-    4: ["11:00", "15:00", "18:30", "21:30"],
-    5: ["10:00", "13:00", "16:00", "19:00", "22:00"],
-    6: ["09:30", "12:00", "14:30", "17:00", "19:30", "22:00"],
-}
+# Referencia compartida importada desde config.py (HORARIOS_PICO_POR_DIA y HORARIOS_PICO_OPTIMOS)
 
 
 def calcular_horarios_inteligentes(
@@ -555,11 +549,24 @@ def calcular_horarios_inteligentes(
         return slots
 
     if "Pico" in modo_horario:
-        horas_del_dia = HORARIOS_PICO_OPTIMOS.get(por_dia, HORARIOS_PICO_OPTIMOS[2])
         d_cursor = d_base
         guard = 0
         while len(slots) < cantidad_total and guard < 60:
             guard += 1
+            # Horarios adaptados al perfil del día específico (0=Lunes ... 6=Domingo)
+            dia_sem = d_cursor.weekday()
+            if dia_sem in (0, 1):
+                perfil_dia = "lunes_martes"
+            elif dia_sem in (2, 3):
+                perfil_dia = "miercoles_jueves"
+            elif dia_sem == 4:
+                perfil_dia = "viernes"
+            else:
+                perfil_dia = "fin_de_semana"
+
+            mapa_dia = HORARIOS_PICO_POR_DIA.get(perfil_dia, HORARIOS_PICO_OPTIMOS)
+            horas_del_dia = mapa_dia.get(por_dia, mapa_dia.get(2, ["13:00", "20:00"]))
+
             for h_str in horas_del_dia:
                 hh, mm = [int(x) for x in h_str.split(":", 1)]
                 dt_cand = _dt.datetime(d_cursor.year, d_cursor.month, d_cursor.day, hh, mm)

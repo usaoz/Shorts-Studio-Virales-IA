@@ -494,7 +494,8 @@ async def generar_voz_y_timestamps_segmento(
                 factor_atempo = 1.0
                 if dur_objetivo_seg and dur_objetivo_seg > 0.5 and dur_cruda > 0.15:
                     dur_ideal_voz = max(0.35, dur_objetivo_seg - 0.06)
-                    factor_atempo = float(np.clip(dur_cruda / dur_ideal_voz, 0.80, 2.4))
+                    # Límite estricto de aceleración a 1.22x para evitar voces robóticas o apresuradas
+                    factor_atempo = float(np.clip(dur_cruda / dur_ideal_voz, 0.85, 1.22))
 
                 if abs(factor_atempo - 1.0) > 0.012 and palabras_raw:
                     for p_w in palabras_raw:

@@ -1,8 +1,12 @@
-TITULO_SUPERIOR: Abuela Reta Joven Vehículo Escaleras
-TITULO_YOUTUBE: ¡Abuela reta a joven en sus vehículos! #shorts
-DESCRIPCION_YOUTUBE: Una abuela y un joven se retan a subir escaleras con sus vehículos eléctricos. ¡Mira quién gana esta increíble competencia! #shorts #humor #fail #viral
+TITULO_SUPERIOR: Broma de Riñón y Refrigerador Hermano
+TITULO_YOUTUBE: ¡Le hizo una broma de riñón y se arrepintió! #shorts
+DESCRIPCION_YOUTUBE: #Comedy #Funny #ComedyVideo #FunnyVideo #ComedyShorts #FunnyShorts #ComedyClips #FunnyClips #Hilarious #LOL #LaughOutLoud #YouTubeShorts
+
+comedy, funny video, comedy shorts, funny shorts, hilarious, viral comedy, comedy clips, entertainment, YouTube Shorts
+
+He Pranked His Brother by Pretending to Take His Kidney… But the Fridge Made It Even Funnier
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-29 15:30
+SCHEDULE: 2026-10-31 20:00
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
@@ -10,7 +14,9 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | izquierda | ninguno | ¡Este joven reta a su abuela a subir estas escaleras con sus vehículos eléctricos! ¡La competencia empieza ya mismo!
-00:05 - 00:10 | zoom_in | whoosh | risa:izquierda | ninguna | ninguno | ¡El chico intenta subir su moto blanca pero batalla muchísimo mientras la abuela avanza segura con su scooter rojo!
-00:10 - 00:15 | alerta_roja | riser_suction | diablo:derecha | ninguna | centro:grande | ¡Llegan a los escalones y la abuela los cruza sin ningún problema, demostrando la fuerza de su vehículo!
-00:15 - 00:21 | temblor | punch+cartoon_laugh | fiesta:derecha | derecha | ninguno | ¡El joven intenta maniobrar pero termina perdiendo el control mientras la abuela triunfa de forma absoluta!
+00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | auto | ninguno | ¡Mira cómo este chico le hace una broma extrema a su hermano durmiendo! ¡Le muestra un plato con un trozo de carne simulando su riñón!
+00:05 - 00:10 | zoom_in | whoosh+xp_Error | enojo:izquierda | ninguna | ninguno | ¡El hermano despierta totalmente confundido y asustado al ver su propia panza vendada! ¡Se cree por completo que le quitaron un órgano por un teléfono!
+00:10 - 00:15 | alerta_roja | riser_suction | diablo:derecha | ninguna | izquierda:grande | ¡Desesperado intenta reclamar su riñón mientras el bromista se lo lleva rápidamente a la cocina! ¡No puede creer que hayan hecho semejante locura!
+00:15 - 00:20 | temblor | punch+cartoon_laugh | risa:izquierda | derecha | ninguno | ¡Unos minutos después están comiendo juntos como si nada mientras el bromista disfruta el trozo de carne! ¡El hermano cree que se está comiendo su propio órgano con asco!
+00:20 - 00:25 | flash | camera_flash | fiesta:derecha | ninguna | ninguno | ¡Cuando le confiesa que solo era comida del refrigerador, el hermano explota de rabia y empieza a golpearlo con furia incontrolable!
+00:25 - 00:27 | brillo_epico | cash_ting+party_horn | enojo:izquierda | ninguna | ninguno | ¡Una venganza perfecta y muy graciosa que terminó con una paliza inolvidable entre risas!

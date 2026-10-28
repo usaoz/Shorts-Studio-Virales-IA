@@ -167,14 +167,47 @@ class PalabraSubtitulo:
     fin_seg: float
     forzar_destaque: bool = False
 
-HORARIOS_PICO_OPTIMOS: Dict[int, List[str]] = {
-    1: ["19:00"],
-    2: ["13:00", "20:00"],
-    3: ["12:30", "17:30", "21:00"],
-    4: ["11:00", "15:00", "18:30", "21:30"],
-    5: ["10:00", "13:00", "16:00", "19:00", "22:00"],
-    6: ["09:30", "12:00", "14:30", "17:00", "19:30", "22:00"],
+# Horarios pico dinámicos según el día de la semana (0=Lunes, ..., 6=Domingo)
+HORARIOS_PICO_POR_DIA: Dict[str, Dict[int, List[str]]] = {
+    # Lunes y Martes (Arranque semanal: almuerzo y desconexión tarde/noche)
+    "lunes_martes": {
+        1: ["19:30"],
+        2: ["13:30", "20:00"],
+        3: ["13:00", "18:30", "21:00"],
+        4: ["12:30", "15:30", "19:00", "21:30"],
+        5: ["11:30", "13:30", "17:00", "19:30", "22:00"],
+        6: ["10:30", "12:30", "15:00", "17:30", "20:00", "22:00"],
+    },
+    # Miércoles y Jueves (Mitad de semana: pausas activas y relax nocturno)
+    "miercoles_jueves": {
+        1: ["20:30"],
+        2: ["13:00", "20:30"],
+        3: ["12:30", "17:30", "21:00"],
+        4: ["11:30", "14:30", "18:00", "21:30"],
+        5: ["11:00", "13:30", "16:30", "19:00", "22:00"],
+        6: ["10:00", "12:30", "15:00", "17:30", "19:30", "22:00"],
+    },
+    # Viernes (Jornada que termina temprano y noche de inicio de fin de semana)
+    "viernes": {
+        1: ["21:00"],
+        2: ["13:00", "20:30"],
+        3: ["12:30", "17:00", "21:30"],
+        4: ["11:30", "14:30", "18:00", "21:30"],
+        5: ["11:00", "13:30", "16:30", "19:30", "22:30"],
+        6: ["10:00", "12:30", "15:00", "17:00", "19:30", "22:30"],
+    },
+    # Sábado y Domingo (Fin de semana: ocio matutino tardío, tarde de descanso y prime time nocturno)
+    "fin_de_semana": {
+        1: ["19:30"],
+        2: ["11:30", "20:00"],
+        3: ["11:00", "16:00", "20:30"],
+        4: ["10:30", "14:30", "18:00", "21:00"],
+        5: ["10:00", "12:30", "15:30", "18:30", "21:30"],
+        6: ["09:30", "11:30", "14:00", "16:30", "19:00", "21:30"],
+    },
 }
+
+HORARIOS_PICO_OPTIMOS: Dict[int, List[str]] = HORARIOS_PICO_POR_DIA["miercoles_jueves"]
 
 
 def _quitar_acentos(texto: str) -> str:

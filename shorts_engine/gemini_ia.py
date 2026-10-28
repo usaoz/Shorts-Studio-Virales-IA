@@ -185,15 +185,15 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
 6. CIRCULO (`circulo_rojo.png`):
    - Rodea el objeto o revelación más impactante del video: usa `auto`, `izquierda`, `derecha`, `centro` (opcional `:grande`), coordenada `X,Y`, o `ninguno`.
    - **LÍMITE ESTRICTO**: usa el círculo en **1 bloque COMO MÁXIMO** en todo el guion. En todos los demás escribe `ninguno`.
-7. TEXTO (Narración de Voz IA continua + Subtítulos Luminosos):
-   - Entre **18 y 20 palabras por cada bloque de 5 segundos** con máxima emoción (`¡!`). Narra siempre lo que pasa en el video sin pedir likes ni suscripciones.
+7. TEXTO (Narración de Voz IA con Cadencia Natural y Dinámica):
+   - Entre **13 y 15 palabras por cada bloque de 5 segundos** (~2.8 a 3.0 palabras/segundo) con máxima emoción (`¡!`). Esta cadencia exacta es perfecta para que la voz IA suene humana, enérgica y fluida, SIN ACELERARSE ni atropellarse. Narra siempre lo que pasa en el video sin pedir likes ni suscripciones.
 
 ================================================================================
 PLANTILLA DE ENTREGA OBLIGATORIA:
 ================================================================================
 TITULO_SUPERIOR: [Nombre corto de 4-5 palabras para el archivo MP4, ej: Abuela Venganza Epica Troleo]
 TITULO_YOUTUBE: [Título viral llamativo y #shorts, ej: ¡La mejor venganza de la abuela! #shorts]
-DESCRIPCION_YOUTUBE: [Descripción atrapante de 2 oraciones + pregunta a la audiencia + hashtags #shorts #humor #fail #viral]
+DESCRIPCION_YOUTUBE: [Descripción atrapante de 2 oraciones + pregunta a la audiencia + 4 o 5 hashtags hiper-específicos del nicho real del video (ej: si es de perros #shorts #perros #mascotas #viral; si es de autos #shorts #autos #carreras #viral; etc.)]
 ESTADO_PUBLICACION: privado
 SCHEDULE: auto
 PARA_NINOS: no
@@ -312,7 +312,7 @@ def generar_guion_con_gemini_flash(
         f"{bloque_contexto_real}\n"
         f"DATOS EXACTOS DEL VIDEO ANALIZADO:\n"
         f"- Duración total exacta del video: {dur_redondeada} segundos (de 00:00 a 00:{dur_redondeada:02d}).\n"
-        f"- Divide los bloques de 00:00 hasta 00:{dur_redondeada:02d} en tramos de 5 segundos (18 a 20 palabras por bloque, hablando de corrido sin silencios de principio a fin).\n"
+        f"- Divide los bloques de 00:00 hasta 00:{dur_redondeada:02d} en tramos de 5 segundos (EXACTAMENTE entre 13 y 15 palabras por bloque de 5s, o ~2.8 palabras/segundo, para que la voz suene enérgica y fluida sin apuros ni aceleraciones).\n"
         f"- En ESTADO_PUBLICACION escribe: {modo_privacidad}\n"
         f"- En SCHEDULE escribe: {schedule_str.strip() if schedule_str.strip() else 'no'}\n"
         f"- En PARA_NINOS escribe: no\n"
@@ -395,79 +395,89 @@ def generar_guion_con_gemini_flash(
             t = "\n".join(lineas).strip()
         return t
 
-    # --- PASADA 1: Enfoque en Gancho Viral y Ritmo ---
+    # --- PASADA 1: Interpretación Real y Contexto Profundo del Video ---
     if callable(progreso_cb):
         try:
-            progreso_cb(0.15, "IA Pasada 1/3: Creando gancho viral y ritmo...")
+            progreso_cb(0.15, "IA Pasada 1/3: Analizando e interpretando el video real...")
         except Exception:
             pass
-    print("[*] IA Pasada 1/3: Creando guión con enfoque en Gancho Viral y Ritmo...")
+    print("[*] IA Pasada 1/3: Analizando video y metadatos para interpretación real y certera...")
     prompt_p1 = (
-        PROMPT_COMPACTO_INTERNO + instruccion_extra_base +
-        "\n[DIRECTIVA DE ENFOQUE 1 - RITMO Y GANCHO VIRAL]:\n"
-        "Concéntrate en generar un hook inicial explosivo en los primeros 3 segundos con preguntas o misterio, "
-        "con ritmo dinámico continuo que atrape la atención sin soltar al espectador.\n"
-        "Entrega ÚNICAMENTE el bloque de guion:"
+        "ACTÚA COMO UN ANALISTA EXPERTO EN CONTENIDO AUDIOVISUAL Y NARRATIVA DIGITAL.\n"
+        f"Tu tarea en esta PASADA 1 es analizar minuciosamente el video adjunto y contrastarlo con su TÍTULO y DESCRIPCIÓN originales.\n"
+        f"{bloque_contexto_real}\n"
+        f"Duración total del video: {dur_redondeada} segundos.\n\n"
+        "Genera un informe conciso y preciso que responda:\n"
+        "1. SUJETOS Y OBJETOS REALES: ¿Quiénes o qué aparecen exactamente? (sin inventar ni confundir juguetes, personas o animales).\n"
+        "2. CRONOLOGÍA DE ACCIONES: ¿Qué ocurre paso a paso a lo largo del video?\n"
+        "3. EL GIRO / CLÍMAX O DESENLACE: ¿Cómo termina la situación o cuál es el momento más gracioso/impactante?\n"
+        "4. NICHO REAL: ¿A qué categoría temática pertenece? (ej: mascotas/perros, autos/motos, cocina, bromas familiares, etc.).\n\n"
+        "Entrega tu análisis de forma directa, descriptiva y clara:"
     )
-    guion_1_raw = _consultar_ia_robusta(prompt_p1, timeout_max=40.0)
-    guion_1 = _limpiar_bloque(guion_1_raw)
+    analisis_1_raw = _consultar_ia_robusta(prompt_p1, timeout_max=40.0)
+    analisis_1 = _limpiar_bloque(analisis_1_raw)
 
-    # --- PASADA 2: Enfoque en Observación Visual y Precisión de Hechos ---
+    # --- PASADA 2: Detección de Momentos Clave para Efectos (SFX, Flechas, Visuales) ---
     if callable(progreso_cb):
         try:
-            progreso_cb(0.50, "IA Pasada 2/3: Analizando precisión visual de objetos y acciones...")
+            progreso_cb(0.50, "IA Pasada 2/3: Detectando momentos clave para efectos de sonido y flechas...")
         except Exception:
             pass
-    print("[*] IA Pasada 2/3: Creando guión con enfoque en Precisión Visual y Hechos...")
+    print("[*] IA Pasada 2/3: Detectando momentos clave para SFX, flechas y elementos visuales...")
     prompt_p2 = (
-        PROMPT_COMPACTO_INTERNO + instruccion_extra_base +
-        "\n[DIRECTIVA DE ENFOQUE 2 - PRECISIÓN VISUAL Y HECHOS]:\n"
-        "Concéntrate en observar con lupa cada segundo del video, qué objetos reales se tocan, qué hace la persona "
-        "con sus manos y qué sucede realmente sin confundir ningún elemento ni inventar cosas.\n"
-        "Entrega ÚNICAMENTE el bloque de guion:"
+        "ACTÚA COMO UN DIRECTOR DE EDICIÓN Y DISEÑADOR DE SONIDO/EFECTOS PARA YOUTUBE SHORTS.\n"
+        f"Analiza minuciosamente el video de {dur_redondeada} segundos para detectar los momentos visuales y sonoros de mayor impacto.\n"
+        f"Dividiendo la duración en bloques de 5 segundos (de 00:00 a 00:{dur_redondeada:02d}), indica para cada bloque:\n"
+        "- SFX RECOMENDADO: Qué efecto sonoro encaja con lo que pasa en pantalla (elige entre: crowd_shocked, whoosh, riser_suction, ding, good_idea, cash_ting, punch, camera_flash, cartoon_laugh, kids_yeyy, party_horn, error, xp_Error, fart, click, pop, ninguno).\n"
+        "- FLECHA ROJA (apuntando al sujeto u objeto principal en movimiento): si corresponde en este bloque (máximo en 2 bloques clave de todo el video, resto 'ninguna'). Opciones: 'auto', 'izquierda', 'derecha', 'centro', 'X,Y' o 'ninguna'.\n"
+        "- CÍRCULO ROJO (resaltando la revelación/sorpresa máxima): si corresponde (máximo en 1 bloque de todo el video, resto 'ninguno'). Opciones: 'auto', 'izquierda', 'derecha', 'centro:grande' o 'ninguno'.\n"
+        "- EMOJI: 'sorprendido', 'risa', 'fiesta', 'diablo', 'enojo', 'lloro', 'sueno' o 'ninguno'.\n\n"
+        "Entrega el desglose temporal sugerido bloque por bloque:"
     )
-    guion_2_raw = _consultar_ia_robusta(prompt_p2, timeout_max=40.0)
-    guion_2 = _limpiar_bloque(guion_2_raw)
+    analisis_2_raw = _consultar_ia_robusta(prompt_p2, timeout_max=40.0)
+    analisis_2 = _limpiar_bloque(analisis_2_raw)
 
-    # --- PASADA 3: Fusión Crítica y Perfeccionamiento Maestro ---
+    # --- PASADA 3: Fusión Maestra y Redacción del Guion Viral Definitivo ---
     if callable(progreso_cb):
         try:
-            progreso_cb(0.80, "IA Pasada 3/3: Fusionando y perfeccionando el guión maestro...")
+            progreso_cb(0.80, "IA Pasada 3/3: Fusionando guion maestro con fluidez y hashtags de nicho...")
         except Exception:
             pass
-    print("[*] IA Pasada 3/3: Fusionando lo mejor de ambos guiones en la versión maestra definitiva...")
+    print("[*] IA Pasada 3/3: Redactando guion maestro definitivo con fluidez, sentido y hashtags...")
     prompt_p3 = (
-        f"ACTÚA COMO EL DIRECTOR Y EDITOR JEFE DE CONTENIDO VIRAL DE YOUTUBE SHORTS.\n"
-        f"Tienes dos borradores generados para el mismo video:\n\n"
-        f"--- [BORRADOR A - GANCHO VIRAL Y RITMO] ---\n{guion_1}\n\n"
-        f"--- [BORRADOR B - PRECISIÓN VISUAL Y DETALLES REALES] ---\n{guion_2}\n\n"
-        f"CONTEXTO ORIGINAL DEL VIDEO:\n{bloque_contexto_real}\n\n"
+        PROMPT_COMPACTO_INTERNO + instruccion_extra_base +
+        f"\n\nACTÚA COMO EL GUIONISTA Y DIRECTOR JEFE DE YOUTUBE SHORTS VIRALES.\n"
+        f"Tienes a tu disposición dos análisis especializados del mismo video:\n\n"
+        f"--- [ANÁLISIS 1: INTERPRETACIÓN REAL Y HECHOS DEL VIDEO] ---\n{analisis_1}\n\n"
+        f"--- [ANÁLISIS 2: MAPA DE MOMENTOS CLAVE PARA SFX Y FLECHAS] ---\n{analisis_2}\n\n"
         f"TU MISIÓN DE FUSIÓN CRÍTICA:\n"
-        f"1. Combina el gancho más atrapante y adictivo del Borrador A con la exactitud de objetos y giros reales del Borrador B.\n"
-        f"2. Asegúrate de que no haya ninguna confusión sobre los objetos ni acciones.\n"
-        f"3. Coloca las FLECHAS (máximo 2 bloques clave: 'auto', 'izquierda', 'derecha', 'centro' o coordenada X,Y apuntando al objeto o sujeto principal en movimiento) y CÍRCULOS (máximo 1 bloque clave: 'auto', 'izquierda', 'derecha', 'centro:grande'), EMOJIS y SFX en los momentos de mayor impacto, sorpresa o revelación del video.\n"
-        f"4. Mantén exactamente los tiempos (de 00:00 a 00:{dur_redondeada:02d}), cada bloque de 5 segundos, y el encabezado de metadatos exacto.\n"
-        f"Entrega ÚNICAMENTE el bloque de guion final estructurado:\n\n"
-        f"TITULO_SUPERIOR: ...\nTITULO_YOUTUBE: ...\nDESCRIPCION_YOUTUBE: ...\n"
-        f"ESTADO_PUBLICACION: {modo_privacidad}\nSCHEDULE: {schedule_str.strip() if schedule_str.strip() else 'no'}\n"
-        f"PARA_NINOS: no\nMODO_ENCUADRE: full\nTONO_VIDEO: fondo\nARCHIVO_SALIDA: auto\n\n"
-        f"[GUION]\nTIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO\n"
+        f"1. NARRATIVA FLUIDA Y CON SENTIDO: Cuenta exactamente lo que ocurre según el Análisis 1, con máxima intriga, humor o emoción, pero SIN inventar elementos contrarios a la realidad.\n"
+        f"2. CADENCIA DE VOZ NATURAL (¡REGLA DE ORO!): Escribe ESTRICTAMENTE entre 13 y 15 palabras por cada bloque de 5 segundos (~2.8 palabras/segundo). NUNCA escribas más de 15 palabras por bloque para garantizar que la voz IA suene humana, enérgica y fluida sin apurarse ni acelerar el audio.\n"
+        f"3. EFECTOS Y SFX: Incorpora el mapa de efectos del Análisis 2 (flecha máx 2 bloques, círculo máx 1 bloque, emojis y sfx sincronizados con los momentos cumbre).\n"
+        f"4. HASHTAGS DE NICHO REAL: En DESCRIPCION_YOUTUBE, escribe una descripción atractiva de 2 oraciones, pregunta para debate en comentarios, y 4 o 5 hashtags hiper-específicos del nicho (ej: #shorts #perros #mascotas #viral; #shorts #autos #carreras #viral; etc.).\n\n"
+        f"Entrega ÚNICAMENTE el bloque de guion final estructurado con la plantilla obligatoria:"
     )
 
     try:
-        guion_final_raw = _consultar_ia_robusta(prompt_p3, timeout_max=35.0)
+        guion_final_raw = _consultar_ia_robusta(prompt_p3, timeout_max=45.0)
         guion_final = _limpiar_bloque(guion_final_raw)
         if guion_final and "[GUION]" in guion_final and len(guion_final) > 150:
             texto_respuesta = guion_final
             print("[+] ¡Pasada 3 completada con éxito! Guión maestro sintetizado.")
         else:
-            texto_respuesta = guion_1 if "[GUION]" in guion_1 else guion_2
+            # Fallback de emergencia si la pasada 3 falló
+            print("[!] Pasada 3 no entregó estructura completa, generando síntesis directa...")
+            prompt_fallback = PROMPT_COMPACTO_INTERNO + instruccion_extra_base + f"\n\n[INFORME PREVIO]:\n{analisis_1}\n\nEntrega ÚNICAMENTE el guion:"
+            fb_raw = _consultar_ia_robusta(prompt_fallback, timeout_max=35.0)
+            texto_respuesta = _limpiar_bloque(fb_raw)
     except Exception as err_p3:
-        print(f"[!] Fusión de pasada 3 tuvo un problema ({err_p3}), usando el mejor borrador disponible.")
-        texto_respuesta = guion_1 if "[GUION]" in guion_1 else guion_2
+        print(f"[!] Fusión de pasada 3 tuvo un problema ({err_p3}), intentando síntesis de respaldo...")
+        prompt_fallback = PROMPT_COMPACTO_INTERNO + instruccion_extra_base + f"\n\n[INFORME PREVIO]:\n{analisis_1}\n\nEntrega ÚNICAMENTE el guion:"
+        fb_raw = _consultar_ia_robusta(prompt_fallback, timeout_max=35.0)
+        texto_respuesta = _limpiar_bloque(fb_raw)
 
     if not texto_respuesta or "[GUION]" not in texto_respuesta:
-        texto_respuesta = guion_1 or guion_2
+        texto_respuesta = guion_final or fb_raw or ""
 
     DEFAULT_GUION_TXT.write_text(texto_respuesta + "\n", encoding="utf-8")
     print(f"[+] ¡Guión final perfeccionado y guardado en {DEFAULT_GUION_TXT.name}!")

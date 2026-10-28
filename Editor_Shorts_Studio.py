@@ -4572,6 +4572,11 @@ def iniciar_aplicacion_gui() -> None:
                     )
 
                 def _on_ok() -> None:
+                    try:
+                        import winsound
+                        winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS | winsound.SND_ASYNC)
+                    except Exception:
+                        pass
                     if solo_guardar:
                         txt_fin = (
                             f"100% — ¡Se crearon y guardaron todos los Reels ({len(videos_seleccionados)}) en output_shorts!"
