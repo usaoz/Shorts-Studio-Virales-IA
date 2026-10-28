@@ -346,12 +346,12 @@ def vincular_nueva_cuenta_interactivo(secret_path: Optional[Path] = None) -> Dic
 
 def mostrar_guia_configuracion() -> None:
     print("=" * 80)
-    print("⚡ CONFIGURACIÓN DE YOUTUBE DATA API v3 (Solo se hace 1 vez)")
+    print("CONFIGURACION DE YOUTUBE DATA API v3 (Solo se hace 1 vez)")
     print("=" * 80)
     print("Para que este script pueda subir tus videos a YouTube automáticamente:")
     print()
     print("1. Entra a Google Cloud Console con la cuenta de tu canal:")
-    print("   👉 https://console.cloud.google.com/")
+    print("   -> https://console.cloud.google.com/")
     print()
     print("2. Crea un proyecto nuevo (ej. 'Shorts Uploader').")
     print()
@@ -371,7 +371,7 @@ def mostrar_guia_configuracion() -> None:
     print("   - Haz clic en 'Crear'.")
     print()
     print("6. Descarga el archivo JSON generado, renómbralo a:")
-    print(f"   👉 client_secrets.json")
+    print(f"   -> client_secrets.json")
     print(f"   y pégalo en esta carpeta: {BASE_DIR}")
     print()
     print("=" * 80)
@@ -568,7 +568,7 @@ def extraer_metadatos_guion(ruta_guion: Optional[Path] = None) -> Dict[str, Any]
                     res["titulo_youtube"] = v_val
             elif k_clean in ("TITULO_SUPERIOR", "TITULO") and not res["titulo_youtube"]:
                 if v_val and v_val.lower() not in ("auto", "none", "ninguno", "-"):
-                    res["titulo_youtube"] = f"¡{v_val}! 😱🔥 #shorts"
+                    res["titulo_youtube"] = f"¡{v_val}! #shorts"
             elif k_clean in ("DESCRIPCION_YOUTUBE", "YOUTUBE_DESCRIPCION", "DESCRIPCION"):
                 if v_val and v_val.lower() not in ("auto", "none", "ninguno", "-"):
                     res["descripcion_youtube"] = v_val
@@ -618,11 +618,11 @@ def subir_video(
 
     nombre_limpio = ruta_video.stem.replace("_", " ").strip()
 
-    titulo_final = titulo or meta.get("titulo_youtube") or f"¡{nombre_limpio}! 😱🔥 #shorts"
+    titulo_final = titulo or meta.get("titulo_youtube") or f"¡{nombre_limpio}! #shorts"
 
     descripcion_final = descripcion or meta.get("descripcion_youtube") or (
-        f"¡Mira lo que ocurrió en este video! 🤣💀 ¿Qué hubieras hecho tú? Déjamelo en los comentarios 👇\n\n"
-        f"Suscríbete para más momentos virales diarios ⚡🔔\n\n"
+        f"¡Mira lo que ocurrió en este video! ¿Qué hubieras hecho tú? Déjamelo en los comentarios:\n\n"
+        f"Suscríbete para más momentos virales diarios.\n\n"
         f"#shorts #viral #humor #comedia #shortsfeed"
     )
 
@@ -663,7 +663,7 @@ def subir_video(
 
     tam_mb = ruta_video.stat().st_size / (1024 * 1024)
     print("=" * 80)
-    print(f"🚀 SUBIENDO VIDEO A YOUTUBE:")
+    print(f"SUBIENDO VIDEO A YOUTUBE:")
     print(f"   Archivo:    {ruta_video.name} ({tam_mb:.2f} MB)")
     print(f"   Título:     {titulo_final}")
     print(f"   Para Niños: {'SÍ (Contenido para niños)' if kids_final else 'NO (Audiencia general / Monetización y comentarios activos)'}")
@@ -735,9 +735,9 @@ def subir_video(
     url_normal = f"https://youtu.be/{video_id}"
 
     print("=" * 80)
-    print(f"🎉 TU SHORT YA ESTÁ EN YOUTUBE:")
-    print(f"   👉 Link Short: {url_short}")
-    print(f"   👉 Link Video: {url_normal}")
+    print(f"TU SHORT YA ESTÁ EN YOUTUBE:")
+    print(f"   -> Link Short: {url_short}")
+    print(f"   -> Link Video: {url_normal}")
     print("=" * 80)
     return video_id
 
@@ -767,7 +767,7 @@ def actualizar_video_existente(
     priv_final = privacidad or meta.get("estado_publicacion", "private")
 
     print("=" * 80)
-    print(f"🔄 ACTUALIZANDO METADATOS EN YOUTUBE (Video ID: {video_id}):")
+    print(f"ACTUALIZANDO METADATOS EN YOUTUBE (Video ID: {video_id}):")
     if titulo_final:
         print(f"   Título:     {titulo_final}")
     print(f"   Para Niños: {'SÍ (Kids)' if kids_final else 'NO (Audiencia general)'}")
@@ -808,8 +808,8 @@ def actualizar_video_existente(
 
     try:
         youtube.videos().update(part="snippet,status", body=cuerpo).execute()
-        print(f"✅ ¡Video {video_id} actualizado exitosamente en YouTube!")
-        print(f"👉 Link: https://youtube.com/shorts/{video_id}")
+        print(f"[+] ¡Video {video_id} actualizado exitosamente en YouTube!")
+        print(f"-> Link: https://youtube.com/shorts/{video_id}")
     except HttpError as err:
         print(f"[!] Error al actualizar video en YouTube: {err}")
         raise
@@ -824,12 +824,12 @@ def verificar_canal_youtube() -> None:
         if items:
             canal = items[0]["snippet"]["title"]
             print("=" * 80)
-            print(f"✅ ¡CONEXIÓN EXITOSA! Canal vinculado: {canal}")
+            print(f"[+] ¡CONEXIÓN EXITOSA! Canal vinculado: {canal}")
             print("=" * 80)
             print("Tu token de sesión quedó guardado. A partir de ahora, cada vez que")
             print("generes un video nuevo, puedes publicarlo con 'Subir_Short_YouTube.bat'.")
         else:
-            print("✅ Conectado a la API de YouTube correctamente.")
+            print("[+] Conectado a la API de YouTube correctamente.")
     except Exception as e:
         print(f"[!] Error al consultar información del canal: {e}")
 
@@ -1031,7 +1031,7 @@ def obtener_metricas_ultimos_videos(limite_por_cuenta: int = 20, total_max: int 
 
 if __name__ == "__main__":
     print("==============================================================================")
-    print(" ⚡ SUBIDOR AUTOMÁTICO DE SHORTS A YOUTUBE")
+    print(" SUBIDOR AUTOMÁTICO DE SHORTS A YOUTUBE")
     print("==============================================================================")
 
     import argparse
