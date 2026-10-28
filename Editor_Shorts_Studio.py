@@ -91,7 +91,7 @@ def iniciar_aplicacion_gui() -> None:
 
     root = ctk.CTk()
     root.title("Shorts Studio")
-    root.minsize(840, 460)
+    root.minsize(840, 320)
     root.configure(fg_color="#0b0d13")
 
     def autoajustar_tamano_ventana() -> None:
@@ -3253,11 +3253,10 @@ def iniciar_aplicacion_gui() -> None:
     barra_progreso_proceso.pack(fill="x", padx=20, pady=(2, 10))
     barra_progreso_proceso.set(0.0)
 
-    frame_milestones = ctk.CTkFrame(progress_card, fg_color="transparent")
-    frame_milestones.pack(fill="x", padx=18, pady=(0, 6))
+    frame_milestones = ctk.CTkFrame(progress_card, fg_color="transparent", height=0)
 
     row_frenar_proceso = ctk.CTkFrame(progress_card, fg_color="transparent")
-    row_frenar_proceso.pack(fill="x", padx=18, pady=(4, 12))
+    row_frenar_proceso.pack(fill="x", padx=18, pady=(0, 10))
 
     evento_cancelar = threading.Event()
 
@@ -3303,7 +3302,10 @@ def iniciar_aplicacion_gui() -> None:
         for w in frame_milestones.winfo_children():
             w.destroy()
         if len(estados_reels) <= 1:
+            frame_milestones.pack_forget()
+            autoajustar_tamano_ventana()
             return
+        frame_milestones.pack(fill="x", padx=18, pady=(0, 6), before=row_frenar_proceso)
         for item_m in estados_reels:
             est_tipo = item_m.get("tipo", "pendiente")
             txt_m = item_m.get("texto", "")

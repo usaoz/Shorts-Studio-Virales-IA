@@ -1,8 +1,8 @@
-TITULO_SUPERIOR: El Padre Con Expectativas De Oro
-TITULO_YOUTUBE: ¡Las expectativas de este padre con su bebé! 🏎️😂 #shorts
-DESCRIPCION_YOUTUBE: Este padre imaginaba un futuro brillante para su hijo, pero la realidad fue totalmente distinta. ¿Cuál de todas las divertidas expectativas te pareció la más graciosa? #shorts #comedia #bebes #humor #padres
+TITULO_SUPERIOR: Izquierda O Derecha Sorpresa Hermano
+TITULO_YOUTUBE: ¡Eligió la peor opción en el reto! 😱🎂 #shorts
+DESCRIPCION_YOUTUBE: Dos hermanos juegan al reto de izquierda o derecha con sorpresas muy divertidas. ¿Qué te pareció el gran final? #shorts #comedy #funny #challenge #viral
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-29 13:00
+SCHEDULE: 2026-10-29 20:30
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
@@ -10,10 +10,8 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | whoosh | sorprendido:derecha | centro | ninguno | ¡Este padre observa totalmente concentrado a su pequeño bebé mientras juega muy tranquilo con sus carritos!
-00:05 - 00:10 | zoom_in | cartoon_laugh | risa:izquierda | ninguna | centro:grande | ¡Imagina que su hijo será un veloz piloto y corre emocionado a ver un superdeportivo real!
-00:10 - 00:15 | flash | cash_ting | risa:derecha | ninguna | ninguno | ¡Pero sorpresa total, sale del lujoso concesionario cargando únicamente un diminuto auto de juguete pequeño!
-00:15 - 00:20 | temblor | error | risa:izquierda | ninguna | ninguno | ¡Para recuperar la inversión, el papá se sienta desesperado sobre el pequeño coche y comienza a manejar!
-00:20 - 00:25 | zoom_out | crowd_shocked | sorprendido:derecha | ninguna | ninguno | ¡Al día siguiente el bebé sujeta un control remoto con fuerza y su padre cree ver superfuerza!
-00:25 - 00:30 | alerta_roja | punch | diablo:izquierda | ninguna | ninguno | ¡Convencido de que su hijo será un poderoso levantador de pesas, lo lleva directo al gimnasio!
-00:30 - 00:36 | brillo_epico | xp_Error | sorprendido:derecha | ninguna | ninguno | ¡Pero el niño arruina el entrenamiento y usa la pesada mancuerna exactamente igual que un carrito!
+00:00 - 00:05 | zoom_impacto | whoosh | sorprendido:derecha | ninguna | ninguno | ¡Izquierda o derecha! ¡El hermano pequeño elige tarta mientras la hermana sufre con el guante gigante!
+00:05 - 00:11 | zoom_in | pop | ninguno | ninguna | ninguno | ¡En el segundo round escoge un pimiento y ella le regala crema batida para decorar!
+00:11 - 00:16 | alerta_roja | good_idea | risa:izquierda | ninguna | ninguno | ¡Llegan los dulces de colores para cubrir toda la deliciosa tarta de cumpleaños con mucho amor!
+00:16 - 00:22 | temblor | ding | fiesta:derecha | ninguna | ninguno | ¡La hermana prueba la salsa más picante mientras celebra el éxito absoluto de su gran hermano!
+00:22 - 00:27 | brillo_epico | kids_yeyy | sorprendido:izquierda | ninguna | ninguno | ¡El gran final desata carcajadas épicas cuando descubre la bebida secreta y su cara lo dice todo!

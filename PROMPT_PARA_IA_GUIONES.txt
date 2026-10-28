@@ -93,12 +93,11 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
   - **NUNCA uses flecha en el último bloque**: El editor añade automáticamente al final un outro freeze-frame de 1 segundo con la flecha animada apuntando al botón de Like.
   - Aparece de forma ágil y breve (~1.8 segundos) para captar la atención inmediatamente y luego desaparecer sin tapar el video.
 
-6. CIRCULO (Círculo rojo grande `circulo_rojo.png` con seguimiento inteligente de objetivos):
-  Rodea y persigue al objetivo en pantalla:
-  - `centro`, `izquierda`, `derecha`, `arriba`, `abajo`, `auto`, `X,Y` (ej. `50,50`) o `ninguno`.
-  - Opcional: agrega `:chico`, `:medio` o `:grande` (ejemplo: `izquierda:grande`).
-  - **LÍMITE ESTRICTO: usa el círculo en 1 o 2 bloques COMO MÁXIMO en todo el guion**, reservado para los momentos más importantes (el detalle clave o el desenlace). En todos los demás bloques escribe `ninguno` en CIRCULO y usa solo la FLECHA. ¡NUNCA pongas flecha + círculo en todos los bloques!
-  - Al igual que la flecha, dura poco tiempo (~1.8 segundos) y se desvanece suavemente para no saturar la pantalla.
+6. CIRCULO (Círculo rojo `circulo_rojo.png` con seguimiento inteligente de objetivos):
+  Rodea un detalle o elemento pequeño y oculto en pantalla (ej. un objeto en la mano, algo en el piso o a un costado):
+  - Escribe SIEMPRE 'ninguno' salvo que exista un detalle u objeto específico fuera del centro para recuadrar con coordenadas 'X,Y' (ej. '30,45') o lateral ('izquierda', 'derecha').
+  - NUNCA uses 'centro' ni 'centro:grande' porque tapar el centro de la pantalla cubre al protagonista principal y no recuadra ningún detalle útil. Si no hay un detalle oculto específico, pon 'ninguno'.
+  - Dura poco tiempo (~1.8 segundos) y se desvanece suavemente para no saturar la pantalla.
 
 7. TEXTO (Narración de Voz IA + Subtítulos Luminosos):
   - Recuerda cumplir **18 a 20 palabras por cada bloque de 5 segundos (MÁXIMO 20 palabras)** para que la voz no deje silencios.

@@ -183,8 +183,8 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
    - **FRECUENCIA MODERADA**: usa la flecha solo en **1 o 2 bloques clave del guion como máximo**, dejando el resto en `ninguna`. No pongas flechas en bloques seguidos.
    - **NUNCA uses flecha en el último bloque**: El último bloque debe concluir el video con su acción y desenlace real de forma limpia, sin flechas.
 6. CIRCULO (`circulo_rojo.png`):
-   - Rodea el objeto o revelación más impactante del video: usa `auto`, `izquierda`, `derecha`, `centro` (opcional `:grande`), coordenada `X,Y`, o `ninguno`.
-   - **LÍMITE ESTRICTO**: usa el círculo en **1 bloque COMO MÁXIMO** en todo el guion. En todos los demás escribe `ninguno`.
+   - Rodea un objeto o detalle pequeño específico y oculto (ej. un objeto en la mano, un detalle en el piso o a un costado).
+   - REGLA CRÍTICA: Escribe SIEMPRE `ninguno` a menos que haya un detalle o elemento secundario pequeño que recuadrar con coordenadas X,Y (ej: `25,60`, `70,40`) o lateral (`izquierda`, `derecha`). NUNCA uses `centro` ni `centro:grande` porque tapar el centro de la pantalla cubre al sujeto principal y no recuadra nada útil. Si no hay un detalle oculto específico, escribe `ninguno`.
 7. TEXTO (Narración de Voz IA Rápida y Enérgica estilo Shorts):
    - Entre **15 y 17 palabras por cada bloque de 5 segundos** (~3.1 a 3.3 palabras/segundo) con máxima emoción (`¡!`). Esta cadencia es rápida, enérgica y atrapante (estilo viral de YouTube Shorts), manteniendo una dicción fluida y continua sin silencios muertos. Narra siempre lo que pasa en el video sin pedir likes ni suscripciones.
 
@@ -335,7 +335,7 @@ def generar_guion_con_gemini_flash(
         f"- En SCHEDULE escribe: {schedule_str.strip() if schedule_str.strip() else 'no'}\n"
         f"- En PARA_NINOS escribe: no\n"
         f"- En TONO_VIDEO escribe 'triste' si el video es triste o dramático, 'inspiracional' si es emotivo, heroico o de superación, o 'fondo' para humor, curiosidad, acción y entretenimiento general.\n"
-        f"- Recuerda usar FLECHA como máximo en 2 bloques clave de todo el guion y CIRCULO como máximo en 1 bloque.\n"
+        f"- Recuerda usar FLECHA como máximo en 2 bloques clave y CIRCULO SIEMPRE en 'ninguno' a menos que haya un detalle pequeño que señalar con coordenadas X,Y (NUNCA 'centro').\n"
     )
 
     modelos_saturados_sesion: Set[str] = set()

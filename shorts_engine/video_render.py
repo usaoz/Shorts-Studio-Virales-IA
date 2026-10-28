@@ -1027,6 +1027,15 @@ def _limitar_circulos_guion(
     Limita tanto los círculos rojos como las flechas rojas para que aparezcan de forma
     espaciada y menos frecuente, evitando saturar todos los segmentos del Short.
     """
+    # 0. El círculo rojo NUNCA debe colocarse en el centro de la pantalla ni en 'auto' genérico,
+    # ya que tapa la acción principal del video y no recuadra ningún detalle útil.
+    for s in segmentos:
+        if s.circulo:
+            c_norm = _quitar_acentos(str(s.circulo).strip().lower())
+            if c_norm in ("centro", "center", "medio", "middle", "auto") or c_norm.startswith("centro"):
+                print(f"[*] Omitiendo círculo rojo '{s.circulo}' en segmento {s.id_segmento}: el centro es el plano principal y no recuadra un detalle útil.")
+                s.circulo = None
+
     con_circulo = [i for i, s in enumerate(segmentos) if s.circulo]
     if len(con_circulo) > max_circulos:
         prioridad = sorted(con_circulo, key=lambda i: (0 if segmentos[i].tamano_circulo == "grande" else 1, i))
