@@ -177,12 +177,13 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
    - `crowd_shocked`, `whoosh`, `riser_suction`, `ding`, `good_idea`, `cash_ting`, `punch`, `boxing_bell`, `camera_flash`, `camera_shooter`, `cartoon_laugh`, `kids_yeyy`, `party_horn`, `awww`, `error`, `xp_Error`, `fart`, `click`, `pop`, `ninguno`.
 4. EMOJI (Elige UNO con posición opcional `:derecha` o `:izquierda`):
    - `sorprendido`, `risa`, `fiesta`, `diablo`, `enojo`, `lloro`, `sueno`, o `ninguno`.
-5. FLECHA (`flecha.png` con seguimiento de objetivos):
-   - Escribe la **coordenada porcentual exacta `X,Y`** (de `15` a `85`, donde `X` es horizontal izq->der y `Y` es vertical arriba->abajo, ej: `28,45` para un objeto a la izquierda, `72,50` a la derecha, `50,38` en el centro-arriba) del objeto o rostro exacto que quieres señalar en ese bloque, o bien `izquierda`, `derecha`, `centro`, `arriba`, `abajo`, o `ninguna`.
+5. FLECHA (`flecha.png` con seguimiento por visión artificial):
+   - Apunta y persigue automáticamente al objeto, persona o acción clave en esa zona del video.
+   - Opciones: `auto` (para que la visión artificial detecte y siga el sujeto/objeto principal en movimiento), `izquierda`, `derecha`, `centro`, `arriba`, `abajo`, o bien la coordenada porcentual exacta `X,Y` (ej: `28,45` si el sujeto está a la izquierda, `72,50` a la derecha), o `ninguna`.
    - **FRECUENCIA MODERADA**: usa la flecha solo en **1 o 2 bloques clave del guion como máximo**, dejando el resto en `ninguna`. No pongas flechas en bloques seguidos.
    - **NUNCA uses flecha en el último bloque**: El editor añade automáticamente al final un outro freeze-frame de 1 segundo con la flecha animada apuntando al botón de Like.
 6. CIRCULO (`circulo_rojo.png`):
-   - Escribe la **coordenada porcentual exacta `X,Y`** del objeto exacto a rodear (ej: `30,48` o `68,45:grande`), o bien `centro`, `izquierda`, `derecha`, `arriba`, `abajo` (opcional `:grande`), o `ninguno`.
+   - Rodea el objeto o revelación más impactante del video: usa `auto`, `izquierda`, `derecha`, `centro` (opcional `:grande`), coordenada `X,Y`, o `ninguno`.
    - **LÍMITE ESTRICTO**: usa el círculo en **1 bloque COMO MÁXIMO** en todo el guion. En todos los demás escribe `ninguno`.
 7. TEXTO (Narración de Voz IA continua + Subtítulos Luminosos):
    - Entre **18 y 20 palabras por cada bloque de 5 segundos** con máxima emoción (`¡!`). Narra siempre lo que pasa en el video sin pedir likes ni suscripciones.
@@ -271,15 +272,40 @@ def generar_guion_con_gemini_flash(
     video_bytes, _ = generar_video_compacto_ia(ruta_video)
     dur_redondeada = max(5, int(round(dur_seg)))
 
-    tit_ctx = (contexto_titulo_orig or ULTIMA_INFO_YTDLP.get("titulo") or "").strip()
-    desc_ctx = (ULTIMA_INFO_YTDLP.get("descripcion") or "").strip()
+    # Recuperar siempre el título y descripción originales reales (de memoria yt-dlp o archivo .info.json en disco)
+    if not ULTIMA_INFO_YTDLP.get("titulo") or not ULTIMA_INFO_YTDLP.get("descripcion"):
+        candidatos_info = [
+            ruta_video.with_suffix(".info.json"),
+            BASE_DIR / "video_input.info.json",
+        ]
+        for c_path in candidatos_info:
+            if c_path.exists():
+                try:
+                    d_json = json.loads(c_path.read_text(encoding="utf-8", errors="replace"))
+                    if not ULTIMA_INFO_YTDLP.get("titulo"):
+                        ULTIMA_INFO_YTDLP["titulo"] = str(d_json.get("title") or "").strip()
+                    if not ULTIMA_INFO_YTDLP.get("descripcion"):
+                        ULTIMA_INFO_YTDLP["descripcion"] = str(d_json.get("description") or "").strip()[:800]
+                    break
+                except Exception:
+                    pass
+
+    tit_ytdlp = (ULTIMA_INFO_YTDLP.get("titulo") or "").strip()
+    desc_ytdlp = (ULTIMA_INFO_YTDLP.get("descripcion") or "").strip()
+
+    tit_ctx = tit_ytdlp
+    if contexto_titulo_orig and not contexto_titulo_orig.lower().startswith("video link"):
+        tit_ctx = contexto_titulo_orig.strip() or tit_ytdlp
+
+    desc_ctx = desc_ytdlp
+
     bloque_contexto_real = ""
     if tit_ctx or desc_ctx:
         bloque_contexto_real = (
-            f"\nCONTEXTO REAL DEL VIDEO ORIGINAL (ÚSALO PARA SABER QUÉ SON LOS OBJETOS REALMENTE Y NO ADIVINAR):\n"
-            f"- Título original del video: {tit_ctx}\n"
-            + (f"- Descripción original: {desc_ctx}\n" if desc_ctx else "")
-            + "- IMPORTANTE: Presta mucha atención a lo que hace la persona y qué objetos reales usa (ej. si tiene un control remoto en las manos y maneja juguetes robóticos/magnéticos, o si es una broma física, descríbelo con total exactitud sin confundir juguetes con comida ni inventar cosas que no están).\n"
+            f"\nCONTEXTO REAL DEL VIDEO ORIGINAL (TÍTULO Y DESCRIPCIÓN OFICIALES):\n"
+            + (f"- TÍTULO ORIGINAL: {tit_ctx}\n" if tit_ctx else "")
+            + (f"- DESCRIPCIÓN ORIGINAL: {desc_ctx}\n" if desc_ctx else "")
+            + "- DIRECTIVA DE FIDELIDAD TOTAL: Usa este título y descripción para conocer exactamente qué sucede, quiénes son y qué objetos o acciones reales aparecen. No inventes elementos contrarios a la descripción ni confundas juguetes/objetos.\n"
         )
 
     instruccion_extra_base = (
@@ -372,7 +398,7 @@ def generar_guion_con_gemini_flash(
     # --- PASADA 1: Enfoque en Gancho Viral y Ritmo ---
     if callable(progreso_cb):
         try:
-            progreso_cb(0.15, "IA Pasada 1/3: Creando gancho viral y ritmo (es la parte que más tiempo toma)...")
+            progreso_cb(0.15, "IA Pasada 1/3: Creando gancho viral y ritmo...")
         except Exception:
             pass
     print("[*] IA Pasada 1/3: Creando guión con enfoque en Gancho Viral y Ritmo...")
@@ -419,7 +445,7 @@ def generar_guion_con_gemini_flash(
         f"TU MISIÓN DE FUSIÓN CRÍTICA:\n"
         f"1. Combina el gancho más atrapante y adictivo del Borrador A con la exactitud de objetos y giros reales del Borrador B.\n"
         f"2. Asegúrate de que no haya ninguna confusión sobre los objetos ni acciones.\n"
-        f"3. Coloca las FLECHAS (máximo 2 bloques clave), CÍRCULOS (máximo 1 bloque clave), EMOJIS y SFX en los momentos de mayor impacto, sorpresa o revelación del video.\n"
+        f"3. Coloca las FLECHAS (máximo 2 bloques clave: 'auto', 'izquierda', 'derecha', 'centro' o coordenada X,Y apuntando al objeto o sujeto principal en movimiento) y CÍRCULOS (máximo 1 bloque clave: 'auto', 'izquierda', 'derecha', 'centro:grande'), EMOJIS y SFX en los momentos de mayor impacto, sorpresa o revelación del video.\n"
         f"4. Mantén exactamente los tiempos (de 00:00 a 00:{dur_redondeada:02d}), cada bloque de 5 segundos, y el encabezado de metadatos exacto.\n"
         f"Entrega ÚNICAMENTE el bloque de guion final estructurado:\n\n"
         f"TITULO_SUPERIOR: ...\nTITULO_YOUTUBE: ...\nDESCRIPCION_YOUTUBE: ...\n"

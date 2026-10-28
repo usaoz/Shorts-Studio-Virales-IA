@@ -137,10 +137,6 @@ _REEMPLAZOS_FONETICOS_TTS = [
     (r"\bPRO\b", "PRÓ"),
     (r"\bsuvs\b", "súbs"),
     (r"\bsubs\b", "súbs"),
-    (r"\b[Ll]ike\b", "láik"),
-    (r"\b[Ll]ikes\b", "láiks"),
-    (r"\b[Dd]eja\b", "Dejá"),
-    (r"\b[Dd]ejá\b", "Dejá"),
 ]
 
 _PALABRAS_HYPE_YOUTUBER = {

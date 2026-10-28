@@ -1131,17 +1131,18 @@ async def editar_video_con_guion(
         archivos_audio_seg.append(ruta_mix_wav)
         datos_segmentos.append([seg, total_frames_seg, dur_seg_exacta, palabras_sub, rms_env])
 
-    # 2.5 Generar Outro automático de 1 segundo ("¡Deja tu like!") con freeze-frame y flecha
+    # 2.5 Generar Outro automático de 1 segundo con llamada nativa al Like y freeze-frame
     dur_outro_seg = 1.0
     total_frames_outro = int(round(FPS * dur_outro_seg))
-    texto_outro_tts = "¡Deja tu like!"
+    voz_outro = config.voz_narrador
+
+    # Si es Giuseppe (voz italiana/multilingüe), "¡Dale tu like!" evita el acento francés de la 'j' en "deja"
+    es_giuseppe = "it-IT" in str(voz_outro)
+    texto_outro_tts = "¡Dale tu like!" if es_giuseppe else "¡Dejá tu like!"
     ruta_mp3_outro = TEMP_DIR / "seg_outro_like.mp3"
     ruta_wav_outro = ruta_mp3_outro.with_suffix(".wav")
 
-    # Mantener consistencia total con la misma voz del video
-    voz_outro = config.voz_narrador
-
-    print(f"[*] Generando audio y mezcla para Outro final de 1 segundo (¡Deja tu like!) con voz {voz_outro}...")
+    print(f"[*] Generando audio y mezcla para Outro final de 1 segundo ({texto_outro_tts}) con voz {voz_outro}...")
     dur_voz_outro, palabras_sub_outro, _, _ = await generar_voz_y_timestamps_segmento(
         texto_outro_tts,
         ruta_mp3_outro,
@@ -1150,9 +1151,12 @@ async def editar_video_con_guion(
     )
     # Asegurar texto limpio y llamativo en los subtítulos de pantalla
     if palabras_sub_outro and len(palabras_sub_outro) >= 3:
-        palabras_sub_outro[0].texto = "¡DEJA"
+        palabras_sub_outro[0].texto = "¡DALE" if es_giuseppe else "¡DEJA"
         palabras_sub_outro[1].texto = "TU"
         palabras_sub_outro[2].texto = "LIKE!"
+    elif palabras_sub_outro and len(palabras_sub_outro) == 2:
+        palabras_sub_outro[0].texto = "¡DALE" if es_giuseppe else "¡DEJA"
+        palabras_sub_outro[1].texto = "LIKE!"
     rms_env_outro = calcular_envolvente_rms(ruta_wav_outro, FPS)
     ruta_mix_outro_wav = TEMP_DIR / "seg_outro_mix.wav"
     gestor_sfx.mezclar_audio_segmento(
@@ -1308,7 +1312,7 @@ async def editar_video_con_guion(
                     raise InterruptedError("Edición cancelada por el usuario.")
                 _notificar_prog(
                     0.40 + 0.58 * (idx_seg / float(max(1, len(datos_segmentos)))),
-                    f"Renderizando video a 60 FPS con subtítulos neón y tracking ({idx_seg + 1}/{len(datos_segmentos)})...",
+                    f"Renderizando a 60 FPS (seg {idx_seg + 1}/{len(datos_segmentos)})...",
                 )
                 t_vid_ini = float(seg.t_inicio_video or 0.0)
                 t_vid_fin = float(seg.t_fin_video or dur_video_origen)
@@ -1351,7 +1355,7 @@ async def editar_video_con_guion(
                         frac_seg = (idx_seg + (f_idx / float(total_frames_seg))) / float(max(1, len(datos_segmentos)))
                         _notificar_prog(
                             0.40 + 0.54 * frac_seg,
-                            f"Renderizando a 60 FPS (seg {idx_seg + 1}/{len(datos_segmentos)} | {int(frac_seg * 100)}%)...",
+                            f"Renderizando a 60 FPS (seg {idx_seg + 1}/{len(datos_segmentos)})...",
                         )
 
                     pt_c_vid = trayectoria_circulo[f_idx] if trayectoria_circulo else (WIDTH / 2.0, HEIGHT * 0.44)
@@ -1456,7 +1460,7 @@ async def editar_video_con_guion(
 
             # 6. Renderizar Outro automático de 1 segundo (Freeze-Frame + Desenfoque + Flecha al Like + Subtítulo Luminoso)
             if ultimo_frame_lienzo is not None and total_frames_outro > 0:
-                _notificar_prog(0.97, "Renderizando outro de 1 segundo (¡Deja tu like!)...")
+                _notificar_prog(0.97, "Renderizando outro final con flecha a 60 FPS...")
                 print("[*] Renderizando Outro de 1 segundo (Freeze-frame + desenfoque + flecha al Like)...")
                 bg_blur = ultimo_frame_lienzo.filter(ImageFilter.GaussianBlur(16))
                 oscurecedor = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 95))
@@ -1468,7 +1472,7 @@ async def editar_video_con_guion(
                     lienzo_out = lienzo_base_outro.copy()
 
                     if f_idx % max(1, FPS // 2) == 0:
-                        _notificar_prog(0.95, "Renderizando outro final (¡Deja tu like!)...")
+                        _notificar_prog(0.95, "Renderizando outro final con flecha a 60 FPS...")
 
                     # Flecha Roja al botón de Like de YouTube Shorts (X: 985, Y: 1040)
                     gestor_assets.dibujar_flecha_outro_like(

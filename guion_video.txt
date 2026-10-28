@@ -1,8 +1,8 @@
-TITULO_SUPERIOR: Sorpresa Absurda En Lonchera Escolar
-TITULO_YOUTUBE: ¡¿Papá qué metiste en mi mochila?! #shorts
-DESCRIPCION_YOUTUBE: Descubre la divertida broma que esta niña encuentra en su mochila escolar cuando su padre le prepara una supuesta lonchera llena de sorpresas raras. #shorts #humor #bromas #viral
+TITULO_SUPERIOR: Perros Cocinan Comida Divertida
+TITULO_YOUTUBE: ¡Perros preparando la cena más graciosa! #shorts
+DESCRIPCION_YOUTUBE: ¡Un hombre espera sentado a que sus perros de juguete le preparen la cena pero el resultado es desopilante! ¿Te comerías este plato tan especial? #shorts #humor #fail #viral
 ESTADO_PUBLICACION: privado
-SCHEDULE: auto
+SCHEDULE: 2026-10-29 20:30
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
@@ -10,8 +10,8 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | izquierda | ninguno | ¡Mira lo que papá puso dentro del bolso de su hija para el viaje! ¡Una falsa lonchera de sushi!
-00:05 - 00:10 | zoom_in | whoosh | risa:izquierda | ninguna | ninguno | ¡Ella abre la caja y saca unos calcetines larguísimos pensando que era comida! ¡Qué confusión tan graciosa!
-00:10 - 00:15 | alerta_roja | riser_suction | diablo:derecha | ninguna | ninguno | ¡Luego intenta averiguar qué es ese objeto amarillo y resulta ser un paraguas con forma de banana! ¡Insólito!
-00:15 - 00:20 | flash | ding | fiesta:izquierda | ninguna | ninguno | ¡Y para terminar saca un pastel verde brillante que parece una vela! ¡Papá se pasó de divertido hoy!
-00:20 - 00:25 | brillo_epico | cash_ting | sorprendido:derecha | ninguna | ninguno | ¡La niña se queda totalmente asombrada con todas las bromas locas que le preparó su querido padre!
+00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | 50,38 | ninguno | ¡Este hombre espera pacientemente sentado a que sus perros de juguete le cocinen la cena! ¡Mira lo que pasa en la mesa!
+00:05 - 00:10 | zoom_in | whoosh | risa:izquierda | ninguna | ninguno | ¡El primer perrito negro giratorio añade salsa picante directamente sobre el plato! ¡Qué habilidad tan graciosa tiene!
+00:10 - 00:15 | alerta_roja | riser_suction | diablo:derecha | ninguna | 50,45:grande | ¡Ahora le toca el turno al perrito dálmata! ¡Añade salsa de soja simulando una divertida travesura casera!
+00:15 - 00:20 | temblor | punch+cartoon_laugh | risa:izquierda | ninguna | ninguno | ¡El perro naranja se pasa totalmente de la raya! ¡Rocía salsa roja de una forma sumamente descarada sobre la comida!
+00:20 - 00:25 | brillo_epico | cash_ting+party_horn | fiesta:derecha | ninguna | ninguno | ¡La cena está lista y el hombre la disfruta con mucho apetito! ¡Una divertida locura culinaria digna de compartir!

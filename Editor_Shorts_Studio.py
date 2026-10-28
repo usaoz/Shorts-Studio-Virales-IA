@@ -3244,7 +3244,15 @@ def iniciar_aplicacion_gui() -> None:
     barra_progreso_proceso.set(0.0)
 
     frame_milestones = ctk.CTkFrame(progress_card, fg_color="transparent")
-    frame_milestones.pack(fill="x", padx=18, pady=(0, 10))
+    frame_milestones.pack(fill="x", padx=18, pady=(0, 6))
+
+    lbl_tiempo_estimado = ctk.CTkLabel(
+        progress_card,
+        text="Tiempo estimado: ~1 a 2 minutos por cada Reel (descarga + guion IA + render 60 FPS + subida)",
+        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        text_color=CYAN_ACCENT,
+    )
+    lbl_tiempo_estimado.pack(anchor="w", padx=20, pady=(0, 8))
 
     row_frenar_proceso = ctk.CTkFrame(progress_card, fg_color="transparent")
     row_frenar_proceso.pack(fill="x", padx=18, pady=(0, 12))
@@ -4374,6 +4382,8 @@ def iniciar_aplicacion_gui() -> None:
                         )
                         ruta_video_usar = descargar_video_youtube(url_descargar)
                         registrar_video_usado(url_descargar)
+                        if ULTIMA_INFO_YTDLP.get("titulo"):
+                            titulo_orig = ULTIMA_INFO_YTDLP["titulo"]
 
                     if es_modo_editado:
                         # Modo Subir Video Editado: el video ya está terminado en el disco, no se renderiza de nuevo

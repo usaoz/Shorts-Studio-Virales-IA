@@ -50,6 +50,9 @@ class RastreadorObjetivosVideo:
         del objeto más cercano a ese punto exacto.
         """
         s = _quitar_acentos(spec.strip().lower())
+        for mod in (":grande", ":chico", ":medio", ":pequeno", ":big", ":small"):
+            s = s.replace(mod, "")
+        s = s.strip()
         if "," in s:
             try:
                 px_s, py_s = s.split(",", 1)
@@ -63,7 +66,7 @@ class RastreadorObjetivosVideo:
                     y_tr = py / cls.ESC_TRACK
                 x_tr = float(np.clip(x_tr, 32.0, cls.W_TR - 32.0))
                 y_tr = float(np.clip(y_tr, 42.0, cls.H_TR - 135.0))
-                return x_tr, y_tr, 42.0, True
+                return x_tr, y_tr, 75.0, True
             except ValueError:
                 pass
 
@@ -131,9 +134,9 @@ class RastreadorObjetivosVideo:
         cx_sal = float(np.sum(xs * pesos) / np.sum(pesos))
         cy_sal = float(np.sum(ys * pesos) / np.sum(pesos))
 
-        # Si la IA dio coordenada exacta X,Y, refinamos suavemente hacia el pico de saliencia local;
-        # si dio una zona ("izquierda", "derecha", "centro"), vamos directo al objeto más saliente (85%).
-        peso_sal = 0.55 if es_exacta else 0.86
+        # Si la IA dio coordenada exacta X,Y, refinamos hacia el pico de saliencia real del objeto cercano;
+        # si dio una zona ("izquierda", "derecha", "centro"), vamos directo al objeto más saliente (86%).
+        peso_sal = 0.72 if es_exacta else 0.86
         tx = peso_sal * cx_sal + (1.0 - peso_sal) * x_nom
         ty = peso_sal * cy_sal + (1.0 - peso_sal) * y_nom
         return float(np.clip(tx, 36.0, w - 36.0)), float(np.clip(ty, 44.0, limite_y_inf))
