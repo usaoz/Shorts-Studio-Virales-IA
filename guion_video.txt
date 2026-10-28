@@ -1,8 +1,8 @@
-TITULO_SUPERIOR: Broma de Pluma en la Escuela
-TITULO_YOUTUBE: ¡La broma escolar con pluma que salió mal! #shorts
-DESCRIPCION_YOUTUBE: Estos estudiantes hacen una broma tan absurda con una pluma que confunden por completo a sus profesores en clase. ¿Alguna vez hiciste una broma parecida en tu colegio? #shorts #comedy #funny #viral #school
+TITULO_SUPERIOR: Pihu Genio Escuela Comedia
+TITULO_YOUTUBE: ¡La niña más inteligente del planeta! #shorts
+DESCRIPCION_YOUTUBE: Pihu sorprende a todo el mundo con su increíble intelecto cuando el resto parece haber perdido el juicio. ¿Tú podrías resolver este reto tan fácil en segundos? #shorts #comedy #funny #viral #humor
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-31 11:30
+SCHEDULE: 2026-10-29 13:00
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
@@ -10,11 +10,9 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | click | sueno:izquierda | izquierda | ninguno | ¡Mira cómo este alumno dibuja con una pluma mientras su compañero duerme plácidamente en el pupitre!
-00:05 - 00:10 | zoom_in | whoosh | sorprendido:derecha | ninguna | ninguno | ¡De repente el bromista siente un impacto terrible al tocar su propio cuello con el bolígrafo mágico!
-00:10 - 00:14 | alerta_roja | riser_suction | diablo:izquierda | ninguna | ninguno | ¡Ambos estudiantes repiten gestos exagerados de dolor e incomodidad frente a la cámara totalmente desesperados!
-00:14 - 00:18 | temblor | punch | risa:derecha | ninguna | ninguno | ¡La situación se vuelve tan extraña que deciden ir corriendo a reportar este misterioso caso escolar!
-00:18 - 00:22 | zoom_in | crowd_shocked | sorprendido:izquierda | derecha | ninguno | ¡El profesor revisa el salón pero todo parece completamente normal y tranquilo para sorpresa de todos los presentes!
-00:22 - 00:26 | blanco_negro | error | enojo:derecha | ninguna | ninguno | ¡Para demostrar lo que pasó, el profesor imita los mismos gestos raros frente a la autoridad escolar!
-00:26 - 00:30 | flash | pop | ninguno | ninguna | centro:grande | ¡El director observa completamente confundido e incrédulo la divertida y extraña actuación de su propio maestro!
-00:30 - 00:33 | brillo_epico | cartoon_laugh | risa:izquierda | ninguna | ninguno | ¡Una broma escolar épica que termina en un momento súper gracioso e inesperado para todos!
+00:00 - 00:05 | zoom_impacto | cash_ting | sorprendido:derecha | centro | ninguno | ¡Esta niña suma dos billetes de cinco y deja a su madre completamente congelada de la impresión!
+00:05 - 00:10 | zoom_in | whoosh | risa:izquierda | ninguna | centro:grande | ¡La mamá verifica la suma en la calculadora y anuncia por megáfono que tiene una genio total!
+00:10 - 00:15 | alerta_roja | riser_suction | sorprendido:derecha | ninguna | ninguno | ¡Al día siguiente en la escuela la maestra pide leer tres letras y nadie es capaz de responder!
+00:15 - 00:20 | temblor | crowd_shocked | sorprendido:izquierda | izquierda | ninguno | ¡Pihu dice el abecedario de memoria y la profesora casi se desmaya del asombro frente a todos!
+00:20 - 00:25 | brillo_epico | ding | risa:derecha | ninguna | ninguno | ¡La maestra le toma las manos agradecida mientras la niña no entiende por qué todos actúan tan raro!
+00:25 - 00:28 | flash | kids_yeyy | fiesta:izquierda | ninguna | ninguno | ¡Al final le entregan un enorme trofeo dorado coronándola como campeona absoluta!

@@ -480,8 +480,9 @@ def generar_guion_con_gemini_flash(
         f"TU MISIÓN DE FUSIÓN CRÍTICA:\n"
         f"1. NARRATIVA FLUIDA Y CON SENTIDO: Cuenta exactamente lo que ocurre según el Análisis 1, con máxima intriga, humor o emoción, pero SIN inventar elementos contrarios a la realidad.\n"
         f"2. CADENCIA DE VOZ VIRAL (¡RÁPIDA Y ENÉRGICA!): Escribe EXACTAMENTE entre 15 y 17 palabras por cada bloque de 5 segundos (~3.2 palabras/segundo) para que la narración fluya con ritmo acelerado y atrapante, sin silencios muertos ni arrastrar las palabras.\n"
-        f"3. EFECTOS Y SFX: Incorpora el mapa de efectos del Análisis 2 (flecha máx 2 bloques, círculo máx 1 bloque, emojis y sfx sincronizados con los momentos cumbre).\n"
-        f"4. HASHTAGS DE NICHO REAL: En DESCRIPCION_YOUTUBE, escribe una descripción atractiva de 2 oraciones, pregunta para debate en comentarios, y 4 o 5 hashtags hiper-específicos del nicho (ej: #shorts #perros #mascotas #viral; #shorts #autos #carreras #viral; etc.).\n\n"
+        f"3. EFECTOS Y FLECHAS CON SENTIDO: Usa FLECHA únicamente si hay un detalle crucial o acción oculta que señalar (máx 1 o 2 bloques en todo el video, NUNCA en el último bloque). Si no hay un objeto clave en movimiento o detalle sutil, pon 'ninguna'. Cero flechas es mucho mejor que una flecha apuntando a un lugar irrelevante.\n"
+        f"4. REMATE VIRAL POTENTE: El remate final del guion debe ser memorable, ingenioso o hilarante. Aunque el video original sea simple o modesto, la narración debe elevarlo dándole un remate épico, irónico o cómico que cierre con máxima fuerza.\n"
+        f"5. HASHTAGS DE NICHO REAL: En DESCRIPCION_YOUTUBE, escribe una descripción atractiva de 2 oraciones, pregunta para debate en comentarios, y 4 o 5 hashtags hiper-específicos del nicho (ej: #shorts #perros #mascotas #viral; #shorts #autos #carreras #viral; etc.).\n\n"
         f"Entrega ÚNICAMENTE el bloque de guion final estructurado con la plantilla obligatoria:"
     )
 
@@ -522,17 +523,28 @@ def generar_guion_con_gemini_flash(
 
             prompt_auditoria = (
                 PROMPT_COMPACTO_INTERNO + instruccion_extra_base +
-                f"\n\nACTÚA COMO EL AUDITOR JEFE DE CALIDAD, COHERENCIA VISUAL Y RETROSPECTIVA DE YOUTUBE SHORTS.\n"
-                f"Estás auditando el guion para este video (Ronda de Control {ronda} de {max_rondas_auditoria}):\n\n"
+                f"\n\nACTÚA COMO EL AUDITOR JEFE DE CALIDAD, VIRALIDAD Y RETROSPECTIVA DE YOUTUBE SHORTS.\n"
+                f"Estás auditando y re-editando el guion para este video (Ronda de Control {ronda} de {max_rondas_auditoria}):\n\n"
                 f"--- [GUION ACTUAL A AUDITAR] ---\n{guion_actual_auditar}\n\n"
-                f"TU MISIÓN DE AUDITORÍA CRÍTICA Y AUTO-RE-EDICIÓN:\n"
-                f"1. FIDELIDAD VISUAL SEGUNDO A SEGUNDO: Compara cada bloque (de 00:00 a 00:{dur_redondeada:02d}) contra lo que REALMENTE pasa en pantalla en el video. ¿La narración describe la acción real o se confundió con los objetos o inventó algo falso? Si se confundió, corrígelo con total precisión.\n"
-                f"2. COHERENCIA DEL FINAL EN RETROSPECTIVA: Analiza cómo termina el video al finalizar su duración. ¿El remate final condice con el desenlace real del video? Si el final fue un fracaso, una broma revelada o una sorpresa, asegúrate de que la frase final coincida con el resultado real.\n"
-                f"3. CALIBRACIÓN DE FLECHAS Y EFECTOS: Revisa si las etiquetas [FLECHA:...] o [CIRCULO:...] están bien puestas en el momento justo del impacto o si apuntan a la nada o en momentos aburridos. Si están mal puestas, ajústalas a 'ninguna' o colócalas en el segundo exacto donde ocurre la acción clave (máximo 2 flechas y 1 círculo en todo el video).\n"
-                f"4. CADENCIA RÁPIDA: Mantén entre 15 y 17 palabras por cada bloque de 5s para que la voz fluya con dinamismo y energía.\n\n"
+                f"DIRECTIVAS ESTRICTAS DE CONTROL DE VIRALIDAD Y AUTO-CORRECCIÓN:\n"
+                f"1. AUDITORÍA DE FLECHAS (TOLERANCIA CERO A FLECHAS INÚTILES O CONFUSAS):\n"
+                f"   - Revisa cada línea donde figure [FLECHA:...]. ¿Apunta a un detalle real, crucial y en movimiento que la audiencia no vería sin la flecha?\n"
+                f"   - Si la flecha apunta a la nada, a un objeto estático, a una pared o en un momento aburrido: ¡ELIMÍNALA INMEDIATAMENTE cambiándola a 'ninguna'!\n"
+                f"   - Es preferible CERO flechas en el cuerpo del video antes que una sola flecha mal ubicada (el editor ya añade automáticamente al final un freeze-frame con flecha animada y campana de like).\n"
+                f"   - Si de verdad se justifica una flecha, calibra su zona exacta: 'izquierda', 'derecha', 'centro' o coordenada X,Y donde ocurre la acción clave.\n"
+                f"2. REMATE FINAL VIRAL (PUNCHLINE OBLIGATORIO Y ELEVACIÓN DEL VIDEO):\n"
+                f"   - Revisa el último bloque del guion. ¿Tiene un remate gracioso, irónico, sorprendente o emocionante? ¿O termina de manera tibia, descriptiva o desinflada?\n"
+                f"   - Aunque el video en sí sea simple o modesto, tu tarea como redactor de élite es ELEVARLO con un remate ingenioso, divertido o con remate de comedia/ironía que cierre con máxima fuerza y deje al espectador con ganas de comentar o volver a verlo.\n"
+                f"   - El remate debe condicir fielmente con el desenlace real del video al terminar (en retrospectiva), pero con máxima chispa y energía narrativa.\n"
+                f"3. GANCHO Y RETENCIÓN ADICTIVA (00:00 - 00:05):\n"
+                f"   - La primera frase debe sembrar curiosidad o expectativa explosiva sin rodeos ni saludos aburridos.\n"
+                f"4. FIDELIDAD TOTAL A LOS HECHOS:\n"
+                f"   - No confundas objetos reales (bolígrafos, herramientas, juguetes, celulares, etc.).\n"
+                f"5. CADENCIA VIRAL:\n"
+                f"   - Mantén estrictamente entre 15 y 17 palabras por bloque de 5s para que la voz fluya con dinamismo y ritmo acelerado.\n\n"
                 f"REGLA DE DECISIÓN OBLIGATORIA:\n"
-                f"- Si el guion ya es 100% coherente, exacto con el video y las flechas están bien: responde en la primera línea 'ESTADO_AUDITORIA: APROBADO' y nada más.\n"
-                f"- Si detectas cualquier incoherencia, objeto confundido, flecha mal puesta o final discordante: escribe en la primera línea 'ESTADO_AUDITORIA: REQUIERE_AJUSTES', explica brevemente en 'MOTIVO_AJUSTE: ...', y entrega INMEDIATAMENTE a continuación el GUION RE-EDITADO Y CORREGIDO completo con la plantilla obligatoria."
+                f"- Si el guion actual ya es un 10/10 en viralidad, el remate es brillante y las flechas están 100% justificadas o en 'ninguna': responde en la primera línea 'ESTADO_AUDITORIA: APROBADO' y nada más.\n"
+                f"- Si el remate es flojo, hay alguna flecha mal puesta o falta gancho: responde en la primera línea 'ESTADO_AUDITORIA: REQUIERE_AJUSTES', explica brevemente en 'MOTIVO_AJUSTE: ...', y entrega INMEDIATAMENTE a continuación el GUION RE-EDITADO Y PERFECCIONADO completo con la plantilla obligatoria."
             )
 
             try:
