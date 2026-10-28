@@ -1180,11 +1180,12 @@ def iniciar_aplicacion_gui() -> None:
         text_color=TEXT_MAIN,
     ).pack(side="left")
 
-    pub_header_controls = ctk.CTkFrame(pub_header, fg_color="transparent")
-    pub_header_controls.pack(side="right")
+    # Controles fijos a la derecha (X Shorts y X/día) que NUNCA se mueven
+    pub_fixed_controls = ctk.CTkFrame(pub_header, fg_color="transparent")
+    pub_fixed_controls.pack(side="right")
 
     opt_cantidad_total = ctk.CTkOptionMenu(
-        pub_header_controls,
+        pub_fixed_controls,
         variable=cantidad_total_var,
         values=list(MAPA_CANTIDAD_TOTAL.keys()),
         corner_radius=12,
@@ -1198,7 +1199,7 @@ def iniciar_aplicacion_gui() -> None:
     opt_cantidad_total.pack(side="left", padx=(0, 8))
 
     opt_por_dia = ctk.CTkOptionMenu(
-        pub_header_controls,
+        pub_fixed_controls,
         variable=shorts_por_dia_var,
         values=list(MAPA_POR_DIA.keys()),
         corner_radius=12,
@@ -1209,25 +1210,28 @@ def iniciar_aplicacion_gui() -> None:
         button_hover_color="#333e5a",
         font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
-    opt_por_dia.pack(side="left", padx=(0, 8))
+    opt_por_dia.pack(side="left")
 
-    # Opciones de horario manual ("Desde mi hora" y "Cada X hs") arriba a la derecha
-    frame_manual_horas = ctk.CTkFrame(pub_header_controls, fg_color="transparent")
+    # Controles extra según la estrategia (se insertan entre el título y las opciones fijas X Shorts / X día)
+    frame_controles_estrategia_extra = ctk.CTkFrame(pub_header, fg_color="transparent")
+
+    # Subframe para "Cada X hs"
+    frame_sub_cada_x_hs = ctk.CTkFrame(frame_controles_estrategia_extra, fg_color="transparent")
 
     lbl_desde = ctk.CTkLabel(
-        frame_manual_horas,
+        frame_sub_cada_x_hs,
         text="Desde:",
         font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
         text_color=TEXT_MUTED,
     )
-    lbl_desde.pack(side="left", padx=(4, 4))
+    lbl_desde.pack(side="left", padx=(0, 4))
 
     LISTA_HORAS_SCROLL = [f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)]
     combo_hora = ctk.CTkComboBox(
-        frame_manual_horas,
+        frame_sub_cada_x_hs,
         variable=hora_elegida_var,
         values=LISTA_HORAS_SCROLL,
-        state="readonly",
+        state="normal",
         corner_radius=12,
         height=30,
         width=88,
@@ -1239,10 +1243,18 @@ def iniciar_aplicacion_gui() -> None:
         dropdown_hover_color=PURPLE_MAIN,
         font=ctk.CTkFont(family="Consolas", size=12, weight="bold"),
     )
-    combo_hora.pack(side="left", padx=(0, 6))
+    combo_hora.pack(side="left", padx=(0, 8))
+
+    lbl_cada = ctk.CTkLabel(
+        frame_sub_cada_x_hs,
+        text="Cada:",
+        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        text_color=TEXT_MUTED,
+    )
+    lbl_cada.pack(side="left", padx=(0, 4))
 
     opt_intervalo = ctk.CTkOptionMenu(
-        frame_manual_horas,
+        frame_sub_cada_x_hs,
         variable=intervalo_horas_var,
         values=list(MAPA_INTERVALO_HS.keys()),
         corner_radius=12,
@@ -1253,7 +1265,36 @@ def iniciar_aplicacion_gui() -> None:
         button_hover_color="#333e5a",
         font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
-    opt_intervalo.pack(side="left", padx=(0, 4))
+    opt_intervalo.pack(side="left")
+
+    # Subframe para "Horario Específico" (permite elegir o escribir libremente ej: 7:52 o 07:52)
+    frame_sub_horario_especifico = ctk.CTkFrame(frame_controles_estrategia_extra, fg_color="transparent")
+
+    lbl_a_las = ctk.CTkLabel(
+        frame_sub_horario_especifico,
+        text="A las:",
+        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        text_color=TEXT_MUTED,
+    )
+    lbl_a_las.pack(side="left", padx=(0, 4))
+
+    combo_hora_esp = ctk.CTkComboBox(
+        frame_sub_horario_especifico,
+        variable=hora_elegida_var,
+        values=["07:52", "08:00", "09:30", "12:00", "13:00", "15:00", "18:00", "19:00", "20:00", "21:00"],
+        state="normal",
+        corner_radius=12,
+        height=30,
+        width=95,
+        fg_color=INPUT_BG,
+        border_color="#2a3147",
+        button_color="#252d42",
+        button_hover_color="#333e5a",
+        dropdown_fg_color="#141824",
+        dropdown_hover_color=PURPLE_MAIN,
+        font=ctk.CTkFont(family="Consolas", size=12, weight="bold"),
+    )
+    combo_hora_esp.pack(side="left")
 
     def _cargar_imagen_avatar_ctk(avatar_path_str: str, size_px: int = 24) -> Optional[ctk.CTkImage]:
         if not avatar_path_str:
@@ -1389,9 +1430,24 @@ def iniciar_aplicacion_gui() -> None:
 
     # Programar está siempre activo (todos los Shorts se programan en sus horarios inteligentes)
 
-    # FILA 2: Fecha de Inicio (DD/MM blanco) + Vista Previa de Salidas (blanco) + Toggle Horarios Pico / Cada X hs
+    # FILA 2: Selector Unificado de Estrategia (a la izquierda) + Fecha Base (DD/MM blanco) + Previsualización de Salidas (blanco)
     row_plan2 = ctk.CTkFrame(card_pub, fg_color="transparent")
     row_plan2.pack(fill="x", padx=20, pady=(0, 12))
+
+    opt_estrategia = ctk.CTkOptionMenu(
+        row_plan2,
+        values=["Horarios Pico", "Cada X hs", "Horario Específico"],
+        variable=modo_horario_var,
+        corner_radius=14,
+        height=34,
+        width=150,
+        fg_color=INPUT_BG,
+        button_color="#252d42",
+        button_hover_color="#333e5a",
+        text_color="#ffffff",
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+    )
+    opt_estrategia.pack(side="left", padx=(0, 8))
 
     btn_calendario = ctk.CTkButton(
         row_plan2,
@@ -1408,7 +1464,6 @@ def iniciar_aplicacion_gui() -> None:
     )
     btn_calendario.pack(side="left", padx=(0, 8))
 
-    # Píldora de Vista Previa de los horarios exactos en los que saldrá cada Short
     preview_box = ctk.CTkFrame(row_plan2, fg_color=INPUT_BG, corner_radius=14, border_width=1, border_color="#1f263a")
     preview_box.pack(side="left", fill="x", expand=True)
 
@@ -1421,20 +1476,6 @@ def iniciar_aplicacion_gui() -> None:
         justify="left",
     )
     lbl_preview_horarios.pack(anchor="w", padx=12, pady=6, fill="x")
-
-    # Selector de Estrategia a la derecha de los horarios (Horarios Pico / Cada X hs)
-    seg_estrategia = ctk.CTkSegmentedButton(
-        row_plan2,
-        values=["Horarios Pico", "Cada X hs"],
-        variable=modo_horario_var,
-        corner_radius=14,
-        height=34,
-        fg_color=INPUT_BG,
-        selected_color=PURPLE_MAIN,
-        selected_hover_color=PURPLE_HOVER,
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-    )
-    seg_estrategia.pack(side="right", padx=(8, 0))
 
     def calcular_lista_horarios_actual() -> List[Optional[str]]:
         mf = modo_fuente_var.get()
@@ -1483,10 +1524,18 @@ def iniciar_aplicacion_gui() -> None:
             autoajustar_tamano_ventana()
             return
 
-        if "Pico" in modo_horario_var.get():
-            frame_manual_horas.pack_forget()
+        est_act = modo_horario_var.get()
+        frame_sub_cada_x_hs.pack_forget()
+        frame_sub_horario_especifico.pack_forget()
+
+        if "Cada X" in est_act:
+            frame_controles_estrategia_extra.pack(side="right", padx=(0, 16))
+            frame_sub_cada_x_hs.pack(side="left")
+        elif "Específ" in est_act or "Fijo" in est_act:
+            frame_controles_estrategia_extra.pack(side="right", padx=(0, 16))
+            frame_sub_horario_especifico.pack(side="left")
         else:
-            frame_manual_horas.pack(side="left", padx=(8, 0))
+            frame_controles_estrategia_extra.pack_forget()
 
         slots = calcular_lista_horarios_actual()
         partes_prev: List[str] = []
@@ -1510,10 +1559,16 @@ def iniciar_aplicacion_gui() -> None:
         )
         autoajustar_tamano_ventana()
 
-    seg_estrategia.configure(command=refrescar_plan_ui)
+    opt_estrategia.configure(command=refrescar_plan_ui)
     opt_cantidad_total.configure(command=refrescar_plan_ui)
     opt_por_dia.configure(command=refrescar_plan_ui)
     combo_hora.configure(command=refrescar_plan_ui)
+    combo_hora_esp.configure(command=refrescar_plan_ui)
+    try:
+        combo_hora_esp._entry.bind("<KeyRelease>", lambda _e: refrescar_plan_ui())
+        combo_hora._entry.bind("<KeyRelease>", lambda _e: refrescar_plan_ui())
+    except Exception:
+        pass
     opt_intervalo.configure(command=refrescar_plan_ui)
 
     def refrescar_texto_boton_accion() -> None:
@@ -2184,17 +2239,17 @@ def iniciar_aplicacion_gui() -> None:
 
         if c == 1:
             texto = "1 Short programado  ·  Ver cola ▾"
-            color_txt = CYAN_ACCENT
+            color_txt = "#ffffff"
             color_bd = "#2e3852"
             color_bg = "#111624"
         elif c > 1:
             texto = f"{c} Shorts programados  ·  Ver cola ▾"
-            color_txt = CYAN_ACCENT
+            color_txt = "#ffffff"
             color_bd = "#2e3852"
             color_bg = "#111624"
         else:
             texto = "Sin Shorts programados  ·  Ver cola de subidas ▾"
-            color_txt = TEXT_MUTED
+            color_txt = "#ffffff"
             color_bd = CARD_BORDER
             color_bg = CARD_BG
 
@@ -2216,12 +2271,12 @@ def iniciar_aplicacion_gui() -> None:
 
         if c_pubs > 0:
             texto = f"{c_pubs} Short{'s' if c_pubs != 1 else ''} reciente{'s' if c_pubs != 1 else ''}  ·  Ver métricas ▾"
-            color_txt = "#c084fc"
+            color_txt = "#ffffff"
             color_bd = "#382752"
             color_bg = "#161124"
         else:
             texto = "Shorts Publicados  ·  Ver métricas ▾"
-            color_txt = TEXT_MUTED
+            color_txt = "#ffffff"
             color_bd = CARD_BORDER
             color_bg = CARD_BG
 
@@ -2341,23 +2396,29 @@ def iniciar_aplicacion_gui() -> None:
                     item_card = ctk.CTkFrame(scroll_f, fg_color=CARD_BG, corner_radius=14, border_width=1, border_color=CARD_BORDER)
                     item_card.pack(fill="x", padx=10, pady=4)
 
-                    # Línea 1: Título a la izquierda, botón Ver en YouTube a la derecha
+                    # Línea 1: Título a la izquierda, Fecha y hora a la derecha
                     row_line1 = ctk.CTkFrame(item_card, fg_color="transparent")
                     row_line1.pack(fill="x", padx=14, pady=(10, 6))
 
-                    url_v = it.get("url") or ""
-                    if url_v:
-                        ctk.CTkButton(
+                    f_dia_str = str(it.get("fecha_dia") or "")
+                    hora_str = str(it.get("hora_local") or "")
+                    try:
+                        d_p = _dt.date.fromisoformat(f_dia_str)
+                        y_short = d_p.year % 100
+                        txt_fecha_prog = f"{d_p.day:02d}/{d_p.month:02d}/{y_short:02d} {hora_str[:5]}"
+                    except Exception:
+                        txt_fecha_prog = f"{f_dia_str} {hora_str}".strip()
+
+                    if txt_fecha_prog:
+                        ctk.CTkLabel(
                             row_line1,
-                            text="Ver en YouTube",
-                            command=lambda u=url_v: webbrowser.open(u),
-                            width=120,
-                            height=26,
-                            corner_radius=10,
-                            fg_color="#1e2436",
-                            hover_color="#2b354f",
-                            text_color=CYAN_ACCENT,
-                            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                            text=txt_fecha_prog,
+                            font=ctk.CTkFont(family="Consolas", size=12, weight="bold"),
+                            text_color="#ffffff",
+                            fg_color="#182030",
+                            corner_radius=8,
+                            padx=10,
+                            pady=2,
                         ).pack(side="right", padx=(8, 0))
 
                     lbl_tit = ctk.CTkLabel(
@@ -2371,7 +2432,7 @@ def iniciar_aplicacion_gui() -> None:
                     )
                     lbl_tit.pack(side="left", fill="x", expand=True)
 
-                    # Línea 2: Estado/Canal a la izquierda, Fecha y hora estilo 28/10/26 13:00 a la derecha
+                    # Línea 2: Estado/Canal a la izquierda, botón Ver en YouTube por debajo de la fecha/hora
                     row_line2 = ctk.CTkFrame(item_card, fg_color="transparent")
                     row_line2.pack(fill="x", padx=14, pady=(0, 10))
 
@@ -2399,26 +2460,20 @@ def iniciar_aplicacion_gui() -> None:
                         pady=2,
                     ).pack(side="left")
 
-                    f_dia_str = str(it.get("fecha_dia") or "")
-                    hora_str = str(it.get("hora_local") or "")
-                    try:
-                        d_p = _dt.date.fromisoformat(f_dia_str)
-                        y_short = d_p.year % 100
-                        txt_fecha_prog = f"{d_p.day:02d}/{d_p.month:02d}/{y_short:02d} {hora_str[:5]}"
-                    except Exception:
-                        txt_fecha_prog = f"{f_dia_str} {hora_str}".strip()
-
-                    if txt_fecha_prog:
-                        ctk.CTkLabel(
+                    url_v = it.get("url") or ""
+                    if url_v:
+                        ctk.CTkButton(
                             row_line2,
-                            text=txt_fecha_prog,
-                            font=ctk.CTkFont(family="Consolas", size=12, weight="bold"),
-                            text_color="#ffffff",
-                            fg_color="#182030",
-                            corner_radius=8,
-                            padx=10,
-                            pady=2,
-                        ).pack(side="right")
+                            text="Ver en YouTube",
+                            command=lambda u=url_v: webbrowser.open(u),
+                            width=120,
+                            height=26,
+                            corner_radius=10,
+                            fg_color="#1e2436",
+                            hover_color="#2b354f",
+                            text_color=CYAN_ACCENT,
+                            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                        ).pack(side="right", padx=(8, 0))
 
         win_p._render_silencioso = _render_vista
 
@@ -2576,23 +2631,29 @@ def iniciar_aplicacion_gui() -> None:
                     card_pub_v = ctk.CTkFrame(scroll_f, fg_color=CARD_BG, corner_radius=14, border_width=1, border_color=CARD_BORDER)
                     card_pub_v.pack(fill="x", padx=10, pady=4)
 
-                    # Línea 1: Título a la izquierda, botón Ver en YouTube a la derecha
+                    # Línea 1: Título a la izquierda, Fecha y hora a la derecha
                     row_line1 = ctk.CTkFrame(card_pub_v, fg_color="transparent")
                     row_line1.pack(fill="x", padx=14, pady=(10, 6))
 
-                    u_pub = it_pub.get("url") or ""
-                    if u_pub:
-                        ctk.CTkButton(
+                    fecha_str = it_pub.get("fecha_dia", "")
+                    hora_str = it_pub.get("hora_local", "")
+                    try:
+                        d_pub = _dt.date.fromisoformat(fecha_str)
+                        y_pub = d_pub.year % 100
+                        txt_fh = f"{d_pub.day:02d}/{d_pub.month:02d}/{y_pub:02d} {hora_str[:5]}"
+                    except Exception:
+                        txt_fh = f"{fecha_str} {hora_str}".strip() if (fecha_str or hora_str) else ""
+
+                    if txt_fh:
+                        ctk.CTkLabel(
                             row_line1,
-                            text="Ver en YouTube",
-                            command=lambda u=u_pub: webbrowser.open(u),
-                            width=120,
-                            height=26,
-                            corner_radius=10,
-                            fg_color="#1e2436",
-                            hover_color="#2b354f",
-                            text_color=CYAN_ACCENT,
-                            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                            text=txt_fh,
+                            font=ctk.CTkFont(family="Consolas", size=12, weight="bold"),
+                            text_color="#ffffff",
+                            fg_color="#182030",
+                            corner_radius=8,
+                            padx=10,
+                            pady=2,
                         ).pack(side="right", padx=(8, 0))
 
                     lbl_tit_pub = ctk.CTkLabel(
@@ -2606,7 +2667,7 @@ def iniciar_aplicacion_gui() -> None:
                     )
                     lbl_tit_pub.pack(side="left", fill="x", expand=True)
 
-                    # Línea 2: Vistas, Likes, Comentarios a la izquierda, Fecha y hora a la derecha
+                    # Línea 2: Vistas, Likes, Comentarios a la izquierda, botón Ver en YouTube por debajo de fecha/hora
                     row_line2 = ctk.CTkFrame(card_pub_v, fg_color="transparent")
                     row_line2.pack(fill="x", padx=14, pady=(0, 10))
 
@@ -2650,20 +2711,20 @@ def iniciar_aplicacion_gui() -> None:
                         pady=2,
                     ).pack(side="left")
 
-                    fecha_str = it_pub.get("fecha_dia", "")
-                    hora_str = it_pub.get("hora_local", "")
-                    txt_fh = f"{fecha_str} · {hora_str} hs" if fecha_str and hora_str else (fecha_str or hora_str or "")
-                    if txt_fh:
-                        ctk.CTkLabel(
+                    u_pub = it_pub.get("url") or ""
+                    if u_pub:
+                        ctk.CTkButton(
                             row_line2,
-                            text=txt_fh,
-                            font=ctk.CTkFont(family="Consolas", size=11),
-                            text_color=TEXT_MUTED,
-                            fg_color="#182030",
-                            corner_radius=8,
-                            padx=8,
-                            pady=2,
-                        ).pack(side="right")
+                            text="Ver en YouTube",
+                            command=lambda u=u_pub: webbrowser.open(u),
+                            width=120,
+                            height=26,
+                            corner_radius=10,
+                            fg_color="#1e2436",
+                            hover_color="#2b354f",
+                            text_color=CYAN_ACCENT,
+                            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                        ).pack(side="right", padx=(8, 0))
 
         win_o._render_silencioso = _render_vista
 
@@ -2991,7 +3052,7 @@ def iniciar_aplicacion_gui() -> None:
         hover_color="#1a2030",
         border_width=1,
         border_color=CARD_BORDER,
-        text_color=CYAN_ACCENT,
+        text_color="#ffffff",
         font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
     btn_cola_programados.pack(side="left", fill="both", expand=True, padx=(0, 6))
@@ -3007,7 +3068,7 @@ def iniciar_aplicacion_gui() -> None:
         hover_color="#1d162d",
         border_width=1,
         border_color=CARD_BORDER,
-        text_color="#c084fc",
+        text_color="#ffffff",
         font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
     btn_rendimiento_videos.pack(side="right", fill="both", expand=True, padx=(6, 0))
@@ -3027,6 +3088,9 @@ def iniciar_aplicacion_gui() -> None:
         if activo:
             btn_auto_1clic.pack_forget()
             row_pildoras_inferiores.pack_forget()
+            evento_cancelar.clear()
+            txt_frenar = "Frenar Proceso" if (accion_final_var.get() == "Guardar en carpeta") else "Frenar Subida"
+            btn_frenar_proceso.configure(state="normal", text=txt_frenar, fg_color="#3b151e")
             progress_card.pack(fill="x")
             row_pildoras_inferiores.pack(fill="x", pady=(10, 0))
         else:
@@ -3068,7 +3132,45 @@ def iniciar_aplicacion_gui() -> None:
     barra_progreso_proceso.set(0.0)
 
     frame_milestones = ctk.CTkFrame(progress_card, fg_color="transparent")
-    frame_milestones.pack(fill="x", padx=18, pady=(0, 12))
+    frame_milestones.pack(fill="x", padx=18, pady=(0, 10))
+
+    row_frenar_proceso = ctk.CTkFrame(progress_card, fg_color="transparent")
+    row_frenar_proceso.pack(fill="x", padx=18, pady=(0, 12))
+
+    lbl_frenar_hint = ctk.CTkLabel(
+        row_frenar_proceso,
+        text="¿Deseas frenar o diste un clic accidental? Puedes detener la operación aquí:",
+        font=ctk.CTkFont(family="Segoe UI", size=11),
+        text_color=TEXT_MUTED,
+    )
+    lbl_frenar_hint.pack(side="left", padx=(2, 0))
+
+    evento_cancelar = threading.Event()
+
+    def solicitar_frenar_proceso() -> None:
+        if not evento_cancelar.is_set():
+            evento_cancelar.set()
+            try:
+                btn_frenar_proceso.configure(state="disabled", text="Frenando...", fg_color="#220e14")
+                lbl_estado.configure(text="Frenando proceso... Asegurando archivos...", text_color="#f87171")
+            except Exception:
+                pass
+
+    btn_frenar_proceso = ctk.CTkButton(
+        row_frenar_proceso,
+        text="Frenar Subida",
+        command=solicitar_frenar_proceso,
+        height=28,
+        width=135,
+        corner_radius=10,
+        fg_color="#3b151e",
+        hover_color="#5f1d2b",
+        border_width=1,
+        border_color="#ef4444",
+        text_color="#fca5a5",
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+    )
+    btn_frenar_proceso.pack(side="right")
 
     def _actualizar_progreso_ui(
         pct_total: float,
@@ -3566,6 +3668,183 @@ def iniciar_aplicacion_gui() -> None:
 
         _mostrar_reel_idx()
 
+    def abrir_dialogo_frenado(datos_frenado: Dict[str, Any]) -> None:
+        subidos = datos_frenado.get("subidos", [])
+        editados = datos_frenado.get("editados", [])
+        cant_cola_total = datos_frenado.get("cant_total", 1)
+
+        win_f = ctk.CTkToplevel(root)
+        win_f.title("Subida Detenida · Estado del Proceso")
+        win_f.geometry("640x480")
+        win_f.resizable(False, False)
+        win_f.configure(fg_color=BG_DARK)
+        win_f.transient(root)
+        aplicar_icono_ventana(win_f)
+        win_f.grab_set()
+
+        if not subidos and not editados:
+            color_badge = "#ef4444"
+            bg_badge = "#38161c"
+            txt_badge = "PROCESO CANCELADO A TIEMPO"
+            tit_header = "No se editó ni se subió ningún video"
+            sub_header = "Detectamos que frenaste la operación a tiempo por clic accidental.\nTu canal de YouTube, tus archivos y tu cuota diaria están 100% intactos."
+        elif editados and not subidos:
+            color_badge = "#facc15"
+            bg_badge = "#342813"
+            txt_badge = "SUBIDA A YOUTUBE DETENIDA"
+            tit_header = f"Se guardaron {len(editados)} video(s) en tu equipo"
+            sub_header = "La subida a YouTube fue detenida. Los videos que ya terminaron de procesarse\nquedaron a salvo en tu carpeta 'output_shorts' sin publicarse en YouTube."
+        else:
+            color_badge = "#a855f7"
+            bg_badge = "#2c153d"
+            txt_badge = "PROCESO DETENIDO CON ENTREGAS PARCIALES"
+            tit_header = f"{len(subidos)} Short(s) subido(s) y {len(editados)} guardado(s)"
+            sub_header = "Se frenó la operación. A continuación puedes ver qué videos ya quedaron\npublicados/programados en YouTube y cuáles quedaron guardados localmente."
+
+        top_f = ctk.CTkFrame(win_f, fg_color="transparent")
+        top_f.pack(fill="x", padx=24, pady=(20, 10))
+
+        badge = ctk.CTkFrame(top_f, fg_color=bg_badge, corner_radius=10, border_width=1, border_color=color_badge)
+        badge.pack(anchor="w", pady=(0, 6))
+        ctk.CTkLabel(
+            badge,
+            text=txt_badge,
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color=color_badge,
+        ).pack(padx=10, pady=3)
+
+        ctk.CTkLabel(
+            top_f,
+            text=tit_header,
+            font=ctk.CTkFont(family="Segoe UI", size=17, weight="bold"),
+            text_color=TEXT_MAIN,
+            anchor="w",
+        ).pack(fill="x", pady=(0, 4))
+
+        ctk.CTkLabel(
+            top_f,
+            text=sub_header,
+            font=ctk.CTkFont(family="Segoe UI", size=12),
+            text_color=TEXT_MUTED,
+            anchor="w",
+            justify="left",
+        ).pack(fill="x")
+
+        scroll_detalles = ctk.CTkScrollableFrame(win_f, fg_color="#101522", corner_radius=14, border_width=1, border_color=CARD_BORDER)
+        scroll_detalles.pack(fill="both", expand=True, padx=24, pady=(6, 14))
+
+        if not subidos and not editados:
+            card_info = ctk.CTkFrame(scroll_detalles, fg_color=CARD_BG, corner_radius=12, border_width=1, border_color=CARD_BORDER)
+            card_info.pack(fill="x", padx=10, pady=10)
+            ctk.CTkLabel(
+                card_info,
+                text="Estado del Sistema:",
+                font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+                text_color=TEXT_MAIN,
+                anchor="w",
+            ).pack(fill="x", padx=14, pady=(12, 4))
+            ctk.CTkLabel(
+                card_info,
+                text="• Videos subidos a YouTube: 0\n• Videos generados en disco: 0\n• Cuota de YouTube API consumida: 0\n• Estado: Detenido inmediatamente sin modificaciones.",
+                font=ctk.CTkFont(family="Segoe UI", size=12),
+                text_color=TEXT_MUTED,
+                anchor="w",
+                justify="left",
+            ).pack(fill="x", padx=14, pady=(0, 12))
+        else:
+            if subidos:
+                ctk.CTkLabel(
+                    scroll_detalles,
+                    text=f"Videos Subidos por Completo a YouTube ({len(subidos)}):",
+                    font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+                    text_color="#4ade80",
+                    anchor="w",
+                ).pack(fill="x", padx=8, pady=(8, 4))
+                for s_item in subidos:
+                    s_card = ctk.CTkFrame(scroll_detalles, fg_color=CARD_BG, corner_radius=10, border_width=1, border_color="#1a3b2b")
+                    s_card.pack(fill="x", padx=8, pady=3)
+                    row_s = ctk.CTkFrame(s_card, fg_color="transparent")
+                    row_s.pack(fill="x", padx=12, pady=8)
+                    u_s = s_item.get("url") or ""
+                    if u_s:
+                        ctk.CTkButton(
+                            row_s,
+                            text="Ver en YouTube",
+                            command=lambda u=u_s: webbrowser.open(u),
+                            width=110,
+                            height=26,
+                            corner_radius=8,
+                            fg_color="#1e2436",
+                            hover_color="#2b354f",
+                            text_color=CYAN_ACCENT,
+                            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                        ).pack(side="right", padx=(8, 0))
+                    ctk.CTkLabel(
+                        row_s,
+                        text=f"Reel #{s_item.get('reel_num', 1)}: {str(s_item.get('titulo', 'Short'))[:50]}",
+                        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+                        text_color=TEXT_MAIN,
+                        anchor="w",
+                    ).pack(side="left", fill="x", expand=True)
+
+            if editados:
+                ctk.CTkLabel(
+                    scroll_detalles,
+                    text=f"Videos Editados y Guardados en Carpeta (No Subidos) ({len(editados)}):",
+                    font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+                    text_color="#38bdf8",
+                    anchor="w",
+                ).pack(fill="x", padx=8, pady=(12, 4))
+                for e_item in editados:
+                    e_card = ctk.CTkFrame(scroll_detalles, fg_color=CARD_BG, corner_radius=10, border_width=1, border_color="#1e2e42")
+                    e_card.pack(fill="x", padx=8, pady=3)
+                    row_e = ctk.CTkFrame(e_card, fg_color="transparent")
+                    row_e.pack(fill="x", padx=12, pady=8)
+                    ctk.CTkLabel(
+                        row_e,
+                        text=f"Reel #{e_item.get('reel_num', 1)}: {str(e_item.get('archivo', 'video.mp4'))[:45]}",
+                        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+                        text_color="#f8fafc",
+                        anchor="w",
+                    ).pack(side="left", fill="x", expand=True)
+                    ctk.CTkLabel(
+                        row_e,
+                        text="Guardado en output_shorts",
+                        font=ctk.CTkFont(family="Segoe UI", size=11),
+                        text_color="#94a3b8",
+                    ).pack(side="right")
+
+        bot_row = ctk.CTkFrame(win_f, fg_color="transparent")
+        bot_row.pack(fill="x", padx=24, pady=(0, 20))
+
+        if editados or subidos:
+            ctk.CTkButton(
+                bot_row,
+                text="Abrir Carpeta 'output_shorts'",
+                command=abrir_carpeta_salida,
+                height=38,
+                corner_radius=12,
+                fg_color="#1e2436",
+                hover_color="#2e3852",
+                border_width=1,
+                border_color=CARD_BORDER,
+                text_color=CYAN_ACCENT,
+                font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            ).pack(side="left")
+
+        ctk.CTkButton(
+            bot_row,
+            text="Entendido",
+            command=lambda: win_f.destroy(),
+            height=38,
+            width=120,
+            corner_radius=12,
+            fg_color=PURPLE_MAIN,
+            hover_color=PURPLE_HOVER,
+            text_color="#ffffff",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+        ).pack(side="right")
+
     def ejecutar_flujo_1_clic() -> None:
         api_k = obtener_gemini_api_key()
         if not api_k:
@@ -3645,6 +3924,8 @@ def iniciar_aplicacion_gui() -> None:
             sys.stdout = RedireccionadorSilencioso(cola_logs)
             sys.stderr = RedireccionadorSilencioso(cola_logs)
             links_subidos: List[str] = []
+            shorts_subidos: List[Dict[str, Any]] = []
+            shorts_guardados_disco: List[Dict[str, Any]] = []
             try:
                 from subir_a_youtube import subir_video
 
@@ -3706,6 +3987,8 @@ def iniciar_aplicacion_gui() -> None:
                         elegido_info: Optional[Tuple[str, str, int]] = None
                         canal_usado = ""
                         for c_cand in canales_intentar:
+                            if evento_cancelar.is_set():
+                                raise InterruptedError("Operación detenida por el usuario antes de procesar videos.")
                             c_lbl = etiqueta_corta_canal(c_cand)
                             pct_busq = 1.0 + (idx_sel / cant_cola) * 6.0
                             root.after(
@@ -3834,6 +4117,8 @@ def iniciar_aplicacion_gui() -> None:
                 # FASE 2: DESCARGAR, CREAR GUIÓN (IA O CUSTOM), RENDERIZAR Y SUBIR
                 # ==================================================================
                 for idx_lote, info_sel in enumerate(videos_seleccionados):
+                    if evento_cancelar.is_set():
+                        raise InterruptedError("Operación detenida por el usuario.")
                     num_actual = idx_lote + 1
                     pref_lote = f"[Reel {num_actual}/{cant_cola}] " if cant_cola > 1 else ""
                     sched_actual = horarios_lote[idx_lote] if idx_lote < len(horarios_lote) else None
@@ -3967,9 +4252,19 @@ def iniciar_aplicacion_gui() -> None:
                                 voz_override=voz_elegida,
                                 modo_encuadre_override=encuadre_elegido,
                                 progreso_cb=_cb_edicion,
+                                cancelar_check=lambda: evento_cancelar.is_set(),
                             )
                         )
                     ultimo_video_generado[0] = ruta_final
+                    shorts_guardados_disco.append({
+                        "titulo": (c_tit if (es_custom_activo and c_tit) else titulo_orig) or ruta_final.stem,
+                        "archivo": ruta_final.name,
+                        "ruta": str(ruta_final),
+                        "reel_num": num_actual,
+                    })
+
+                    if evento_cancelar.is_set():
+                        raise InterruptedError("Operación detenida por el usuario tras guardar la edición.")
 
                     if solo_guardar:
                         _actualizar_milestone_actual("subido", f"Reel {num_actual}: ¡Guardado!")
@@ -4004,7 +4299,14 @@ def iniciar_aplicacion_gui() -> None:
                             publish_at=sched_actual,
                             ruta_guion=DEFAULT_GUION_TXT,
                             cuenta_id=id_cuenta_usar,
+                            callback_cancelar=lambda: evento_cancelar.is_set(),
                         )
+                        shorts_subidos.append({
+                            "titulo": (c_tit if (es_custom_activo and c_tit) else titulo_orig) or ruta_final.stem,
+                            "url": f"https://youtube.com/shorts/{vid_id}",
+                            "cuenta": nombre_cuenta_subida,
+                            "reel_num": num_actual,
+                        })
                         incrementar_cuota_diaria(video_id=vid_id)
                         root.after(0, refrescar_barra_cuota)
                         root.after(1500, sincronizar_cola_programados_async)
@@ -4048,6 +4350,37 @@ def iniciar_aplicacion_gui() -> None:
                     root.after(2800, lambda: _mostrar_modo_progreso_activo(False) if not editando_lock.locked() else None)
 
                 root.after(0, _on_ok)
+            except InterruptedError as exc_int:
+                def _on_cancelado() -> None:
+                    subidos_nums = {u.get("reel_num") for u in shorts_subidos}
+                    editados_sin_subir = [e for e in shorts_guardados_disco if e.get("reel_num") not in subidos_nums]
+                    datos_resumen = {
+                        "subidos": shorts_subidos,
+                        "editados": editados_sin_subir,
+                        "cant_total": cant_cola,
+                    }
+                    if not shorts_subidos and not editados_sin_subir:
+                        _actualizar_progreso_ui(0.0, "Operación frenada a tiempo. Sin cambios.", "#94a3b8", "#ef4444")
+                    elif editados_sin_subir and not shorts_subidos:
+                        pct_actual = barra_progreso_proceso.get() * 100.0
+                        _actualizar_progreso_ui(
+                            pct_actual,
+                            f"Subida detenida: {len(editados_sin_subir)} video(s) guardado(s) en disco.",
+                            "#facc15",
+                            "#eab308",
+                        )
+                    else:
+                        pct_actual = barra_progreso_proceso.get() * 100.0
+                        _actualizar_progreso_ui(
+                            pct_actual,
+                            f"Proceso detenido: {len(shorts_subidos)} subido(s), {len(editados_sin_subir)} guardado(s).",
+                            "#facc15",
+                            PURPLE_MAIN,
+                        )
+                    abrir_dialogo_frenado(datos_resumen)
+                    root.after(1500, lambda: _mostrar_modo_progreso_activo(False) if not editando_lock.locked() else None)
+
+                root.after(0, _on_cancelado)
             except Exception as exc:
                 err_completo = str(exc)
                 def _on_err(err_msg: str = err_completo) -> None:

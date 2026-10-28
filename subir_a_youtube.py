@@ -17,7 +17,7 @@ import re
 import unicodedata
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Callable
 
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
     try:
@@ -602,6 +602,7 @@ def subir_video(
     estado_privacidad: Optional[str] = None,
     ruta_guion: Optional[Path] = None,
     cuenta_id: Optional[str] = None,
+    callback_cancelar: Optional[Callable[[], bool]] = None,
 ) -> str:
     """
     Sube el archivo de video especificado a YouTube con metadatos completos.
@@ -681,6 +682,9 @@ def subir_video(
     ultimo_error_subida: Optional[Exception] = None
     respuesta = None
 
+    if callback_cancelar and callback_cancelar():
+        raise InterruptedError("Subida cancelada por el usuario antes de iniciar el envío.")
+
     for idx_api, secret_cand in enumerate(pool_secrets):
         try:
             if len(pool_secrets) > 1 and secret_cand is not None:
@@ -703,6 +707,8 @@ def subir_video(
             respuesta = None
             ultimo_progreso = -1
             while respuesta is None:
+                if callback_cancelar and callback_cancelar():
+                    raise InterruptedError("Subida cancelada por el usuario durante el envío.")
                 estado, respuesta = request.next_chunk()
                 if estado:
                     progreso = int(estado.progress() * 100)

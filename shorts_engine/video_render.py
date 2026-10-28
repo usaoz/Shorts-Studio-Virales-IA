@@ -11,7 +11,7 @@ import subprocess
 import time
 import wave
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Callable
 import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
@@ -1022,6 +1022,7 @@ async def editar_video_con_guion(
     voz_override: Optional[str] = None,
     modo_encuadre_override: Optional[str] = None,
     progreso_cb: Optional[object] = None,
+    cancelar_check: Optional[Callable[[], bool]] = None,
 ) -> Path:
     def _notificar_prog(frac_0_1: float, detalle: str) -> None:
         if callable(progreso_cb):
@@ -1259,6 +1260,20 @@ async def editar_video_con_guion(
 
     # 5. Renderizar segmento por segmento con seguimiento de objetivos (Optical Flow) y subtítulos luminosos
     for idx_seg, (seg, total_frames_seg, dur_seg_exacta, palabras_sub, rms_env) in enumerate(datos_segmentos):
+        if cancelar_check and cancelar_check():
+            try:
+                if proceso_ffmpeg and proceso_ffmpeg.stdin:
+                    proceso_ffmpeg.stdin.close()
+                proceso_ffmpeg.terminate()
+                f_err.close()
+            except Exception:
+                pass
+            if ruta_mp4_final.exists():
+                try:
+                    ruta_mp4_final.unlink()
+                except Exception:
+                    pass
+            raise InterruptedError("Edición cancelada por el usuario.")
         _notificar_prog(
             0.40 + 0.58 * (idx_seg / float(max(1, len(datos_segmentos)))),
             f"Renderizando video a 60 FPS con subtítulos neón y tracking ({idx_seg + 1}/{len(datos_segmentos)})...",

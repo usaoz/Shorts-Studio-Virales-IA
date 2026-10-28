@@ -494,6 +494,33 @@ def calcular_horarios_inteligentes(
 
     slots: List[str] = []
 
+    if "Específ" in modo_horario or "Fijo" in modo_horario or "especif" in modo_horario.lower():
+        try:
+            partes = hora_inicio.strip().split(":", 1)
+            hh_esp = int(partes[0])
+            mm_esp = int(partes[1]) if len(partes) > 1 else 0
+        except Exception:
+            hh_esp, mm_esp = 13, 0
+        hh_esp = max(0, min(23, hh_esp))
+        mm_esp = max(0, min(59, mm_esp))
+
+        d_cursor = d_base
+        guard = 0
+        paso_hs = max(1, 24 // por_dia) if por_dia > 1 else 24
+        while len(slots) < cantidad_total and guard < 60:
+            guard += 1
+            dt_base_dia = _dt.datetime(d_cursor.year, d_cursor.month, d_cursor.day, hh_esp, mm_esp)
+            for idx_p in range(por_dia):
+                dt_cand = dt_base_dia + _dt.timedelta(hours=idx_p * paso_hs)
+                if dt_cand > limite_minimo:
+                    cand_str = dt_cand.strftime("%Y-%m-%d %H:%M")
+                    if not slots or cand_str > slots[-1]:
+                        slots.append(cand_str)
+                        if len(slots) >= cantidad_total:
+                            break
+            d_cursor += _dt.timedelta(days=1)
+        return slots
+
     if "Pico" in modo_horario:
         horas_del_dia = HORARIOS_PICO_OPTIMOS.get(por_dia, HORARIOS_PICO_OPTIMOS[2])
         d_cursor = d_base
