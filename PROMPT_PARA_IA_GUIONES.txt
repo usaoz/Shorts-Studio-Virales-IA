@@ -90,6 +90,7 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
    Apunta y persigue automáticamente a la persona u objeto dentro de la zona que indiques según lo que viste en el video:
    - `centro`, `izquierda`, `derecha`, `arriba`, `abajo`, `auto`, `X,Y` (ej. `45,60`), o `ninguna`.
    - ⚠️ **FRECUENCIA MODERADA: usa la flecha solo en 2 bloques clave del guion como máximo**, dejando el resto en `ninguna` para no saturar el video. No pongas flechas en bloques seguidos ni junto al círculo.
+   - ⚠️ **NUNCA uses flecha en el último bloque**: El editor añade automáticamente al final un outro freeze-frame de 1 segundo con la flecha animada apuntando al botón de Like.
    - Aparece de forma ágil y breve (~1.8 segundos) para captar la atención inmediatamente y luego desaparecer sin tapar el video.
 
 6. CIRCULO (Círculo rojo grande `circulo_rojo.png` con seguimiento inteligente de objetivos):

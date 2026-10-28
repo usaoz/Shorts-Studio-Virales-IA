@@ -795,6 +795,81 @@ def verificar_canal_youtube() -> None:
         print(f"[!] Error al consultar información del canal: {e}")
 
 
+def obtener_shorts_programados() -> List[Dict[str, Any]]:
+    """
+    Consulta en la API de YouTube todos los Shorts programados (con status.publishAt en el futuro)
+    en todas las cuentas vinculadas. Devuelve una lista ordenada por fecha de publicación.
+    """
+    import datetime as _dt
+    cuentas = listar_cuentas_vinculadas()
+    if not cuentas:
+        cuentas = [{"id": "principal", "nombre": "Canal Principal"}]
+
+    tz_local = _dt.datetime.now().astimezone().tzinfo
+    now_utc = _dt.datetime.now(_dt.timezone.utc)
+    todos: List[Dict[str, Any]] = []
+
+    for c in cuentas:
+        cid = str(c.get("id") or "principal")
+        cname = str(c.get("nombre") or cid)
+        try:
+            yt = obtener_servicio_youtube(cuenta_id=cid)
+            ch_resp = yt.channels().list(mine=True, part="contentDetails,snippet").execute()
+            items_ch = ch_resp.get("items", [])
+            if not items_ch:
+                continue
+            uploads_id = items_ch[0]["contentDetails"]["relatedPlaylists"]["uploads"]
+            pl_resp = yt.playlistItems().list(
+                playlistId=uploads_id,
+                part="snippet,contentDetails",
+                maxResults=40,
+            ).execute()
+            vids = [
+                it["contentDetails"]["videoId"]
+                for it in pl_resp.get("items", [])
+                if it.get("contentDetails", {}).get("videoId")
+            ]
+            if not vids:
+                continue
+            for i_b in range(0, len(vids), 50):
+                sub_vids = vids[i_b : i_b + 50]
+                v_resp = yt.videos().list(
+                    id=",".join(sub_vids),
+                    part="snippet,status",
+                ).execute()
+                for it in v_resp.get("items", []):
+                    st = it.get("status", {})
+                    pub_str = st.get("publishAt")
+                    if not pub_str:
+                        continue
+                    try:
+                        dt_utc = _dt.datetime.fromisoformat(pub_str.replace("Z", "+00:00"))
+                    except Exception:
+                        continue
+                    if dt_utc < now_utc:
+                        continue
+                    dt_local = dt_utc.astimezone(tz_local)
+                    vid_id = str(it.get("id") or "")
+                    tit = str(it.get("snippet", {}).get("title") or "Short sin título")
+                    todos.append({
+                        "id": vid_id,
+                        "titulo": tit,
+                        "cuenta_id": cid,
+                        "cuenta_nombre": cname,
+                        "dt_utc": dt_utc,
+                        "dt_local": dt_local,
+                        "fecha_dia": dt_local.strftime("%Y-%m-%d"),
+                        "hora_local": dt_local.strftime("%H:%M"),
+                        "url": f"https://youtube.com/shorts/{vid_id}",
+                    })
+        except Exception as e_ch:
+            print(f"[!] No se pudieron leer programados de '{cname}': {e_ch}")
+            continue
+
+    todos.sort(key=lambda x: x["dt_utc"])
+    return todos
+
+
 if __name__ == "__main__":
     print("==============================================================================")
     print(" ⚡ SUBIDOR AUTOMÁTICO DE SHORTS A YOUTUBE")

@@ -40,7 +40,7 @@ import urllib.request
 import wave
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import cv2
 import numpy as np
@@ -2358,6 +2358,60 @@ class GestorEfectosYAssets:
                 flecha_rot = flecha_rot.crop((crop_l, crop_t, crop_r, crop_b))
             lienzo.alpha_composite(flecha_rot, dest=(max(0, pos_x), max(0, pos_y)))
 
+    def dibujar_flecha_outro_like(
+        self,
+        lienzo: Image.Image,
+        t_seg: float,
+        dur_seg: float = 1.0,
+    ) -> None:
+        """
+        Dibuja la flecha roja animada apuntando directamente hacia el botón de Like
+        de la interfaz móvil de YouTube Shorts (margen derecho, X ≈ 985, Y ≈ 1040)
+        con rebote elástico y resplandor neón de alta calidad.
+        """
+        if self.flecha_base is None:
+            return
+
+        if t_seg < 0.12:
+            p_in = max(0.0, t_seg / 0.12)
+            escala = 0.50 + 0.55 * math.sin(p_in * math.pi * 0.5)
+            alpha_f = min(1.0, p_in * 1.5)
+        elif t_seg > dur_seg - 0.10:
+            p_out = max(0.0, (dur_seg - t_seg) / 0.10)
+            escala = 0.85 + 0.15 * p_out
+            alpha_f = p_out
+        else:
+            escala = 1.0
+            alpha_f = 1.0
+
+        tam_flecha = max(120, int(round(360 * escala)))
+        flecha_scaled = self.flecha_base.resize((tam_flecha, tam_flecha), Image.Resampling.LANCZOS)
+        # Rotar 180° para que la punta señale a la derecha (+X) directamente hacia el botón de Like
+        flecha_rot = flecha_scaled.rotate(180, resample=Image.Resampling.BICUBIC, expand=True)
+
+        if alpha_f < 0.99:
+            r, g, b, a = flecha_rot.split()
+            a = a.point(lambda p: int(p * alpha_f))
+            flecha_rot = Image.merge("RGBA", (r, g, b, a))
+
+        target_x = 985.0
+        target_y = 1040.0
+        rebote = 25.0 * abs(math.sin(t_seg * 10.0))
+        dist_punta = 15.0 + rebote
+
+        fw, fh = flecha_rot.size
+        pos_x = int(round(target_x - fw - dist_punta))
+        pos_y = int(round(target_y - fh / 2.0))
+
+        crop_l = max(0, -pos_x)
+        crop_t = max(0, -pos_y)
+        crop_r = min(fw, WIDTH - pos_x)
+        crop_b = min(fh, HEIGHT - pos_y)
+        if crop_r > crop_l and crop_b > crop_t:
+            if crop_l > 0 or crop_t > 0 or crop_r < fw or crop_b < fh:
+                flecha_rot = flecha_rot.crop((crop_l, crop_t, crop_r, crop_b))
+            lienzo.alpha_composite(flecha_rot, dest=(max(0, pos_x), max(0, pos_y)))
+
     def dibujar_emoji(
         self,
         lienzo: Image.Image,
@@ -2900,6 +2954,11 @@ def _limitar_circulos_guion(
             f"{', '.join(str(i + 1) for i in sorted(conservar_flechas))}."
         )
 
+    # El último bloque del video jamás debe tener flecha de seguimiento de video,
+    # porque el editor agrega automáticamente el Outro de 1 segundo con flecha apuntando al botón de Like.
+    if segmentos and segmentos[-1].flecha:
+        segmentos[-1].flecha = None
+
 
 async def editar_video_con_guion(
     ruta_video: Path,
@@ -2986,6 +3045,31 @@ async def editar_video_con_guion(
         archivos_audio_seg.append(ruta_mix_wav)
         datos_segmentos.append([seg, total_frames_seg, dur_seg_exacta, palabras_sub, rms_env])
 
+    # 2.5 Generar Outro automático de 1 segundo ("¡Deja tu like!") con freeze-frame y flecha
+    dur_outro_seg = 1.0
+    total_frames_outro = int(round(FPS * dur_outro_seg))
+    texto_outro = "¡Deja tu like!"
+    ruta_mp3_outro = TEMP_DIR / "seg_outro_like.mp3"
+    ruta_wav_outro = ruta_mp3_outro.with_suffix(".wav")
+
+    print("[*] Generando audio y mezcla para Outro final de 1 segundo (¡Deja tu like!)...")
+    dur_voz_outro, palabras_sub_outro, _, _ = await generar_voz_y_timestamps_segmento(
+        texto_outro,
+        ruta_mp3_outro,
+        voz_edge=config.voz_narrador,
+        dur_objetivo_seg=dur_outro_seg,
+    )
+    rms_env_outro = calcular_envolvente_rms(ruta_wav_outro, FPS)
+    ruta_mix_outro_wav = TEMP_DIR / "seg_outro_mix.wav"
+    gestor_sfx.mezclar_audio_segmento(
+        ruta_voz_wav=ruta_wav_outro,
+        duracion_total_seg=dur_outro_seg,
+        sfx_lista=["pop"],
+        tiene_emoji_o_flecha=True,
+        ruta_salida_wav=ruta_mix_outro_wav,
+    )
+    archivos_audio_seg.append(ruta_mix_outro_wav)
+
     _notificar_prog(0.38, "Masterizando pista de audio final con música de fondo...")
 
     # 3. Unir el audio maestro de la voz + SFX + audio de fondo del video original
@@ -3067,6 +3151,8 @@ async def editar_video_con_guion(
 
     # Nota: `config.titulo_superior` se usa únicamente para darle nombre al archivo MP4 exportado
     # y NO se renderiza encima del video.
+
+    ultimo_frame_lienzo: Optional[Image.Image] = None
 
     # 5. Renderizar segmento por segmento con seguimiento de objetivos (Optical Flow) y subtítulos luminosos
     for idx_seg, (seg, total_frames_seg, dur_seg_exacta, palabras_sub, rms_env) in enumerate(datos_segmentos):
@@ -3182,6 +3268,9 @@ async def editar_video_con_guion(
                     f"Detalles:\n{err_txt}"
                 )
 
+            if idx_seg == len(datos_segmentos) - 1 and f_idx == total_frames_seg - 1:
+                ultimo_frame_lienzo = lienzo.copy()
+
             if proceso_ffmpeg.stdin:
                 try:
                     proceso_ffmpeg.stdin.write(lienzo.convert("RGB").tobytes())
@@ -3196,6 +3285,62 @@ async def editar_video_con_guion(
                     raise RuntimeError(
                         f"Error al enviar frame a FFmpeg ({e}).\nDetalles del encoder:\n{err_txt}"
                     ) from e
+
+    # 6. Renderizar Outro automático de 1 segundo (Freeze-Frame + Desenfoque + Flecha al Like + Subtítulo Luminoso)
+    if ultimo_frame_lienzo is not None and total_frames_outro > 0:
+        _notificar_prog(0.97, "Renderizando outro de 1 segundo (¡Deja tu like!)...")
+        print("[*] Renderizando Outro de 1 segundo (Freeze-frame + desenfoque + flecha al Like)...")
+        bg_blur = ultimo_frame_lienzo.filter(ImageFilter.GaussianBlur(16))
+        oscurecedor = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 95))
+        lienzo_base_outro = Image.alpha_composite(bg_blur.convert("RGBA"), oscurecedor)
+
+        for f_idx in range(total_frames_outro):
+            t_seg = f_idx / float(FPS)
+            rms_val = float(rms_env_outro[f_idx]) if f_idx < len(rms_env_outro) else 0.0
+            lienzo_out = lienzo_base_outro.copy()
+
+            # Flecha Roja al botón de Like de YouTube Shorts (X: 985, Y: 1040)
+            gestor_assets.dibujar_flecha_outro_like(
+                lienzo=lienzo_out,
+                t_seg=t_seg,
+                dur_seg=dur_outro_seg,
+            )
+
+            # Subtítulo neón animado
+            renderizar_subtitulos_luminosos(
+                lienzo=lienzo_out,
+                palabras=palabras_sub_outro,
+                t_actual=t_seg,
+                nivel_voz_rms=rms_val,
+                y_centro=1340,
+                palabras_verdes_extra={"LIKE!", "LIKE! 👍", "LIKE"},
+            )
+
+            if proceso_ffmpeg.poll() is not None:
+                f_err.flush()
+                f_err.close()
+                err_txt = ""
+                try:
+                    err_txt = ruta_err_ffmpeg.read_text(encoding="utf-8", errors="replace").strip()
+                except Exception:
+                    pass
+                raise RuntimeError(
+                    f"FFmpeg se cerró antes de tiempo durante el outro con código {proceso_ffmpeg.returncode}.\n"
+                    f"Detalles:\n{err_txt}"
+                )
+
+            if proceso_ffmpeg.stdin:
+                try:
+                    proceso_ffmpeg.stdin.write(lienzo_out.convert("RGB").tobytes())
+                except OSError as e:
+                    f_err.flush()
+                    f_err.close()
+                    err_txt = ""
+                    try:
+                        err_txt = ruta_err_ffmpeg.read_text(encoding="utf-8", errors="replace").strip()
+                    except Exception:
+                        pass
+                    raise RuntimeError(f"Error al enviar frame de outro a FFmpeg ({e}).\nDetalles:\n{err_txt}") from e
 
     if proceso_ffmpeg.stdin:
         try:
@@ -3437,6 +3582,7 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
 5. FLECHA (`flecha.png` con seguimiento de objetivos):
    - Escribe la **coordenada porcentual exacta `X,Y`** (de `15` a `85`, donde `X` es horizontal izq->der y `Y` es vertical arriba->abajo, ej: `28,45` para un objeto a la izquierda, `72,50` a la derecha, `50,38` en el centro-arriba) del objeto o rostro exacto que quieres señalar en ese bloque, o bien `izquierda`, `derecha`, `centro`, `arriba`, `abajo`, o `ninguna`.
    - ⚠️ **FRECUENCIA MODERADA**: usa la flecha solo en **1 o 2 bloques clave del guion como máximo**, dejando el resto en `ninguna`. No pongas flechas en bloques seguidos.
+   - ⚠️ **NUNCA uses flecha en el último bloque**: El editor añade automáticamente al final un outro freeze-frame de 1 segundo con la flecha animada apuntando al botón de Like.
 6. CIRCULO (`circulo_rojo.png`):
    - Escribe la **coordenada porcentual exacta `X,Y`** del objeto exacto a rodear (ej: `30,48` o `68,45:grande`), o bien `centro`, `izquierda`, `derecha`, `arriba`, `abajo` (opcional `:grande`), o `ninguno`.
    - ⚠️ **LÍMITE ESTRICTO**: usa el círculo en **1 bloque COMO MÁXIMO** en todo el guion. En todos los demás escribe `ninguno`.
@@ -4076,26 +4222,132 @@ def iniciar_aplicacion_gui() -> None:
     if not _ico_app.exists():
         _ico_app = BASE_DIR / "icono_ctk_azul.ico"
 
-    if _ico_app.exists():
-        try:
-            root.iconbitmap(str(_ico_app))
-        except Exception:
-            pass
+    _ico_cache: Dict[str, Any] = {"big": None, "small": None}
+
+    def _obtener_iconos_nativos() -> Tuple[Any, Any]:
+        if not _ico_app.exists():
+            return None, None
+        if _ico_cache["big"] is None:
+            try:
+                import ctypes
+                user32 = ctypes.windll.user32
+                _ico_cache["big"] = user32.LoadImageW(None, str(_ico_app), 1, 32, 32, 0x10)
+                _ico_cache["small"] = user32.LoadImageW(None, str(_ico_app), 1, 16, 16, 0x10)
+            except Exception:
+                pass
+        return _ico_cache["big"], _ico_cache["small"]
+
+    def configurar_icono_taskbar_hwnd(hwnd: int) -> None:
+        """
+        Configura el icono nativo de Shorts Studio en la barra de tareas de Windows
+        y en el PropertyStore de Shell para la ventana toplevel.
+        """
+        if not _ico_app.exists() or not hwnd:
+            return
         try:
             import ctypes
+            from ctypes import wintypes
+            import uuid
+
             user32 = ctypes.windll.user32
-            root.update_idletasks()
-            top_hwnd = user32.GetParent(root.winfo_id())
-            if not top_hwnd:
-                top_hwnd = int(root.wm_frame(), 16) if root.wm_frame() else root.winfo_id()
-            h_big = user32.LoadImageW(None, str(_ico_app), 1, 32, 32, 0x10)
-            h_small = user32.LoadImageW(None, str(_ico_app), 1, 16, 16, 0x10)
+            h_big, h_small = _obtener_iconos_nativos()
             if h_big:
-                user32.SendMessageW(top_hwnd, 0x80, 1, h_big)
+                user32.SendMessageW(hwnd, 0x80, 1, h_big)  # WM_SETICON ICON_BIG
             if h_small:
-                user32.SendMessageW(top_hwnd, 0x80, 0, h_small)
+                user32.SendMessageW(hwnd, 0x80, 0, h_small)  # WM_SETICON ICON_SMALL
+
+            # Asignar AppUserModelID y RelaunchIconResource en el IPropertyStore de la ventana
+            IID_IPropertyStore = uuid.UUID("{886d8eeb-8cf2-4446-8d02-cdba1dbdcf99}")
+
+            class PROPERTYKEY(ctypes.Structure):
+                _fields_ = [("fmtid", ctypes.c_ubyte * 16), ("pid", wintypes.DWORD)]
+
+            class PROPVARIANT(ctypes.Structure):
+                _fields_ = [
+                    ("vt", wintypes.USHORT),
+                    ("wReserved1", wintypes.WORD),
+                    ("wReserved2", wintypes.WORD),
+                    ("wReserved3", wintypes.WORD),
+                    ("pwszVal", wintypes.LPWSTR),
+                    ("pad", ctypes.c_ubyte * 8),
+                ]
+
+            def _make_pkey(guid_str: str, pid: int) -> PROPERTYKEY:
+                u = uuid.UUID(guid_str)
+                pk = PROPERTYKEY()
+                pk.pid = pid
+                pk.fmtid = (ctypes.c_ubyte * 16)(*u.bytes_le)
+                return pk
+
+            PKEY_AUMID = _make_pkey("{9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}", 5)
+            PKEY_IconRes = _make_pkey("{9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}", 2)
+            PKEY_RelaunchCmd = _make_pkey("{9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}", 4)
+
+            class IPropertyStoreVtbl(ctypes.Structure):
+                _fields_ = [
+                    ("QueryInterface", ctypes.c_void_p),
+                    ("AddRef", ctypes.c_void_p),
+                    ("Release", ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)),
+                    ("GetCount", ctypes.c_void_p),
+                    ("GetAt", ctypes.c_void_p),
+                    ("GetValue", ctypes.c_void_p),
+                    ("SetValue", ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(PROPERTYKEY), ctypes.POINTER(PROPVARIANT))),
+                    ("Commit", ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p)),
+                ]
+
+            class IPropertyStore(ctypes.Structure):
+                _fields_ = [("lpVtbl", ctypes.POINTER(IPropertyStoreVtbl))]
+
+            iid_bytes = (ctypes.c_ubyte * 16)(*IID_IPropertyStore.bytes_le)
+            pps = ctypes.POINTER(IPropertyStore)()
+            if hasattr(ctypes.windll, "propsys") and hasattr(ctypes.windll.propsys, "SHGetPropertyStoreForWindow"):
+                hr = ctypes.windll.propsys.SHGetPropertyStoreForWindow(hwnd, ctypes.byref(iid_bytes), ctypes.byref(pps))
+                if hr == 0 and pps:
+                    pv_aumid = PROPVARIANT()
+                    pv_aumid.vt = 31  # VT_LPWSTR
+                    pv_aumid.pwszVal = "Mateo.ShortsStudio.App"
+                    pps.contents.lpVtbl.contents.SetValue(pps, ctypes.byref(PKEY_AUMID), ctypes.byref(pv_aumid))
+
+                    pv_icon = PROPVARIANT()
+                    pv_icon.vt = 31
+                    pv_icon.pwszVal = str(_ico_app.resolve()) + ",0"
+                    pps.contents.lpVtbl.contents.SetValue(pps, ctypes.byref(PKEY_IconRes), ctypes.byref(pv_icon))
+
+                    exe_launcher = BASE_DIR / "Shorts Studio.exe"
+                    if exe_launcher.exists():
+                        pv_cmd = PROPVARIANT()
+                        pv_cmd.vt = 31
+                        pv_cmd.pwszVal = f'"{exe_launcher.resolve()}"'
+                        pps.contents.lpVtbl.contents.SetValue(pps, ctypes.byref(PKEY_RelaunchCmd), ctypes.byref(pv_cmd))
+
+                    pps.contents.lpVtbl.contents.Commit(pps)
+                    pps.contents.lpVtbl.contents.Release(pps)
         except Exception:
             pass
+
+    def aplicar_icono_ventana(win: tk.Misc) -> None:
+        """Aplica el icono oficial de Shorts Studio a cualquier ventana toplevel."""
+        if _ico_app.exists():
+            try:
+                win.iconbitmap(str(_ico_app))
+            except Exception:
+                pass
+            try:
+                import ctypes
+                user32 = ctypes.windll.user32
+                top_hwnd = user32.GetParent(win.winfo_id())
+                if not top_hwnd:
+                    top_hwnd = int(win.wm_frame(), 16) if win.wm_frame() else win.winfo_id()
+                if top_hwnd:
+                    configurar_icono_taskbar_hwnd(top_hwnd)
+            except Exception:
+                pass
+
+    try:
+        root.iconbitmap(str(_ico_app))
+    except Exception:
+        pass
+    root.after(150, lambda: aplicar_icono_ventana(root))
 
     cola_logs: "queue.Queue[str]" = queue.Queue()
     editando_lock = threading.Lock()
@@ -4348,7 +4600,7 @@ def iniciar_aplicacion_gui() -> None:
 
     ctk.CTkLabel(
         title_box,
-        text="⚡ Shorts Studio",
+        text="Shorts Studio",
         font=ctk.CTkFont(family="Segoe UI", size=23, weight="bold"),
         text_color=TEXT_MAIN,
     ).pack(anchor="w")
@@ -4446,23 +4698,12 @@ def iniciar_aplicacion_gui() -> None:
 
         def _worker_sync() -> None:
             sincronizar_cuota_real_youtube()
-            root.after(0, refrescar_barra_cuota)
+            try:
+                root.after(0, refrescar_barra_cuota)
+            except Exception:
+                pass
 
         threading.Thread(target=_worker_sync, daemon=True).start()
-
-    btn_sync_api = ctk.CTkButton(
-        quota_top,
-        text="🔄",
-        command=sincronizar_cuota_async,
-        width=26,
-        height=28,
-        corner_radius=14,
-        fg_color="transparent",
-        hover_color="#252d42",
-        text_color=CYAN_ACCENT,
-        font=ctk.CTkFont(size=12, weight="bold"),
-    )
-    btn_sync_api.pack(side="right", padx=(2, 0))
 
     refrescar_barra_cuota()
     root.after(400, sincronizar_cuota_async)
@@ -4850,6 +5091,13 @@ def iniciar_aplicacion_gui() -> None:
             except Exception:
                 pass
         renderizar_chips_canales()
+        try:
+            try:
+                root.after(0, _actualizar_pildora_cola)
+            except Exception:
+                pass
+        except Exception:
+            pass
 
     def vincular_nueva_cuenta_gui(parent_win: Optional[tk.Misc] = None) -> None:
         def _worker_vinc() -> None:
@@ -5044,6 +5292,24 @@ def iniciar_aplicacion_gui() -> None:
     combo_hora.configure(command=refrescar_plan_ui)
     opt_intervalo.configure(command=refrescar_plan_ui)
 
+    def refrescar_texto_boton_accion() -> None:
+        """Actualiza el texto y estilo del botón de acción según si está en IA Automática o Personalizado."""
+        try:
+            if "Personalizado" in modo_contenido_var.get():
+                btn_auto_1clic.configure(
+                    text="✍️  ELEGIR SHORTS Y ARMAR GUIÓN / TÍTULO",
+                    fg_color="#0284c7",
+                    hover_color="#0369a1",
+                )
+            else:
+                btn_auto_1clic.configure(
+                    text="🚀  CREAR Y SUBIR SHORT AHORA",
+                    fg_color=PURPLE_MAIN,
+                    hover_color=PURPLE_HOVER,
+                )
+        except Exception:
+            pass
+
     def actualizar_modo_vista(*_args: object) -> None:
         _guardar_memoria()
         renderizar_chips_canales()
@@ -5054,6 +5320,7 @@ def iniciar_aplicacion_gui() -> None:
             card_canales.pack_forget()
             card_link.pack(fill="x")
         refrescar_plan_ui()
+        refrescar_texto_boton_accion()
 
     # ==========================================================================
     # VENTANA DE AJUSTES (CON TOGGLE DE MODO, CONTENIDO IA/MANUAL Y MODELO ARGON 4)
@@ -5065,6 +5332,7 @@ def iniciar_aplicacion_gui() -> None:
         win.resizable(False, False)
         win.configure(fg_color=BG_DARK)
         win.transient(root)
+        aplicar_icono_ventana(win)
         win.grab_set()
 
         ctk.CTkLabel(
@@ -5551,6 +5819,379 @@ def iniciar_aplicacion_gui() -> None:
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         ).pack(side="right", fill="x", expand=True, padx=(6, 0))
 
+    _CACHE_SHORTS_PROGRAMADOS: List[Dict[str, Any]] = []
+
+    def _obtener_programados_filtrados() -> Tuple[List[Dict[str, Any]], str, str]:
+        """
+        Retorna (items_filtrados, etiqueta_contexto, nombre_canal).
+        Filtra _CACHE_SHORTS_PROGRAMADOS según estado_seleccion_cuentas ('una', 'grupo', 'todas').
+        """
+        modo_act = str(estado_seleccion_cuentas.get("modo") or "una")
+        cid_act = str(estado_seleccion_cuentas.get("cuenta_id") or "principal")
+        g_ids = set(str(g) for g in (estado_seleccion_cuentas.get("grupo_ids") or []))
+
+        try:
+            from subir_a_youtube import listar_cuentas_vinculadas
+            cuentas = listar_cuentas_vinculadas()
+        except Exception:
+            cuentas = []
+        mapa_nombres = {str(c.get("id") or "principal"): str(c.get("nombre") or c.get("id") or "Canal") for c in cuentas}
+
+        if modo_act == "una":
+            nom_c = mapa_nombres.get(cid_act, cid_act)
+            filtrados = [x for x in _CACHE_SHORTS_PROGRAMADOS if str(x.get("cuenta_id")) == cid_act]
+            return filtrados, f"en {nom_c}", nom_c
+        elif modo_act == "grupo":
+            filtrados = [x for x in _CACHE_SHORTS_PROGRAMADOS if str(x.get("cuenta_id")) in g_ids]
+            return filtrados, f"en grupo ({len(g_ids)} canales)", f"Grupo ({len(g_ids)})"
+        else:
+            filtrados = list(_CACHE_SHORTS_PROGRAMADOS)
+            return filtrados, "en todas las cuentas", "Todas las cuentas"
+
+    def _actualizar_pildora_cola() -> None:
+        if "btn_cola_programados" not in locals() and "btn_cola_programados" not in globals():
+            return
+        items_f, txt_ctx, _ = _obtener_programados_filtrados()
+        c = len(items_f)
+        total_global = len(_CACHE_SHORTS_PROGRAMADOS)
+
+        if c == 1:
+            texto = f"📆  1 Short programado en cola {txt_ctx}  ·  Ver fecha y hora ▾"
+            color_txt = CYAN_ACCENT
+            color_bd = "#2e3852"
+            color_bg = "#111624"
+        elif c > 1:
+            texto = f"📆  {c} Shorts programados en cola {txt_ctx}  ·  Ver fechas ▾"
+            color_txt = CYAN_ACCENT
+            color_bd = "#2e3852"
+            color_bg = "#111624"
+        else:
+            if total_global > 0:
+                texto = f"📆  0 Shorts programados {txt_ctx} ({total_global} en otros canales)  ·  Ver cola ▾"
+            else:
+                texto = f"📆  Sin Shorts programados en cola  ·  Ver calendario ▾"
+            color_txt = TEXT_MUTED
+            color_bd = CARD_BORDER
+            color_bg = CARD_BG
+
+        try:
+            btn_cola_programados.configure(
+                text=texto,
+                text_color=color_txt,
+                border_color=color_bd,
+                fg_color=color_bg,
+            )
+        except Exception:
+            pass
+
+    def sincronizar_cola_programados_async() -> None:
+        def _worker_cola() -> None:
+            try:
+                from subir_a_youtube import obtener_shorts_programados
+                prog = obtener_shorts_programados()
+                _CACHE_SHORTS_PROGRAMADOS.clear()
+                _CACHE_SHORTS_PROGRAMADOS.extend(prog)
+            except Exception as e_c:
+                print(f"[!] Error al sincronizar cola: {e_c}")
+            try:
+                root.after(0, _actualizar_pildora_cola)
+            except Exception:
+                pass
+
+        threading.Thread(target=_worker_cola, daemon=True).start()
+
+    def abrir_ventana_shorts_programados() -> None:
+        win_p = ctk.CTkToplevel(root)
+        win_p.title("Shorts Programados en YouTube")
+        win_p.geometry("680x620")
+        win_p.minsize(620, 500)
+        win_p.configure(fg_color=BG_DARK)
+        win_p.transient(root)
+        aplicar_icono_ventana(win_p)
+        win_p.grab_set()
+
+        top_bar = ctk.CTkFrame(win_p, fg_color="transparent")
+        top_bar.pack(fill="x", padx=24, pady=(18, 10))
+
+        tit_f = ctk.CTkFrame(top_bar, fg_color="transparent")
+        tit_f.pack(side="left")
+
+        ctk.CTkLabel(
+            tit_f,
+            text="📆 Shorts Programados en Cola",
+            font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
+            text_color=TEXT_MAIN,
+        ).pack(anchor="w")
+
+        lbl_sub = ctk.CTkLabel(
+            tit_f,
+            text="Próximos videos a publicarse automáticamente según su schedule.",
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color=TEXT_MUTED,
+        )
+        lbl_sub.pack(anchor="w", pady=(2, 0))
+
+        # Barra de filtros (Canal seleccionado vs Todas las cuentas)
+        filter_bar = ctk.CTkFrame(win_p, fg_color="transparent")
+        filter_bar.pack(fill="x", padx=24, pady=(0, 10))
+
+        vista_var = tk.StringVar(value="filtro")
+
+        scroll_f = ctk.CTkScrollableFrame(
+            win_p,
+            fg_color=INPUT_BG,
+            corner_radius=18,
+            border_width=1,
+            border_color=CARD_BORDER,
+        )
+        scroll_f.pack(fill="both", expand=True, padx=24, pady=(0, 16))
+
+        def _render_vista() -> None:
+            for widget in scroll_f.winfo_children():
+                widget.destroy()
+
+            modo_v = vista_var.get()
+            if modo_v == "todas":
+                items_a_mostrar = list(_CACHE_SHORTS_PROGRAMADOS)
+                titulo_filtro = "todas las cuentas"
+            else:
+                items_a_mostrar, txt_ctx, _ = _obtener_programados_filtrados()
+                titulo_filtro = txt_ctx
+
+            if not items_a_mostrar:
+                empty_card = ctk.CTkFrame(scroll_f, fg_color=CARD_BG, corner_radius=14, border_width=1, border_color=CARD_BORDER)
+                empty_card.pack(fill="x", padx=16, pady=24)
+                ctk.CTkLabel(
+                    empty_card,
+                    text=f"🎉 No tienes Shorts programados {titulo_filtro}.",
+                    font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+                    text_color=TEXT_MAIN,
+                ).pack(pady=(16, 4))
+                ctk.CTkLabel(
+                    empty_card,
+                    text="Todos tus videos ya se encuentran publicados o en modo público directo.",
+                    font=ctk.CTkFont(family="Segoe UI", size=11),
+                    text_color=TEXT_MUTED,
+                ).pack(pady=(0, 12))
+
+                total_tot = len(_CACHE_SHORTS_PROGRAMADOS)
+                if total_tot > 0 and modo_v != "todas":
+                    ctk.CTkButton(
+                        empty_card,
+                        text=f"👀 Ver todos los canales ({total_tot} programados en total)",
+                        command=lambda: [vista_var.set("todas"), _actualizar_pestanas(), _render_vista()],
+                        corner_radius=12,
+                        height=32,
+                        fg_color=PURPLE_MAIN,
+                        hover_color=PURPLE_HOVER,
+                        text_color="#ffffff",
+                        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                    ).pack(pady=(0, 14))
+
+                lbl_sub.configure(text=f"0 videos programados {titulo_filtro}.")
+                return
+
+            from collections import OrderedDict
+            grupos: Dict[str, List[Dict[str, Any]]] = OrderedDict()
+            for it in items_a_mostrar:
+                f_dia = str(it.get("fecha_dia") or "Sin fecha")
+                grupos.setdefault(f_dia, []).append(it)
+
+            lbl_sub.configure(
+                text=f"{len(items_a_mostrar)} Short(s) programados {titulo_filtro} repartidos en {len(grupos)} día(s)."
+            )
+
+            hoy = _dt.date.today()
+            for f_dia, lista_dia in grupos.items():
+                try:
+                    d_obj = _dt.date.fromisoformat(f_dia)
+                    if d_obj == hoy:
+                        dia_label = f"🔥 HOY · {d_obj.day:02d} {MESES_ES[d_obj.month]} ({len(lista_dia)} Short{'s' if len(lista_dia) > 1 else ''})"
+                        color_dia = CYAN_ACCENT
+                    elif d_obj == hoy + _dt.timedelta(days=1):
+                        dia_label = f"✨ MAÑANA · {d_obj.day:02d} {MESES_ES[d_obj.month]} ({len(lista_dia)} Short{'s' if len(lista_dia) > 1 else ''})"
+                        color_dia = "#c084fc"
+                    else:
+                        dias_es = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+                        nom_dia = dias_es[d_obj.weekday()]
+                        dia_label = f"📅 {nom_dia} · {d_obj.day:02d} {MESES_ES[d_obj.month]} ({len(lista_dia)} Short{'s' if len(lista_dia) > 1 else ''})"
+                        color_dia = TEXT_MAIN
+                except Exception:
+                    dia_label = f"📅 {f_dia} ({len(lista_dia)} Shorts)"
+                    color_dia = TEXT_MAIN
+
+                dia_header = ctk.CTkFrame(scroll_f, fg_color="transparent")
+                dia_header.pack(fill="x", padx=10, pady=(12, 4))
+                ctk.CTkLabel(
+                    dia_header,
+                    text=dia_label,
+                    font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+                    text_color=color_dia,
+                ).pack(side="left")
+
+                for it in lista_dia:
+                    item_card = ctk.CTkFrame(scroll_f, fg_color=CARD_BG, corner_radius=14, border_width=1, border_color=CARD_BORDER)
+                    item_card.pack(fill="x", padx=10, pady=3)
+
+                    row_top = ctk.CTkFrame(item_card, fg_color="transparent")
+                    row_top.pack(fill="x", padx=12, pady=(8, 4))
+
+                    ctk.CTkLabel(
+                        row_top,
+                        text=f"⏰ {it.get('hora_local', '--:--')} hs",
+                        font=ctk.CTkFont(family="Consolas", size=11, weight="bold"),
+                        text_color="#facc15",
+                        fg_color="#232938",
+                        corner_radius=8,
+                        padx=8,
+                        pady=2,
+                    ).pack(side="left", padx=(0, 6))
+
+                    ctk.CTkLabel(
+                        row_top,
+                        text=f"📺 {it.get('cuenta_nombre', 'Canal')[:24]}",
+                        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                        text_color="#c084fc",
+                        fg_color="#251a3a",
+                        corner_radius=8,
+                        padx=8,
+                        pady=2,
+                    ).pack(side="left", padx=(0, 6))
+
+                    ctk.CTkLabel(
+                        row_top,
+                        text="⏳ Programado",
+                        font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+                        text_color=CYAN_ACCENT,
+                        fg_color="#122338",
+                        corner_radius=8,
+                        padx=8,
+                        pady=2,
+                    ).pack(side="left")
+
+                    url_v = it.get("url") or ""
+                    if url_v:
+                        ctk.CTkButton(
+                            row_top,
+                            text="🔗 Ver en YouTube",
+                            command=lambda u=url_v: webbrowser.open(u),
+                            width=115,
+                            height=24,
+                            corner_radius=10,
+                            fg_color="#1e2436",
+                            hover_color="#2b354f",
+                            text_color=CYAN_ACCENT,
+                            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+                        ).pack(side="right")
+
+                    lbl_tit = ctk.CTkLabel(
+                        item_card,
+                        text=str(it.get("titulo") or "Short sin título"),
+                        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+                        text_color=TEXT_MAIN,
+                        anchor="w",
+                        justify="left",
+                        wraplength=570,
+                    )
+                    lbl_tit.pack(fill="x", padx=12, pady=(2, 10))
+
+        def _actualizar_pestanas() -> None:
+            items_f, _, nom_f = _obtener_programados_filtrados()
+            c_f = len(items_f)
+            c_tot = len(_CACHE_SHORTS_PROGRAMADOS)
+
+            tab_canal.configure(text=f"📺 Canal actual: {nom_f} ({c_f})")
+            tab_todas.configure(text=f"🌐 Todas las cuentas ({c_tot})")
+
+            if vista_var.get() == "filtro":
+                tab_canal.configure(fg_color=PURPLE_MAIN, text_color="#ffffff", border_color=PURPLE_MAIN)
+                tab_todas.configure(fg_color=CARD_BG, text_color=TEXT_MUTED, border_color=CARD_BORDER)
+            else:
+                tab_canal.configure(fg_color=CARD_BG, text_color=TEXT_MUTED, border_color=CARD_BORDER)
+                tab_todas.configure(fg_color=PURPLE_MAIN, text_color="#ffffff", border_color=PURPLE_MAIN)
+
+        tab_canal = ctk.CTkButton(
+            filter_bar,
+            text="📺 Canal actual",
+            command=lambda: [vista_var.set("filtro"), _actualizar_pestanas(), _render_vista()],
+            corner_radius=12,
+            height=30,
+            border_width=1,
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        )
+        tab_canal.pack(side="left", padx=(0, 8))
+
+        tab_todas = ctk.CTkButton(
+            filter_bar,
+            text="🌐 Todas las cuentas",
+            command=lambda: [vista_var.set("todas"), _actualizar_pestanas(), _render_vista()],
+            corner_radius=12,
+            height=30,
+            border_width=1,
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        )
+        tab_todas.pack(side="left")
+
+        def _refrescar_en_vivo() -> None:
+            btn_refrescar.configure(text="🔄 ...", state="disabled")
+            if not _CACHE_SHORTS_PROGRAMADOS:
+                for w in scroll_f.winfo_children():
+                    w.destroy()
+                ctk.CTkLabel(
+                    scroll_f,
+                    text="⏳ Consultando canales de YouTube en tiempo real...",
+                    font=ctk.CTkFont(family="Segoe UI", size=12),
+                    text_color=TEXT_MUTED,
+                ).pack(pady=30)
+
+            def _worker_fetch() -> None:
+                try:
+                    from subir_a_youtube import obtener_shorts_programados
+                    items_prog = obtener_shorts_programados()
+                    _CACHE_SHORTS_PROGRAMADOS.clear()
+                    _CACHE_SHORTS_PROGRAMADOS.extend(items_prog)
+                except Exception as e_f:
+                    print(f"[!] Error refrescando programados: {e_f}")
+
+                def _ui_update() -> None:
+                    try:
+                        if win_p.winfo_exists():
+                            btn_refrescar.configure(text="🔄 Refrescar", state="normal")
+                            _actualizar_pestanas()
+                            _render_vista()
+                        _actualizar_pildora_cola()
+                    except Exception:
+                        pass
+
+                try:
+                    root.after(0, _ui_update)
+                except Exception:
+                    pass
+
+            threading.Thread(target=_worker_fetch, daemon=True).start()
+
+        btn_refrescar = ctk.CTkButton(
+            top_bar,
+            text="🔄 Refrescar",
+            command=_refrescar_en_vivo,
+            corner_radius=14,
+            height=30,
+            width=95,
+            fg_color=CARD_BG,
+            hover_color="#252d42",
+            border_width=1,
+            border_color=CARD_BORDER,
+            text_color=CYAN_ACCENT,
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        )
+        btn_refrescar.pack(side="right")
+
+        _actualizar_pestanas()
+        if _CACHE_SHORTS_PROGRAMADOS:
+            _render_vista()
+        else:
+            _refrescar_en_vivo()
+
     btn_cuenta_top = ctk.CTkButton(
         header,
         text="📺 Mi Cuenta ▾",
@@ -5760,6 +6401,23 @@ def iniciar_aplicacion_gui() -> None:
         font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold"),
     )
     btn_auto_1clic.pack(fill="x")
+    refrescar_texto_boton_accion()
+
+    btn_cola_programados = ctk.CTkButton(
+        contenedor_accion_y_progreso,
+        text="📆  Consultando cola de Shorts...",
+        command=lambda: abrir_ventana_shorts_programados(),
+        corner_radius=16,
+        height=38,
+        fg_color=CARD_BG,
+        hover_color="#1a2030",
+        border_width=1,
+        border_color=CARD_BORDER,
+        text_color=CYAN_ACCENT,
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+    )
+    btn_cola_programados.pack(fill="x", pady=(10, 0))
+    _actualizar_pildora_cola()
 
     progress_card = ctk.CTkFrame(
         contenedor_accion_y_progreso,
@@ -5768,21 +6426,22 @@ def iniciar_aplicacion_gui() -> None:
         border_width=1,
         border_color=CARD_BORDER,
     )
-    # Oculto inicialmente; al tocar "CREAR Y SUBIR SHORT AHORA", el botón desaparece
+    # Oculto inicialmente; al tocar el botón de acción, el botón desaparece
     # y aparece esta tarjeta de progreso en su lugar.
 
     def _mostrar_modo_progreso_activo(activo: bool) -> None:
         if activo:
             btn_auto_1clic.pack_forget()
+            btn_cola_programados.pack_forget()
             progress_card.pack(fill="x")
+            btn_cola_programados.pack(fill="x", pady=(10, 0))
         else:
             progress_card.pack_forget()
-            btn_auto_1clic.configure(
-                state="normal",
-                text="🚀  CREAR Y SUBIR SHORT AHORA",
-                fg_color=PURPLE_MAIN,
-            )
+            btn_cola_programados.pack_forget()
+            btn_auto_1clic.configure(state="normal")
+            refrescar_texto_boton_accion()
             btn_auto_1clic.pack(fill="x")
+            btn_cola_programados.pack(fill="x", pady=(10, 0))
 
     prog_top_row = ctk.CTkFrame(progress_card, fg_color="transparent")
     prog_top_row.pack(fill="x", padx=20, pady=(14, 6))
@@ -6042,6 +6701,7 @@ def iniciar_aplicacion_gui() -> None:
         win_c.resizable(False, False)
         win_c.configure(fg_color=BG_DARK)
         win_c.transient(root)
+        aplicar_icono_ventana(win_c)
         win_c.grab_set()
 
         total_v = len(videos_elegidos)
@@ -6633,6 +7293,7 @@ def iniciar_aplicacion_gui() -> None:
                     )
                     incrementar_cuota_diaria(video_id=vid_id)
                     root.after(0, refrescar_barra_cuota)
+                    root.after(1500, sincronizar_cola_programados_async)
                     url_short = f"https://youtube.com/shorts/{vid_id}"
                     links_subidos.append(url_short)
 
@@ -6681,6 +7342,7 @@ def iniciar_aplicacion_gui() -> None:
 
     btn_auto_1clic.configure(command=ejecutar_flujo_1_clic)
     root.after(200, vaciar_cola_logs)
+    root.after(700, sincronizar_cola_programados_async)
     root.deiconify()
     root.lift()
     root.focus_force()
