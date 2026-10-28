@@ -181,7 +181,7 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
    - Apunta y persigue automáticamente al objeto, persona o acción clave en esa zona del video.
    - Opciones: `auto` (para que la visión artificial detecte y siga el sujeto/objeto principal en movimiento), `izquierda`, `derecha`, `centro`, `arriba`, `abajo`, o bien la coordenada porcentual exacta `X,Y` (ej: `28,45` si el sujeto está a la izquierda, `72,50` a la derecha), o `ninguna`.
    - **FRECUENCIA MODERADA**: usa la flecha solo en **1 o 2 bloques clave del guion como máximo**, dejando el resto en `ninguna`. No pongas flechas en bloques seguidos.
-   - **NUNCA uses flecha en el último bloque**: El editor añade automáticamente al final un outro freeze-frame de 1 segundo con la flecha animada apuntando al botón de Like.
+   - **NUNCA uses flecha en el último bloque**: El editor añade automáticamente al final un outro freeze-frame de 0.7 segundos con la flecha animada apuntando al botón de Like y sonido de campana.
 6. CIRCULO (`circulo_rojo.png`):
    - Rodea el objeto o revelación más impactante del video: usa `auto`, `izquierda`, `derecha`, `centro` (opcional `:grande`), coordenada `X,Y`, o `ninguno`.
    - **LÍMITE ESTRICTO**: usa el círculo en **1 bloque COMO MÁXIMO** en todo el guion. En todos los demás escribe `ninguno`.

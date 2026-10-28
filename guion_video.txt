@@ -1,8 +1,8 @@
-TITULO_SUPERIOR: Perros Cocinan Comida Divertida
-TITULO_YOUTUBE: ¡Perros preparando la cena más graciosa! #shorts
-DESCRIPCION_YOUTUBE: ¡Un hombre espera sentado a que sus perros de juguete le preparen la cena pero el resultado es desopilante! ¿Te comerías este plato tan especial? #shorts #humor #fail #viral
+TITULO_SUPERIOR: Abuela Reta Joven Vehículo Escaleras
+TITULO_YOUTUBE: ¡Abuela reta a joven en sus vehículos! #shorts
+DESCRIPCION_YOUTUBE: Una abuela y un joven se retan a subir escaleras con sus vehículos eléctricos. ¡Mira quién gana esta increíble competencia! #shorts #humor #fail #viral
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-29 20:30
+SCHEDULE: 2026-10-29 15:30
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
@@ -10,8 +10,7 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | 50,38 | ninguno | ¡Este hombre espera pacientemente sentado a que sus perros de juguete le cocinen la cena! ¡Mira lo que pasa en la mesa!
-00:05 - 00:10 | zoom_in | whoosh | risa:izquierda | ninguna | ninguno | ¡El primer perrito negro giratorio añade salsa picante directamente sobre el plato! ¡Qué habilidad tan graciosa tiene!
-00:10 - 00:15 | alerta_roja | riser_suction | diablo:derecha | ninguna | 50,45:grande | ¡Ahora le toca el turno al perrito dálmata! ¡Añade salsa de soja simulando una divertida travesura casera!
-00:15 - 00:20 | temblor | punch+cartoon_laugh | risa:izquierda | ninguna | ninguno | ¡El perro naranja se pasa totalmente de la raya! ¡Rocía salsa roja de una forma sumamente descarada sobre la comida!
-00:20 - 00:25 | brillo_epico | cash_ting+party_horn | fiesta:derecha | ninguna | ninguno | ¡La cena está lista y el hombre la disfruta con mucho apetito! ¡Una divertida locura culinaria digna de compartir!
+00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | izquierda | ninguno | ¡Este joven reta a su abuela a subir estas escaleras con sus vehículos eléctricos! ¡La competencia empieza ya mismo!
+00:05 - 00:10 | zoom_in | whoosh | risa:izquierda | ninguna | ninguno | ¡El chico intenta subir su moto blanca pero batalla muchísimo mientras la abuela avanza segura con su scooter rojo!
+00:10 - 00:15 | alerta_roja | riser_suction | diablo:derecha | ninguna | centro:grande | ¡Llegan a los escalones y la abuela los cruza sin ningún problema, demostrando la fuerza de su vehículo!
+00:15 - 00:21 | temblor | punch+cartoon_laugh | fiesta:derecha | derecha | ninguno | ¡El joven intenta maniobrar pero termina perdiendo el control mientras la abuela triunfa de forma absoluta!

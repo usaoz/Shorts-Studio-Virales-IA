@@ -1131,42 +1131,51 @@ async def editar_video_con_guion(
         archivos_audio_seg.append(ruta_mix_wav)
         datos_segmentos.append([seg, total_frames_seg, dur_seg_exacta, palabras_sub, rms_env])
 
-    # 2.5 Generar Outro automático de 1 segundo con llamada nativa al Like y freeze-frame
-    dur_outro_seg = 1.0
+    # 2.5 Generar Outro automático de 0.7 segundos con llamada visual al Like (campana ding, flecha y texto neón, sin voz)
+    dur_outro_seg = 0.7
     total_frames_outro = int(round(FPS * dur_outro_seg))
-    voz_outro = config.voz_narrador
 
-    # Si es Giuseppe (voz italiana/multilingüe), "¡Dale tu like!" evita el acento francés de la 'j' en "deja"
-    es_giuseppe = "it-IT" in str(voz_outro)
-    texto_outro_tts = "¡Dale tu like!" if es_giuseppe else "¡Dejá tu like!"
-    ruta_mp3_outro = TEMP_DIR / "seg_outro_like.mp3"
-    ruta_wav_outro = ruta_mp3_outro.with_suffix(".wav")
+    print(f"[*] Configurando Outro final de {dur_outro_seg}s con sonido de campana (ding) y texto luminoso (sin voz)...")
 
-    print(f"[*] Generando audio y mezcla para Outro final de 1 segundo ({texto_outro_tts}) con voz {voz_outro}...")
-    dur_voz_outro, palabras_sub_outro, _, _ = await generar_voz_y_timestamps_segmento(
-        texto_outro_tts,
-        ruta_mp3_outro,
-        voz_edge=voz_outro,
-        dur_objetivo_seg=dur_outro_seg,
-    )
-    # Asegurar texto limpio y llamativo en los subtítulos de pantalla
-    if palabras_sub_outro and len(palabras_sub_outro) >= 3:
-        palabras_sub_outro[0].texto = "¡DALE" if es_giuseppe else "¡DEJA"
-        palabras_sub_outro[1].texto = "TU"
-        palabras_sub_outro[2].texto = "LIKE!"
-    elif palabras_sub_outro and len(palabras_sub_outro) == 2:
-        palabras_sub_outro[0].texto = "¡DALE" if es_giuseppe else "¡DEJA"
-        palabras_sub_outro[1].texto = "LIKE!"
-    rms_env_outro = calcular_envolvente_rms(ruta_wav_outro, FPS)
+    # Subtítulos sincronizados para los 0.7 segundos: ¡DEJA TU LIKE!
+    palabras_sub_outro = [
+        PalabraSubtitulo(texto="¡DEJA", inicio_seg=0.00, fin_seg=0.22),
+        PalabraSubtitulo(texto="TU", inicio_seg=0.22, fin_seg=0.44),
+        PalabraSubtitulo(texto="LIKE!", inicio_seg=0.44, fin_seg=dur_outro_seg, forzar_destaque=True),
+    ]
+
+    # Generar pista de audio para el Outro con sonido de campana (ding)
     ruta_mix_outro_wav = TEMP_DIR / "seg_outro_mix.wav"
-    gestor_sfx.mezclar_audio_segmento(
-        ruta_voz_wav=ruta_wav_outro,
-        duracion_total_seg=dur_outro_seg,
-        sfx_lista=["pop"],
-        tiene_emoji_o_flecha=True,
-        ruta_salida_wav=ruta_mix_outro_wav,
-    )
+    sr_audio = gestor_sfx.sr
+    n_samples_outro = int(round(sr_audio * dur_outro_seg))
+    mezcla_outro = np.zeros(n_samples_outro, dtype=np.float32)
+
+    ding_pcm = gestor_sfx.obtener_pcm("ding")
+    if ding_pcm is not None and len(ding_pcm) > 0:
+        n_copiar = min(n_samples_outro, len(ding_pcm))
+        mezcla_outro[:n_copiar] = ding_pcm[:n_copiar] * 0.85
+    else:
+        pop_pcm = gestor_sfx.obtener_pcm("pop")
+        if pop_pcm is not None and len(pop_pcm) > 0:
+            n_copiar = min(n_samples_outro, len(pop_pcm))
+            mezcla_outro[:n_copiar] = pop_pcm[:n_copiar] * 0.85
+
+    # Fade-out suave en los últimos ~60ms para transición limpia
+    fade_samples = min(int(sr_audio * 0.06), n_samples_outro // 4)
+    if fade_samples > 0:
+        mezcla_outro[-fade_samples:] *= np.linspace(1.0, 0.0, fade_samples, dtype=np.float32)
+
+    mezcla_outro = np.clip(mezcla_outro, -0.98, 0.98)
+    pcm_outro_bytes = (mezcla_outro * 32767).astype(np.int16).tobytes()
+
+    with wave.open(str(ruta_mix_outro_wav), "w") as wf_out:
+        wf_out.setnchannels(1)
+        wf_out.setsampwidth(2)
+        wf_out.setframerate(sr_audio)
+        wf_out.writeframes(pcm_outro_bytes)
+
     archivos_audio_seg.append(ruta_mix_outro_wav)
+    rms_env_outro = calcular_envolvente_rms(ruta_mix_outro_wav, FPS)
 
     _notificar_prog(0.38, "Masterizando pista de audio final con música de fondo...")
 
@@ -1204,10 +1213,10 @@ async def editar_video_con_guion(
 
     if pista_musica and pista_musica.exists():
         vol_bgm = max(0.18, min(0.40, getattr(config, "volumen_musica", VOLUMEN_MUSICA_FONDO)))
-        fade_start = max(0.5, dur_total_audio - 1.8)
+        fade_start = max(0.5, dur_total_audio - 0.4)
         print(f"[*] Música de fondo elegida: '{pista_musica.name}' (tono: '{tono_efectivo}', volumen: {vol_bgm:.2f}).")
         filter_str = (
-            f"[1:a]volume={vol_bgm:.2f},afade=t=out:st={fade_start:.2f}:d=1.8[bgm];"
+            f"[1:a]volume={vol_bgm:.2f},afade=t=out:st={fade_start:.2f}:d=0.4[bgm];"
             f"[0:a][bgm]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.98:level=disabled[aout]"
         )
         res_mix = subprocess.run(
@@ -1458,10 +1467,10 @@ async def editar_video_con_guion(
                                 f"Error al enviar frame a FFmpeg ({e}).\nDetalles del encoder:\n{err_txt}"
                             ) from e
 
-            # 6. Renderizar Outro automático de 1 segundo (Freeze-Frame + Desenfoque + Flecha al Like + Subtítulo Luminoso)
+            # 6. Renderizar Outro automático de 0.7 segundos (Freeze-Frame + Desenfoque + Flecha al Like + Subtítulo Luminoso)
             if ultimo_frame_lienzo is not None and total_frames_outro > 0:
                 _notificar_prog(0.97, "Renderizando outro final con flecha a 60 FPS...")
-                print("[*] Renderizando Outro de 1 segundo (Freeze-frame + desenfoque + flecha al Like)...")
+                print("[*] Renderizando Outro de 0.7 segundos (Freeze-frame + desenfoque + flecha al Like)...")
                 bg_blur = ultimo_frame_lienzo.filter(ImageFilter.GaussianBlur(16))
                 oscurecedor = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 95))
                 lienzo_base_outro = Image.alpha_composite(bg_blur.convert("RGBA"), oscurecedor)
