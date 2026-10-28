@@ -1131,19 +1131,17 @@ async def editar_video_con_guion(
         archivos_audio_seg.append(ruta_mix_wav)
         datos_segmentos.append([seg, total_frames_seg, dur_seg_exacta, palabras_sub, rms_env])
 
-    # 2.5 Generar Outro automático de 1 segundo ("¡Dejá tu like!") con freeze-frame y flecha
+    # 2.5 Generar Outro automático de 1 segundo ("¡Deja tu like!") con freeze-frame y flecha
     dur_outro_seg = 1.0
     total_frames_outro = int(round(FPS * dur_outro_seg))
-    texto_outro_tts = "¡Dejá tu láik!"
+    texto_outro_tts = "¡Deja tu like!"
     ruta_mp3_outro = TEMP_DIR / "seg_outro_like.mp3"
     ruta_wav_outro = ruta_mp3_outro.with_suffix(".wav")
 
-    # Si la voz configurada es Giuseppe (italiana), usamos Tomás para un llamado nativo en español con energía YouTuber
+    # Mantener consistencia total con la misma voz del video
     voz_outro = config.voz_narrador
-    if "it-IT" in str(voz_outro):
-        voz_outro = "es-AR-TomasNeural"
 
-    print(f"[*] Generando audio y mezcla para Outro final de 1 segundo (¡Dejá tu like!) con voz {voz_outro}...")
+    print(f"[*] Generando audio y mezcla para Outro final de 1 segundo (¡Deja tu like!) con voz {voz_outro}...")
     dur_voz_outro, palabras_sub_outro, _, _ = await generar_voz_y_timestamps_segmento(
         texto_outro_tts,
         ruta_mp3_outro,
@@ -1201,7 +1199,7 @@ async def editar_video_con_guion(
     pista_musica = seleccionar_musica_fondo(tono_efectivo)
 
     if pista_musica and pista_musica.exists():
-        vol_bgm = max(0.04, min(0.30, getattr(config, "volumen_musica", VOLUMEN_MUSICA_FONDO)))
+        vol_bgm = max(0.18, min(0.40, getattr(config, "volumen_musica", VOLUMEN_MUSICA_FONDO)))
         fade_start = max(0.5, dur_total_audio - 1.8)
         print(f"[*] Música de fondo elegida: '{pista_musica.name}' (tono: '{tono_efectivo}', volumen: {vol_bgm:.2f}).")
         filter_str = (
@@ -1349,6 +1347,13 @@ async def editar_video_con_guion(
                     rms_val = float(rms_env[f_idx]) if f_idx < len(rms_env) else 0.0
                     frame_rgb = frames_seg_rgb[f_idx]
 
+                    if f_idx % max(1, FPS // 2) == 0:
+                        frac_seg = (idx_seg + (f_idx / float(total_frames_seg))) / float(max(1, len(datos_segmentos)))
+                        _notificar_prog(
+                            0.40 + 0.54 * frac_seg,
+                            f"Renderizando a 60 FPS (seg {idx_seg + 1}/{len(datos_segmentos)} | {int(frac_seg * 100)}%)...",
+                        )
+
                     pt_c_vid = trayectoria_circulo[f_idx] if trayectoria_circulo else (WIDTH / 2.0, HEIGHT * 0.44)
                     pt_f_vid = trayectoria_flecha[f_idx] if trayectoria_flecha else pt_c_vid
                     foco_camara = pt_c_vid if trayectoria_circulo else (pt_f_vid if trayectoria_flecha else (WIDTH / 2.0, HEIGHT * 0.46))
@@ -1461,6 +1466,9 @@ async def editar_video_con_guion(
                     t_seg = f_idx / float(FPS)
                     rms_val = float(rms_env_outro[f_idx]) if f_idx < len(rms_env_outro) else 0.0
                     lienzo_out = lienzo_base_outro.copy()
+
+                    if f_idx % max(1, FPS // 2) == 0:
+                        _notificar_prog(0.95, "Renderizando outro final (¡Deja tu like!)...")
 
                     # Flecha Roja al botón de Like de YouTube Shorts (X: 985, Y: 1040)
                     gestor_assets.dibujar_flecha_outro_like(

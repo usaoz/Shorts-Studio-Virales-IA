@@ -249,14 +249,15 @@ def generar_guion_con_gemini_flash(
     schedule_str: str = "auto",
     modo_privacidad: str = "privado",
     contexto_titulo_orig: str = "",
-    modelo_preferido: str = "gemini-4-argon",
+    modelo_preferido: str = "gemini-3.5-flash-lite",
+    progreso_cb: Optional[object] = None,
 ) -> str:
     """
-    Envía el VIDEO COMPLETO comprimido + el mosaico de guía espacial + el contexto
-    original del video a la API de Google (soportando Argon 4 `gemini-4-argon`,
-    `gemini-3.8-flash` y `gemini-3.5-flash-lite`) usando un ejecutor con timeout
-    estricto por hilo para NUNCA quedarse trabado si un servidor de Google tiene
-    demanda alta o límite de cuota.
+    Sistema de Triple Pasada (Ensemble Refinement) con IA:
+    1. Pasada 1 (Gancho y Ritmo Viral): Explora el hook más adictivo e intrigante para retención.
+    2. Pasada 2 (Precisión Visual y Objetos): Analiza al detalle las acciones reales sin inventar nada.
+    3. Pasada 3 (Fusión Maestra y Perfeccionamiento): Combina lo mejor de ambas pasadas, colocando
+       las flechas, círculos, emojis y efectos sonoros (SFX) en los momentos de mayor clímax.
     """
     import concurrent.futures
     from google import genai
@@ -281,7 +282,7 @@ def generar_guion_con_gemini_flash(
             + "- IMPORTANTE: Presta mucha atención a lo que hace la persona y qué objetos reales usa (ej. si tiene un control remoto en las manos y maneja juguetes robóticos/magnéticos, o si es una broma física, descríbelo con total exactitud sin confundir juguetes con comida ni inventar cosas que no están).\n"
         )
 
-    instruccion_extra = (
+    instruccion_extra_base = (
         f"{bloque_contexto_real}\n"
         f"DATOS EXACTOS DEL VIDEO ANALIZADO:\n"
         f"- Duración total exacta del video: {dur_redondeada} segundos (de 00:00 a 00:{dur_redondeada:02d}).\n"
@@ -291,96 +292,162 @@ def generar_guion_con_gemini_flash(
         f"- En PARA_NINOS escribe: no\n"
         f"- En TONO_VIDEO escribe 'triste' si el video es triste o dramático, 'inspiracional' si es emotivo, heroico o de superación, o 'fondo' para humor, curiosidad, acción y entretenimiento general.\n"
         f"- Recuerda usar FLECHA como máximo en 2 bloques clave de todo el guion y CIRCULO como máximo en 1 bloque.\n"
-        f"Observa el video completo y el mosaico adjunto y entrega ÚNICAMENTE el bloque de guion:"
     )
-    prompt_final = PROMPT_COMPACTO_INTERNO + instruccion_extra
 
-    partes_con_video: List[object] = []
-    if video_bytes:
-        partes_con_video.append(types.Part.from_bytes(data=video_bytes, mime_type="video/mp4"))
-    partes_con_video.append(types.Part.from_bytes(data=jpeg_bytes, mime_type="image/jpeg"))
-    partes_con_video.append(prompt_final)
+    def _consultar_ia_robusta(texto_prompt: str, timeout_max: float = 40.0) -> str:
+        partes_v: List[object] = []
+        if video_bytes:
+            partes_v.append(types.Part.from_bytes(data=video_bytes, mime_type="video/mp4"))
+        partes_v.append(types.Part.from_bytes(data=jpeg_bytes, mime_type="image/jpeg"))
+        partes_v.append(texto_prompt)
 
-    partes_solo_mosaico: List[object] = [
-        types.Part.from_bytes(data=jpeg_bytes, mime_type="image/jpeg"),
-        prompt_final,
-    ]
+        partes_m: List[object] = [
+            types.Part.from_bytes(data=jpeg_bytes, mime_type="image/jpeg"),
+            texto_prompt,
+        ]
 
-    # Plan escalonado con reintentos y timeouts realistas para multimodalidad (video + mosaico):
-    candidatos_base: List[Tuple[str, List[object], float]] = [
-        (modelo_preferido, partes_con_video, 45.0),
-        ("gemini-3.5-flash-lite", partes_con_video, 45.0),
-        ("gemini-flash-lite-latest", partes_con_video, 45.0),
-        ("gemini-3.6-flash", partes_con_video, 45.0),
-        ("gemini-3.8-flash", partes_con_video, 45.0),
-        ("gemini-3.5-flash-lite", partes_solo_mosaico, 35.0),
-        ("gemini-flash-lite-latest", partes_solo_mosaico, 35.0),
-        ("gemini-3.6-flash", partes_solo_mosaico, 35.0),
-    ]
-    plan_intentos: List[Tuple[str, List[object], float]] = []
-    vistos: Set[Tuple[str, int]] = set()
-    for m, c, t in candidatos_base:
-        k_id = (m, len(c))
-        if k_id not in vistos:
-            vistos.add(k_id)
-            plan_intentos.append((m, c, t))
+        candidatos_base: List[Tuple[str, List[object], float]] = [
+            (modelo_preferido, partes_v, timeout_max),
+            ("gemini-3.5-flash-lite", partes_v, timeout_max),
+            ("gemini-flash-lite-latest", partes_v, timeout_max),
+            ("gemini-3.6-flash", partes_v, timeout_max),
+            ("gemini-3.8-flash", partes_v, timeout_max),
+            ("gemini-3.5-flash-lite", partes_m, min(30.0, timeout_max)),
+            ("gemini-flash-lite-latest", partes_m, min(30.0, timeout_max)),
+            ("gemini-3.6-flash", partes_m, min(30.0, timeout_max)),
+        ]
+        plan_intentos: List[Tuple[str, List[object], float]] = []
+        vistos: Set[Tuple[str, int]] = set()
+        for m, c, t in candidatos_base:
+            k_id = (m, len(c))
+            if k_id not in vistos:
+                vistos.add(k_id)
+                plan_intentos.append((m, c, t))
 
-    ultimo_err: Optional[Exception] = None
-    texto_respuesta = ""
+        ultimo_err: Optional[Exception] = None
+        for mod, cont_env, t_lim in plan_intentos:
+            def _call(m=mod, cnt=cont_env, tl=t_lim):
+                cli = genai.Client(
+                    api_key=key_limpia,
+                    http_options=types.HttpOptions(
+                        timeout=max(20000, int(tl * 1000)),
+                        retry_options=types.HttpRetryOptions(attempts=1),
+                    ),
+                )
+                r = cli.models.generate_content(model=m, contents=cnt)
+                return (r.text or "").strip()
 
-    def _llamar_modelo_una_vez(mod_name: str, contenido_enviar: List[object], timeout_s: float) -> str:
-        cli = genai.Client(
-            api_key=key_limpia,
-            http_options=types.HttpOptions(
-                timeout=max(20000, int(timeout_s * 1000)),
-                retry_options=types.HttpRetryOptions(attempts=2),
-            ),
-        )
-        resp = cli.models.generate_content(
-            model=mod_name,
-            contents=contenido_enviar,
-        )
-        return (resp.text or "").strip()
+            ex_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            fut = ex_pool.submit(_call)
+            try:
+                res_txt = fut.result(timeout=t_lim + 1.5)
+                ex_pool.shutdown(wait=False, cancel_futures=True)
+                if res_txt and len(res_txt) > 80:
+                    return res_txt
+            except Exception as e:
+                ultimo_err = e
+                ex_pool.shutdown(wait=False, cancel_futures=True)
+                err_msg_corto = str(e) or repr(e)
+                if "429" in err_msg_corto or "RESOURCE_EXHAUSTED" in err_msg_corto:
+                    print(f"[!] {mod} sin cuota disponible en Free Tier, pasando al siguiente...")
+                else:
+                    print(f"[!] {mod} con demora ({err_msg_corto[:70]}), pasando al siguiente...")
 
-    for mod, cont_env, t_lim in plan_intentos:
-        ex_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        fut = ex_pool.submit(_llamar_modelo_una_vez, mod, cont_env, t_lim)
+        if ultimo_err:
+            det = str(ultimo_err) if str(ultimo_err).strip() else f"Tiempo límite agotado ({repr(ultimo_err)})"
+            raise RuntimeError(f"No se pudo obtener respuesta de Gemini: {det}")
+        return ""
+
+    def _limpiar_bloque(texto_raw: str) -> str:
+        t = texto_raw.strip()
+        if t.startswith("```"):
+            lineas = t.splitlines()
+            if lineas and lineas[0].startswith("```"):
+                lineas = lineas[1:]
+            if lineas and lineas[-1].strip().startswith("```"):
+                lineas = lineas[:-1]
+            t = "\n".join(lineas).strip()
+        return t
+
+    # --- PASADA 1: Enfoque en Gancho Viral y Ritmo ---
+    if callable(progreso_cb):
         try:
-            modo_lbl = "Video+Mosaico" if len(cont_env) == 3 else "Mosaico+Contexto"
-            print(f"[*] Consultando {mod} ({modo_lbl}, máx {int(t_lim)}s)...")
-            texto_respuesta = fut.result(timeout=t_lim + 1.5)
-            ex_pool.shutdown(wait=False, cancel_futures=True)
-            if texto_respuesta and "[GUION]" in texto_respuesta:
-                print(f"[+] Respuesta recibida de {mod} correctamente.")
-                break
-            elif texto_respuesta:
-                print(f"[+] Respuesta recibida de {mod}.")
-                break
-        except Exception as e:
-            ultimo_err = e
-            ex_pool.shutdown(wait=False, cancel_futures=True)
-            err_msg_corto = str(e) or repr(e)
-            if "429" in err_msg_corto or "RESOURCE_EXHAUSTED" in err_msg_corto:
-                print(f"[!] {mod} sin cuota disponible hoy en Free Tier (límite de 20/día alcanzado), pasando al siguiente...")
-            else:
-                print(f"[!] {mod} ocupado o con demora ({err_msg_corto[:75]}), pasando al siguiente...")
+            progreso_cb(0.15, "IA Pasada 1/3: Creando gancho viral y ritmo (es la parte que más tiempo toma)...")
+        except Exception:
+            pass
+    print("[*] IA Pasada 1/3: Creando guión con enfoque en Gancho Viral y Ritmo...")
+    prompt_p1 = (
+        PROMPT_COMPACTO_INTERNO + instruccion_extra_base +
+        "\n[DIRECTIVA DE ENFOQUE 1 - RITMO Y GANCHO VIRAL]:\n"
+        "Concéntrate en generar un hook inicial explosivo en los primeros 3 segundos con preguntas o misterio, "
+        "con ritmo dinámico continuo que atrape la atención sin soltar al espectador.\n"
+        "Entrega ÚNICAMENTE el bloque de guion:"
+    )
+    guion_1_raw = _consultar_ia_robusta(prompt_p1, timeout_max=40.0)
+    guion_1 = _limpiar_bloque(guion_1_raw)
 
-    if not texto_respuesta:
-        det_err = str(ultimo_err) if str(ultimo_err).strip() else f"Tiempo de espera agotado ({repr(ultimo_err)})"
-        raise RuntimeError(f"No se pudo obtener respuesta de Gemini: {det_err}")
+    # --- PASADA 2: Enfoque en Observación Visual y Precisión de Hechos ---
+    if callable(progreso_cb):
+        try:
+            progreso_cb(0.50, "IA Pasada 2/3: Analizando precisión visual de objetos y acciones...")
+        except Exception:
+            pass
+    print("[*] IA Pasada 2/3: Creando guión con enfoque en Precisión Visual y Hechos...")
+    prompt_p2 = (
+        PROMPT_COMPACTO_INTERNO + instruccion_extra_base +
+        "\n[DIRECTIVA DE ENFOQUE 2 - PRECISIÓN VISUAL Y HECHOS]:\n"
+        "Concéntrate en observar con lupa cada segundo del video, qué objetos reales se tocan, qué hace la persona "
+        "con sus manos y qué sucede realmente sin confundir ningún elemento ni inventar cosas.\n"
+        "Entrega ÚNICAMENTE el bloque de guion:"
+    )
+    guion_2_raw = _consultar_ia_robusta(prompt_p2, timeout_max=40.0)
+    guion_2 = _limpiar_bloque(guion_2_raw)
 
-    # Limpiar posibles bloques markdown ```
-    if texto_respuesta.startswith("```"):
-        lineas = texto_respuesta.splitlines()
-        if lineas and lineas[0].startswith("```"):
-            lineas = lineas[1:]
-        if lineas and lineas[-1].strip().startswith("```"):
-            lineas = lineas[:-1]
-        texto_respuesta = "\n".join(lineas).strip()
+    # --- PASADA 3: Fusión Crítica y Perfeccionamiento Maestro ---
+    if callable(progreso_cb):
+        try:
+            progreso_cb(0.80, "IA Pasada 3/3: Fusionando y perfeccionando el guión maestro...")
+        except Exception:
+            pass
+    print("[*] IA Pasada 3/3: Fusionando lo mejor de ambos guiones en la versión maestra definitiva...")
+    prompt_p3 = (
+        f"ACTÚA COMO EL DIRECTOR Y EDITOR JEFE DE CONTENIDO VIRAL DE YOUTUBE SHORTS.\n"
+        f"Tienes dos borradores generados para el mismo video:\n\n"
+        f"--- [BORRADOR A - GANCHO VIRAL Y RITMO] ---\n{guion_1}\n\n"
+        f"--- [BORRADOR B - PRECISIÓN VISUAL Y DETALLES REALES] ---\n{guion_2}\n\n"
+        f"CONTEXTO ORIGINAL DEL VIDEO:\n{bloque_contexto_real}\n\n"
+        f"TU MISIÓN DE FUSIÓN CRÍTICA:\n"
+        f"1. Combina el gancho más atrapante y adictivo del Borrador A con la exactitud de objetos y giros reales del Borrador B.\n"
+        f"2. Asegúrate de que no haya ninguna confusión sobre los objetos ni acciones.\n"
+        f"3. Coloca las FLECHAS (máximo 2 bloques clave), CÍRCULOS (máximo 1 bloque clave), EMOJIS y SFX en los momentos de mayor impacto, sorpresa o revelación del video.\n"
+        f"4. Mantén exactamente los tiempos (de 00:00 a 00:{dur_redondeada:02d}), cada bloque de 5 segundos, y el encabezado de metadatos exacto.\n"
+        f"Entrega ÚNICAMENTE el bloque de guion final estructurado:\n\n"
+        f"TITULO_SUPERIOR: ...\nTITULO_YOUTUBE: ...\nDESCRIPCION_YOUTUBE: ...\n"
+        f"ESTADO_PUBLICACION: {modo_privacidad}\nSCHEDULE: {schedule_str.strip() if schedule_str.strip() else 'no'}\n"
+        f"PARA_NINOS: no\nMODO_ENCUADRE: full\nTONO_VIDEO: fondo\nARCHIVO_SALIDA: auto\n\n"
+        f"[GUION]\nTIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO\n"
+    )
+
+    try:
+        guion_final_raw = _consultar_ia_robusta(prompt_p3, timeout_max=35.0)
+        guion_final = _limpiar_bloque(guion_final_raw)
+        if guion_final and "[GUION]" in guion_final and len(guion_final) > 150:
+            texto_respuesta = guion_final
+            print("[+] ¡Pasada 3 completada con éxito! Guión maestro sintetizado.")
+        else:
+            texto_respuesta = guion_1 if "[GUION]" in guion_1 else guion_2
+    except Exception as err_p3:
+        print(f"[!] Fusión de pasada 3 tuvo un problema ({err_p3}), usando el mejor borrador disponible.")
+        texto_respuesta = guion_1 if "[GUION]" in guion_1 else guion_2
+
+    if not texto_respuesta or "[GUION]" not in texto_respuesta:
+        texto_respuesta = guion_1 or guion_2
 
     DEFAULT_GUION_TXT.write_text(texto_respuesta + "\n", encoding="utf-8")
-    print(f"[+] ¡Guión generado y guardado en {DEFAULT_GUION_TXT.name}!")
+    print(f"[+] ¡Guión final perfeccionado y guardado en {DEFAULT_GUION_TXT.name}!")
+    if callable(progreso_cb):
+        try:
+            progreso_cb(1.0, "Guión viral de triple pasada completado.")
+        except Exception:
+            pass
     return texto_respuesta
-
-
-

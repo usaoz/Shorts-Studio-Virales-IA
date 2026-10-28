@@ -4442,10 +4442,10 @@ def iniciar_aplicacion_gui() -> None:
                                     text=f"{p}CREANDO GUIÓN VIRAL CON IA..."
                                 ),
                             )
-                            _set_subprogreso(
-                                0.22,
-                                f"{pref_lote}Analizando video completo y contexto real con IA (es la parte que más tiempo toma)...",
-                            )
+                            def _cb_guion(sub_frac: float, msg_ia: str) -> None:
+                                frac_ia = 0.12 + max(0.0, min(1.0, sub_frac)) * 0.16
+                                _set_subprogreso(frac_ia, f"{pref_lote}{msg_ia}", "#facc15")
+
                             generar_guion_con_gemini_flash(
                                 ruta_video=ruta_video_usar,
                                 api_key=api_k,
@@ -4453,6 +4453,7 @@ def iniciar_aplicacion_gui() -> None:
                                 modo_privacidad="privado" if modo_priv == "private" else modo_priv,
                                 contexto_titulo_orig=titulo_orig,
                                 modelo_preferido=pref_modelo_ia,
+                                progreso_cb=_cb_guion,
                             )
                             if es_custom_activo and (c_tit or c_desc):
                                 _sobreescribir_campos_custom_en_guion_txt(c_tit, c_desc)
@@ -4466,8 +4467,9 @@ def iniciar_aplicacion_gui() -> None:
                         )
 
                         def _cb_edicion(pct_edit: float, txt_edit: str) -> None:
-                            # Mapea 0..100% de la edición al tramo 0.30 .. 0.88 del Reel actual
-                            frac_interna = 0.30 + (max(0.0, min(100.0, pct_edit)) / 100.0) * 0.58
+                            # Soporta tanto fracción 0.0..1.0 como porcentaje 0.0..100.0 sin saltos
+                            f_val = pct_edit if pct_edit <= 1.0 else (pct_edit / 100.0)
+                            frac_interna = 0.30 + max(0.0, min(1.0, f_val)) * 0.58
                             _set_subprogreso(frac_interna, f"{pref_lote}{txt_edit}", CYAN_ACCENT)
 
                         modo_render_elegido = "cpu" if "CPU" in modo_render_var.get() else "auto"

@@ -1,6 +1,6 @@
-TITULO_SUPERIOR: Mesero Molesto Broma Extrema
-TITULO_YOUTUBE: ¡Broma pesada al mesero en el restaurante! #shorts
-DESCRIPCION_YOUTUBE: Este mesero no aguanta ni un segundo más las locuras de los clientes. ¡Mira cómo termina esta divertida broma! #shorts #humor #broma #viral
+TITULO_SUPERIOR: Sorpresa Absurda En Lonchera Escolar
+TITULO_YOUTUBE: ¡¿Papá qué metiste en mi mochila?! #shorts
+DESCRIPCION_YOUTUBE: Descubre la divertida broma que esta niña encuentra en su mochila escolar cuando su padre le prepara una supuesta lonchera llena de sorpresas raras. #shorts #humor #bromas #viral
 ESTADO_PUBLICACION: privado
 SCHEDULE: auto
 PARA_NINOS: no
@@ -10,9 +10,8 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | 20,40 | ninguno | ¡Mira a este mesero intentando descansar mientras alguien lo interrumpe sin parar! ¡Está completamente harto de la situación actual!
-00:05 - 00:10 | zoom_in | whoosh | enojo:izquierda | ninguna | 50,45 | ¡La clienta le exige que atienda rápido y le señala el lugar donde debe sentarse! ¡El pobre empleado ya no sabe qué hacer!
-00:10 - 00:15 | flash | xp_Error | risa:derecha | ninguna | ninguno | ¡Le preparan platos para todos incluyendo a un muñeco extraño sentado en la mesa! ¡La confusión es total en este restaurante!
-00:15 - 00:20 | zoom_out | click | diablo:izquierda | ninguna | ninguno | ¡En lugar de anotar el pedido la clienta dibuja garabatos en el menú! ¡El mesero se queda sin palabras al ver semejante escena!
-00:20 - 00:25 | alerta_roja | punch | lloro:derecha | ninguna | 75,50 | ¡Para colmo le untan salsa directamente en la cara sin previo aviso! ¡El pobre empleado explota de la furia acumulada!
-00:25 - 00:29 | temblor | cartoon_laugh | fiesta:izquierda | ninguna | ninguno | ¡Da un salto desesperado para escapar del lugar mientras todos se burlan! ¡Un final totalmente caótico e inesperado!
+00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | izquierda | ninguno | ¡Mira lo que papá puso dentro del bolso de su hija para el viaje! ¡Una falsa lonchera de sushi!
+00:05 - 00:10 | zoom_in | whoosh | risa:izquierda | ninguna | ninguno | ¡Ella abre la caja y saca unos calcetines larguísimos pensando que era comida! ¡Qué confusión tan graciosa!
+00:10 - 00:15 | alerta_roja | riser_suction | diablo:derecha | ninguna | ninguno | ¡Luego intenta averiguar qué es ese objeto amarillo y resulta ser un paraguas con forma de banana! ¡Insólito!
+00:15 - 00:20 | flash | ding | fiesta:izquierda | ninguna | ninguno | ¡Y para terminar saca un pastel verde brillante que parece una vela! ¡Papá se pasó de divertido hoy!
+00:20 - 00:25 | brillo_epico | cash_ting | sorprendido:derecha | ninguna | ninguno | ¡La niña se queda totalmente asombrada con todas las bromas locas que le preparó su querido padre!
