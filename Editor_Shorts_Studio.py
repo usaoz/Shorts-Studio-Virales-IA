@@ -4903,7 +4903,7 @@ def iniciar_aplicacion_gui() -> None:
 
     lbl_titulo_canales = ctk.CTkLabel(
         top_canales,
-        text="Canales Fuente de Shorts Virales",
+        text="Canales Fuente",
         font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
         text_color=TEXT_MAIN,
     )
@@ -5409,11 +5409,11 @@ def iniciar_aplicacion_gui() -> None:
         if modo_act == "todas" and len(cuentas) > 1:
             txt_btn = f"Todas ({len(cuentas)} cuentas) ▾"
             img_btn = None
-            lbl_titulo_canales.configure(text="Canales Fuente de Shorts Virales")
+            lbl_titulo_canales.configure(text="Canales Fuente")
         elif modo_act == "grupo" and len(grupo_ids) >= 1:
             txt_btn = f"Grupo ({len(grupo_ids)} cuentas) ▾"
             img_btn = None
-            lbl_titulo_canales.configure(text="Canales Fuente de Shorts Virales")
+            lbl_titulo_canales.configure(text="Canales Fuente")
         else:
             estado_seleccion_cuentas["modo"] = "una"
             info_c = dict_por_id.get(cid_act, cuentas[0])
@@ -5423,7 +5423,7 @@ def iniciar_aplicacion_gui() -> None:
             av_p = str(info_c.get("avatar_path") or "")
             img_btn = _cargar_imagen_avatar_ctk(av_p, size_px=24)
             txt_btn = f"{nom_c[:18]}{subs_tag} ▾"
-            lbl_titulo_canales.configure(text="Canales Fuente de Shorts Virales")
+            lbl_titulo_canales.configure(text="Canales Fuente")
 
         if "btn_cuenta_top" in locals() or "btn_cuenta_top" in globals():
             try:
