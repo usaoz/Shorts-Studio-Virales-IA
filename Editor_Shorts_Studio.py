@@ -505,7 +505,7 @@ def iniciar_aplicacion_gui() -> None:
     def _formatear_boton_fecha(iso_str: str) -> str:
         try:
             d = _dt.date.fromisoformat(iso_str)
-            return f"{d.day:02d} {MESES_ES[d.month]}"
+            return f"{d.day:02d}/{d.month:02d}"
         except Exception:
             return f"{iso_str}"
 
@@ -576,18 +576,86 @@ def iniciar_aplicacion_gui() -> None:
         except Exception as e_ap:
             messagebox.showerror("Error", f"No se pudo importar el archivo JSON:\n{e_ap}", parent=parent_win or root)
 
+    def abrir_dialogo_explicativo_api_json(parent_win: Optional[tk.Misc] = None) -> None:
+        win_exp = ctk.CTkToplevel(parent_win or root)
+        win_exp.title("Aumentar Cuota Diaria de Subida")
+        win_exp.geometry("540x360")
+        win_exp.resizable(False, False)
+        win_exp.configure(fg_color=BG_DARK)
+        win_exp.transient(parent_win or root)
+        aplicar_icono_ventana(win_exp)
+        win_exp.grab_set()
+
+        card_e = ctk.CTkFrame(win_exp, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
+        card_e.pack(fill="both", expand=True, padx=20, pady=20)
+
+        ctk.CTkLabel(
+            card_e,
+            text="Aumentar Capacidad Diaria (+6 Shorts/día)",
+            font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold"),
+            text_color=TEXT_MAIN,
+        ).pack(anchor="w", padx=20, pady=(18, 8))
+
+        msg_explicativo = (
+            "YouTube limita la subida automática a aproximadamente 6 Shorts diarios "
+            "por cada proyecto de Google Cloud (cuota de 10.000 unidades de YouTube Data API v3).\n\n"
+            "Para aumentar tu límite y poder subir 12, 18, 24 o más Shorts por día, "
+            "puedes sumar archivos 'client_secrets.json' de otros proyectos de Google Cloud Console.\n\n"
+            "El sistema rotará automáticamente entre todas tus claves para no agotar la cuota de ninguna."
+        )
+
+        ctk.CTkLabel(
+            card_e,
+            text=msg_explicativo,
+            font=ctk.CTkFont(family="Segoe UI", size=12),
+            text_color=TEXT_MUTED,
+            justify="left",
+            wraplength=460,
+        ).pack(anchor="w", padx=20, pady=(0, 16))
+
+        btn_row = ctk.CTkFrame(card_e, fg_color="transparent")
+        btn_row.pack(fill="x", padx=20, pady=(8, 16))
+
+        def _proceder_seleccion() -> None:
+            win_exp.destroy()
+            agregar_api_json_gui(parent_win or root)
+
+        ctk.CTkButton(
+            btn_row,
+            text="Seleccionar client_secrets.json",
+            command=_proceder_seleccion,
+            height=34,
+            corner_radius=12,
+            fg_color=PURPLE_MAIN,
+            hover_color=PURPLE_HOVER,
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        ).pack(side="right", padx=(8, 0))
+
+        ctk.CTkButton(
+            btn_row,
+            text="Cancelar",
+            command=win_exp.destroy,
+            height=34,
+            corner_radius=12,
+            fg_color=INPUT_BG,
+            hover_color="#1d2334",
+            border_width=1,
+            border_color=CARD_BORDER,
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        ).pack(side="right")
+
     lbl_cuota_info = ctk.CTkLabel(
         quota_top,
         text="6/6 Shorts hoy",
         font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-        text_color=GREEN_ACCENT,
+        text_color="#ffffff",
     )
     lbl_cuota_info.pack(side="left", padx=(0, 8), pady=2)
 
     btn_add_api_top = ctk.CTkButton(
         quota_top,
         text="+",
-        command=lambda: agregar_api_json_gui(root),
+        command=lambda: abrir_dialogo_explicativo_api_json(root),
         width=28,
         height=28,
         corner_radius=14,
@@ -601,10 +669,9 @@ def iniciar_aplicacion_gui() -> None:
     def refrescar_barra_cuota() -> None:
         max_tot, n_apis = obtener_max_shorts_pool_dia()
         usados_h, disp_h, _pct = obtener_estado_cuota_diaria()
-        color_b = GREEN_ACCENT if disp_h >= 3 else ("#facc15" if disp_h >= 1 else "#ef4444")
         lbl_cuota_info.configure(
             text=f"{disp_h}/{max_tot} Shorts restantes",
-            text_color=color_b,
+            text_color="#ffffff",
         )
 
     def sincronizar_cuota_async() -> None:
@@ -1108,7 +1175,7 @@ def iniciar_aplicacion_gui() -> None:
 
     ctk.CTkLabel(
         pub_header,
-        text="Plan de Subida y Programación Inteligente",
+        text="Plan de Subida y Programación",
         font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
         text_color=TEXT_MAIN,
     ).pack(side="left")
@@ -1116,13 +1183,8 @@ def iniciar_aplicacion_gui() -> None:
     pub_header_controls = ctk.CTkFrame(pub_header, fg_color="transparent")
     pub_header_controls.pack(side="right")
 
-    box_cant = ctk.CTkFrame(pub_header_controls, fg_color="transparent")
-    box_cant.pack(side="left", padx=(0, 10))
-    ctk.CTkLabel(
-        box_cant, text="Cantidad Total", font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"), text_color=TEXT_MUTED
-    ).pack(anchor="w", pady=(0, 2))
     opt_cantidad_total = ctk.CTkOptionMenu(
-        box_cant,
+        pub_header_controls,
         variable=cantidad_total_var,
         values=list(MAPA_CANTIDAD_TOTAL.keys()),
         corner_radius=12,
@@ -1133,15 +1195,10 @@ def iniciar_aplicacion_gui() -> None:
         button_hover_color="#333e5a",
         font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
-    opt_cantidad_total.pack()
+    opt_cantidad_total.pack(side="left", padx=(0, 8))
 
-    box_pordia = ctk.CTkFrame(pub_header_controls, fg_color="transparent")
-    box_pordia.pack(side="left", padx=(0, 12))
-    ctk.CTkLabel(
-        box_pordia, text="Shorts por Día", font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"), text_color=TEXT_MUTED
-    ).pack(anchor="w", pady=(0, 2))
     opt_por_dia = ctk.CTkOptionMenu(
-        box_pordia,
+        pub_header_controls,
         variable=shorts_por_dia_var,
         values=list(MAPA_POR_DIA.keys()),
         corner_radius=12,
@@ -1152,33 +1209,51 @@ def iniciar_aplicacion_gui() -> None:
         button_hover_color="#333e5a",
         font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
-    opt_por_dia.pack()
+    opt_por_dia.pack(side="left", padx=(0, 8))
 
-    def _on_priv_change(val: str) -> None:
-        if val == "Público":
-            privacidad_var.set("Privado")
-        _guardar_memoria()
+    # Opciones de horario manual ("Desde mi hora" y "Cada X hs") arriba a la derecha
+    frame_manual_horas = ctk.CTkFrame(pub_header_controls, fg_color="transparent")
 
-    box_priv = ctk.CTkFrame(pub_header_controls, fg_color="transparent")
-    box_priv.pack(side="left")
-    ctk.CTkLabel(
-        box_priv, text="Visibilidad Base", font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"), text_color=TEXT_MUTED
-    ).pack(anchor="w", pady=(0, 2))
-    seg_priv = ctk.CTkSegmentedButton(
-        box_priv,
-        values=["Privado", "Oculto"],
-        variable=privacidad_var,
-        command=_on_priv_change,
+    lbl_desde = ctk.CTkLabel(
+        frame_manual_horas,
+        text="Desde:",
+        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        text_color=TEXT_MUTED,
+    )
+    lbl_desde.pack(side="left", padx=(4, 4))
+
+    LISTA_HORAS_SCROLL = [f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)]
+    combo_hora = ctk.CTkComboBox(
+        frame_manual_horas,
+        variable=hora_elegida_var,
+        values=LISTA_HORAS_SCROLL,
+        state="readonly",
         corner_radius=12,
         height=30,
+        width=88,
         fg_color=INPUT_BG,
-        selected_color=PURPLE_MAIN,
-        selected_hover_color=PURPLE_HOVER,
-        unselected_color=INPUT_BG,
-        unselected_hover_color="#1a2030",
-        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        border_color="#2a3147",
+        button_color="#252d42",
+        button_hover_color="#333e5a",
+        dropdown_fg_color="#141824",
+        dropdown_hover_color=PURPLE_MAIN,
+        font=ctk.CTkFont(family="Consolas", size=12, weight="bold"),
     )
-    seg_priv.pack()
+    combo_hora.pack(side="left", padx=(0, 6))
+
+    opt_intervalo = ctk.CTkOptionMenu(
+        frame_manual_horas,
+        variable=intervalo_horas_var,
+        values=list(MAPA_INTERVALO_HS.keys()),
+        corner_radius=12,
+        height=30,
+        width=98,
+        fg_color=INPUT_BG,
+        button_color="#252d42",
+        button_hover_color="#333e5a",
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+    )
+    opt_intervalo.pack(side="left", padx=(0, 4))
 
     def _cargar_imagen_avatar_ctk(avatar_path_str: str, size_px: int = 24) -> Optional[ctk.CTkImage]:
         if not avatar_path_str:
@@ -1314,68 +1389,24 @@ def iniciar_aplicacion_gui() -> None:
 
     # Programar está siempre activo (todos los Shorts se programan en sus horarios inteligentes)
 
-    # FILA 2: Fecha de Inicio + Controles de Hora / Intervalo + Vista Previa + Toggle Horarios Pico / Cada X hs
+    # FILA 2: Fecha de Inicio (DD/MM blanco) + Vista Previa de Salidas (blanco) + Toggle Horarios Pico / Cada X hs
     row_plan2 = ctk.CTkFrame(card_pub, fg_color="transparent")
     row_plan2.pack(fill="x", padx=20, pady=(0, 12))
 
     btn_calendario = ctk.CTkButton(
         row_plan2,
         text=_formatear_boton_fecha(fecha_elegida_var.get()),
-        corner_radius=16,
+        corner_radius=14,
         height=34,
-        width=110,
+        width=80,
         fg_color=INPUT_BG,
         hover_color="#1c2233",
         border_width=1,
         border_color="#2e3852",
-        text_color=CYAN_ACCENT,
+        text_color="#ffffff",
         font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
     btn_calendario.pack(side="left", padx=(0, 8))
-
-    # Sub-frame para Controles Manuales (Hora de arranque + Intervalo cada X hs)
-    frame_manual_horas = ctk.CTkFrame(row_plan2, fg_color="transparent")
-
-    lbl_desde = ctk.CTkLabel(
-        frame_manual_horas,
-        text="Desde:",
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-        text_color=TEXT_MUTED,
-    )
-    lbl_desde.pack(side="left", padx=(2, 4))
-
-    LISTA_HORAS_SCROLL = [f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)]
-    combo_hora = ctk.CTkComboBox(
-        frame_manual_horas,
-        variable=hora_elegida_var,
-        values=LISTA_HORAS_SCROLL,
-        state="readonly",
-        corner_radius=14,
-        height=34,
-        width=92,
-        fg_color=INPUT_BG,
-        border_color="#2a3147",
-        button_color="#252d42",
-        button_hover_color="#333e5a",
-        dropdown_fg_color="#141824",
-        dropdown_hover_color=PURPLE_MAIN,
-        font=ctk.CTkFont(family="Consolas", size=13, weight="bold"),
-    )
-    combo_hora.pack(side="left", padx=(0, 6))
-
-    opt_intervalo = ctk.CTkOptionMenu(
-        frame_manual_horas,
-        variable=intervalo_horas_var,
-        values=list(MAPA_INTERVALO_HS.keys()),
-        corner_radius=14,
-        height=34,
-        width=102,
-        fg_color=INPUT_BG,
-        button_color="#252d42",
-        button_hover_color="#333e5a",
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-    )
-    opt_intervalo.pack(side="left", padx=(0, 6))
 
     # Píldora de Vista Previa de los horarios exactos en los que saldrá cada Short
     preview_box = ctk.CTkFrame(row_plan2, fg_color=INPUT_BG, corner_radius=14, border_width=1, border_color="#1f263a")
@@ -1385,8 +1416,8 @@ def iniciar_aplicacion_gui() -> None:
         preview_box,
         text="",
         font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-        text_color="#a7f3d0",
-        wraplength=380,
+        text_color="#ffffff",
+        wraplength=540,
         justify="left",
     )
     lbl_preview_horarios.pack(anchor="w", padx=12, pady=6, fill="x")
@@ -1435,12 +1466,7 @@ def iniciar_aplicacion_gui() -> None:
         es_editado = "Editado" in mf
         solo_guardar = accion_final_var.get() == "Guardar en carpeta"
 
-        if privacidad_var.get() == "Público":
-            privacidad_var.set("Privado")
-        try:
-            seg_priv.configure(values=["Privado", "Oculto"])
-        except Exception:
-            pass
+        privacidad_var.set("Privado")
 
         if es_canales:
             opt_cantidad_total.configure(state="normal")
@@ -1460,32 +1486,25 @@ def iniciar_aplicacion_gui() -> None:
         if "Pico" in modo_horario_var.get():
             frame_manual_horas.pack_forget()
         else:
-            preview_box.pack_forget()
-            frame_manual_horas.pack(side="left", padx=(0, 6))
-            preview_box.pack(side="left", fill="x", expand=True)
-
-        if not programar_var.get():
-            lbl_preview_horarios.configure(
-                text="Subida inmediata sin programación (se publicarán ahora mismo)",
-                text_color="#facc15",
-            )
-            autoajustar_tamano_ventana()
-            return
+            frame_manual_horas.pack(side="left", padx=(8, 0))
 
         slots = calcular_lista_horarios_actual()
         partes_prev: List[str] = []
         for idx_s, s_str in enumerate(slots):
             if not s_str:
                 continue
-            f_part, h_part = s_str.split(" ")
-            d_obj = _dt.date.fromisoformat(f_part)
-            d_txt = f"{d_obj.day:02d} {MESES_ES[d_obj.month]}"
-            partes_prev.append(f"#{idx_s + 1} {d_txt} {h_part}")
+            try:
+                f_part, h_part = s_str.split(" ")
+                d_obj = _dt.date.fromisoformat(f_part)
+                d_txt = f"{d_obj.day:02d}/{d_obj.month:02d}"
+                partes_prev.append(f"#{idx_s + 1} {d_txt} {h_part}")
+            except Exception:
+                partes_prev.append(f"#{idx_s + 1} {s_str}")
 
         resumen_str = "  ·  ".join(partes_prev)
         lbl_preview_horarios.configure(
-            text=f"Salidas ({len(partes_prev)}): {resumen_str}",
-            text_color="#a7f3d0",
+            text=resumen_str,
+            text_color="#ffffff",
             wraplength=540,
             justify="left",
         )
@@ -1494,7 +1513,6 @@ def iniciar_aplicacion_gui() -> None:
     seg_estrategia.configure(command=refrescar_plan_ui)
     opt_cantidad_total.configure(command=refrescar_plan_ui)
     opt_por_dia.configure(command=refrescar_plan_ui)
-    seg_priv.configure(command=refrescar_plan_ui)
     combo_hora.configure(command=refrescar_plan_ui)
     opt_intervalo.configure(command=refrescar_plan_ui)
 
@@ -2319,94 +2337,88 @@ def iniciar_aplicacion_gui() -> None:
                     text_color=TEXT_MUTED,
                 ).pack(pady=(0, 14))
             else:
-                from collections import OrderedDict
-                grupos: Dict[str, List[Dict[str, Any]]] = OrderedDict()
                 for it in items_a_mostrar:
-                    f_dia = str(it.get("fecha_dia") or "Sin fecha")
-                    grupos.setdefault(f_dia, []).append(it)
+                    item_card = ctk.CTkFrame(scroll_f, fg_color=CARD_BG, corner_radius=14, border_width=1, border_color=CARD_BORDER)
+                    item_card.pack(fill="x", padx=10, pady=4)
 
-                hoy = _dt.date.today()
-                for f_dia, lista_dia in grupos.items():
-                    try:
-                        d_obj = _dt.date.fromisoformat(f_dia)
-                        if d_obj == hoy:
-                            dia_label = f"HOY · {d_obj.day:02d} {MESES_ES[d_obj.month]} ({len(lista_dia)} Short{'s' if len(lista_dia) > 1 else ''})"
-                            color_dia = CYAN_ACCENT
-                        elif d_obj == hoy + _dt.timedelta(days=1):
-                            dia_label = f"MAÑANA · {d_obj.day:02d} {MESES_ES[d_obj.month]} ({len(lista_dia)} Short{'s' if len(lista_dia) > 1 else ''})"
-                            color_dia = "#c084fc"
-                        else:
-                            dias_es = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-                            nom_dia = dias_es[d_obj.weekday()]
-                            dia_label = f"{nom_dia} · {d_obj.day:02d} {MESES_ES[d_obj.month]} ({len(lista_dia)} Short{'s' if len(lista_dia) > 1 else ''})"
-                            color_dia = TEXT_MAIN
-                    except Exception:
-                        dia_label = f"{f_dia} ({len(lista_dia)} Shorts)"
-                        color_dia = TEXT_MAIN
+                    # Línea 1: Título a la izquierda, botón Ver en YouTube a la derecha
+                    row_line1 = ctk.CTkFrame(item_card, fg_color="transparent")
+                    row_line1.pack(fill="x", padx=14, pady=(10, 6))
 
-                    dia_header = ctk.CTkFrame(scroll_f, fg_color="transparent")
-                    dia_header.pack(fill="x", padx=10, pady=(10, 4))
+                    url_v = it.get("url") or ""
+                    if url_v:
+                        ctk.CTkButton(
+                            row_line1,
+                            text="Ver en YouTube",
+                            command=lambda u=url_v: webbrowser.open(u),
+                            width=120,
+                            height=26,
+                            corner_radius=10,
+                            fg_color="#1e2436",
+                            hover_color="#2b354f",
+                            text_color=CYAN_ACCENT,
+                            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                        ).pack(side="right", padx=(8, 0))
+
+                    lbl_tit = ctk.CTkLabel(
+                        row_line1,
+                        text=str(it.get("titulo") or "Short sin título"),
+                        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+                        text_color=TEXT_MAIN,
+                        anchor="w",
+                        justify="left",
+                        wraplength=520,
+                    )
+                    lbl_tit.pack(side="left", fill="x", expand=True)
+
+                    # Línea 2: Estado/Canal a la izquierda, Fecha y hora estilo 28/10/26 13:00 a la derecha
+                    row_line2 = ctk.CTkFrame(item_card, fg_color="transparent")
+                    row_line2.pack(fill="x", padx=14, pady=(0, 10))
+
+                    nom_cuenta = str(it.get("cuenta_nombre") or "")
+                    if nom_cuenta:
+                        ctk.CTkLabel(
+                            row_line2,
+                            text=nom_cuenta[:20],
+                            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                            text_color="#c084fc",
+                            fg_color="#221834",
+                            corner_radius=8,
+                            padx=10,
+                            pady=2,
+                        ).pack(side="left", padx=(0, 8))
+
                     ctk.CTkLabel(
-                        dia_header,
-                        text=dia_label,
-                        font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-                        text_color=color_dia,
+                        row_line2,
+                        text="Programado",
+                        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                        text_color=CYAN_ACCENT,
+                        fg_color="#0e2a3a",
+                        corner_radius=8,
+                        padx=10,
+                        pady=2,
                     ).pack(side="left")
 
-                    for it in lista_dia:
-                        item_card = ctk.CTkFrame(scroll_f, fg_color=CARD_BG, corner_radius=14, border_width=1, border_color=CARD_BORDER)
-                        item_card.pack(fill="x", padx=10, pady=3)
+                    f_dia_str = str(it.get("fecha_dia") or "")
+                    hora_str = str(it.get("hora_local") or "")
+                    try:
+                        d_p = _dt.date.fromisoformat(f_dia_str)
+                        y_short = d_p.year % 100
+                        txt_fecha_prog = f"{d_p.day:02d}/{d_p.month:02d}/{y_short:02d} {hora_str[:5]}"
+                    except Exception:
+                        txt_fecha_prog = f"{f_dia_str} {hora_str}".strip()
 
-                        row_top = ctk.CTkFrame(item_card, fg_color="transparent")
-                        row_top.pack(fill="x", padx=12, pady=(8, 4))
-
+                    if txt_fecha_prog:
                         ctk.CTkLabel(
-                            row_top,
-                            text=f"{it.get('hora_local', '--:--')} hs",
+                            row_line2,
+                            text=txt_fecha_prog,
                             font=ctk.CTkFont(family="Consolas", size=12, weight="bold"),
-                            text_color="#facc15",
-                            fg_color="#232938",
+                            text_color="#ffffff",
+                            fg_color="#182030",
                             corner_radius=8,
-                            padx=8,
+                            padx=10,
                             pady=2,
-                        ).pack(side="left", padx=(0, 6))
-
-                        ctk.CTkLabel(
-                            row_top,
-                            text="Programado",
-                            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-                            text_color=CYAN_ACCENT,
-                            fg_color="#122338",
-                            corner_radius=8,
-                            padx=8,
-                            pady=2,
-                        ).pack(side="left")
-
-                        url_v = it.get("url") or ""
-                        if url_v:
-                            ctk.CTkButton(
-                                row_top,
-                                text="Ver en YouTube",
-                                command=lambda u=url_v: webbrowser.open(u),
-                                width=120,
-                                height=24,
-                                corner_radius=10,
-                                fg_color="#1e2436",
-                                hover_color="#2b354f",
-                                text_color=CYAN_ACCENT,
-                                font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-                            ).pack(side="right")
-
-                        lbl_tit = ctk.CTkLabel(
-                            item_card,
-                            text=str(it.get("titulo") or "Short sin título"),
-                            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-                            text_color=TEXT_MAIN,
-                            anchor="w",
-                            justify="left",
-                            wraplength=640,
-                        )
-                        lbl_tit.pack(fill="x", padx=12, pady=(2, 10))
+                        ).pack(side="right")
 
         win_p._render_silencioso = _render_vista
 
