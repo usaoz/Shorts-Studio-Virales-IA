@@ -112,6 +112,32 @@ class SegmentoVideoGuion:
     flecha: Optional[str] = None
     circulo: Optional[str] = None
     tamano_circulo: str = "medio"
+    track_flecha_activo: bool = False
+    track_circulo_activo: bool = False
+    callout_flecha: Optional[str] = None
+    callout_circulo: Optional[str] = None
+    tiene_circulo: bool = False
+    tiene_flecha: bool = False
+    tiene_emoji: bool = False
+    tiene_foto: bool = False
+    emoji_nombre: Optional[str] = None
+    foto_nombre: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if self.flecha:
+            self.track_flecha_activo = True
+            self.tiene_flecha = True
+            if not self.callout_flecha:
+                self.callout_flecha = self.flecha
+        if self.circulo:
+            self.track_circulo_activo = True
+            self.tiene_circulo = True
+            if not self.callout_circulo:
+                self.callout_circulo = self.circulo
+        if self.emoji:
+            self.tiene_emoji = True
+            if not self.emoji_nombre:
+                self.emoji_nombre = self.emoji
 
 @dataclass
 class ConfigGuion:

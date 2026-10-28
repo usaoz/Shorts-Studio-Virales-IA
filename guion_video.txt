@@ -1,6 +1,6 @@
-TITULO_SUPERIOR: Pareja Pelea Divertida En Carro
-TITULO_YOUTUBE: ¡Cuando intentas dominar el auto y sale mal! 😂 #shorts
-DESCRIPCION_YOUTUBE: Esta divertida pareja tiene una discusión inesperada en el coche cuando ella decide poner sus pies en el tablero. ¿Qué harías tú en esa situación? #shorts #humor #fail #viral
+TITULO_SUPERIOR: Barbilla De Acero En Clase
+TITULO_YOUTUBE: ¡Sorprendió al profesor con su barbilla! #shorts
+DESCRIPCION_YOUTUBE: Unos estudiantes demuestran la increíble fuerza de su barbilla rompiendo varios objetos en plena clase. ¡El último alumno dejó a todos sin palabras! #shorts #humor #fail #viral
 ESTADO_PUBLICACION: privado
 SCHEDULE: 2026-10-29 19:00
 PARA_NINOS: no
@@ -10,7 +10,9 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | whoosh | sorprendido:derecha | 35,25 | ninguno | ¡Esta chica pone sus pies sobre el tablero del auto y se niega rotundamente a bajarlos entre risas desafiantes!
-00:05 - 00:10 | temblor | punch+cartoon_laugh | risa:izquierda | ninguna | 50,70 | ¡El conductor frena de golpe y la chica termina cayéndose estrepitosamente al piso del auto sin poder levantarse sola!
-00:10 - 00:15 | alerta_roja | riser_suction | enojo:izquierda | ninguna | ninguno | ¡Al salir del carro ella se molesta muchísimo e intenta llamar a su suegra para denunciar la travesura!
-00:15 - 00:21 | brillo_epico | awww | fiesta:derecha | ninguna | ninguno | ¡Pero él la atrapa rápidamente, la recuesta sobre el césped suavemente y terminan este divertido momento llenos de mucho amor y ternura!
+00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | ¡El profesor camina sorprendido mientras ve a este estudiante romper una papa frita usando solo su propia barbilla!
+00:05 - 00:10 | zoom_in | whoosh+punch | sorprendido:izquierda | ninguna | ninguno | ¡El maestro avanza y el segundo alumno destruye un huevo completo sin dudarlo usando la misma fuerza mental!
+00:10 - 00:15 | alerta_roja | riser_suction | diablo:derecha | ninguna | centro | ¡Llega al tercer chico y todos piensan que va a fracasar al intentar aplastar esa dura fruta del dragón!
+00:15 - 00:20 | temblor | punch+cartoon_laugh | risa:derecha | ninguna | ninguno | ¡Pero de un solo golpe con su mentón la destruye por completo dejando al profesor totalmente impresionado y sin palabras!
+00:20 - 00:25 | zoom_in | whoosh+error | sorprendido:izquierda | derecha | ninguno | ¡El cuarto estudiante mira aterrado la enorme fruta espinosa que tiene enfrente y no sabe exactamente qué hacer!
+00:25 - 00:28 | brillo_epico | party_horn+cartoon_laugh | risa:derecha | ninguna | ninguno | ¡Así que decide darle un tierno beso para no lastimarse la cara!

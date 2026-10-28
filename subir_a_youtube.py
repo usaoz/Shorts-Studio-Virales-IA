@@ -660,6 +660,20 @@ def subir_video(
     }
 
     if publish_at_final:
+        # Validar si publish_at_final quedó en el pasado (por ej. si la app quedó abierta muchas horas)
+        try:
+            dt_pub = datetime.fromisoformat(publish_at_final.replace("Z", "+00:00"))
+            ahora_utc = datetime.now(timezone.utc)
+            # YouTube requiere al menos 10 minutos en el futuro para programar
+            if dt_pub <= ahora_utc + timedelta(minutes=10):
+                dias_sumar = 1
+                while dt_pub + timedelta(days=dias_sumar) <= ahora_utc + timedelta(minutes=10):
+                    dias_sumar += 1
+                dt_nueva = dt_pub + timedelta(days=dias_sumar)
+                publish_at_final = dt_nueva.strftime("%Y-%m-%dT%H:%M:%SZ")
+                print(f"[!] AVISO: El horario de programación ({dt_pub.strftime('%Y-%m-%d %H:%M')} UTC) ya había pasado o estaba muy cerca. Se reprogramó automáticamente a horario futuro: {publish_at_final}")
+        except Exception:
+            pass
         cuerpo["status"]["publishAt"] = publish_at_final
 
     tam_mb = ruta_video.stat().st_size / (1024 * 1024)
