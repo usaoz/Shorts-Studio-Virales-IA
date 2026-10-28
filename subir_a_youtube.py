@@ -870,6 +870,111 @@ def obtener_shorts_programados() -> List[Dict[str, Any]]:
     return todos
 
 
+def obtener_metricas_ultimos_videos(limite_por_cuenta: int = 15, total_max: int = 10) -> List[Dict[str, Any]]:
+    """
+    Consulta en la API de YouTube los videos más recientes ya subidos/publicados
+    en todas las cuentas vinculadas, obteniendo sus métricas reales:
+    - Título
+    - Vistas (viewCount)
+    - Likes (likeCount)
+    - Comentarios (commentCount)
+    - Porcentaje de Engagement ((likes + comments) / views * 100)
+    - Fecha y hora de publicación
+    - Link directo al Short/Video
+    Devuelve la lista ordenada por fecha de publicación descendente (los más recientes primero).
+    """
+    import datetime as _dt
+    cuentas = listar_cuentas_vinculadas()
+    if not cuentas:
+        cuentas = [{"id": "principal", "nombre": "Canal Principal"}]
+
+    tz_local = _dt.datetime.now().astimezone().tzinfo
+    now_utc = _dt.datetime.now(_dt.timezone.utc)
+    todos_publicados: List[Dict[str, Any]] = []
+
+    for c in cuentas:
+        cid = str(c.get("id") or "principal")
+        cname = str(c.get("nombre") or cid)
+        try:
+            yt = obtener_servicio_youtube(cuenta_id=cid)
+            ch_resp = yt.channels().list(mine=True, part="contentDetails,snippet").execute()
+            items_ch = ch_resp.get("items", [])
+            if not items_ch:
+                continue
+            uploads_id = items_ch[0]["contentDetails"]["relatedPlaylists"]["uploads"]
+            pl_resp = yt.playlistItems().list(
+                playlistId=uploads_id,
+                part="snippet,contentDetails",
+                maxResults=min(50, limite_por_cuenta + 5),
+            ).execute()
+            vids = [
+                it["contentDetails"]["videoId"]
+                for it in pl_resp.get("items", [])
+                if it.get("contentDetails", {}).get("videoId")
+            ]
+            if not vids:
+                continue
+
+            v_resp = yt.videos().list(
+                id=",".join(vids),
+                part="snippet,status,statistics",
+            ).execute()
+
+            for it in v_resp.get("items", []):
+                st = it.get("status", {})
+                pub_sched = st.get("publishAt")
+                if pub_sched:
+                    # Si tiene fecha de publicación en el futuro, es programado, no publicado aún
+                    try:
+                        dt_s = _dt.datetime.fromisoformat(pub_sched.replace("Z", "+00:00"))
+                        if dt_s > now_utc:
+                            continue
+                    except Exception:
+                        pass
+
+                snip = it.get("snippet", {})
+                raw_pub = snip.get("publishedAt") or pub_sched or ""
+                try:
+                    dt_pub_utc = _dt.datetime.fromisoformat(raw_pub.replace("Z", "+00:00"))
+                except Exception:
+                    dt_pub_utc = now_utc
+
+                dt_pub_local = dt_pub_utc.astimezone(tz_local)
+
+                stats = it.get("statistics", {})
+                vistas = int(stats.get("viewCount", 0))
+                likes = int(stats.get("likeCount", 0))
+                comentarios = int(stats.get("commentCount", 0))
+
+                # Ratio de engagement: interacciones totales (likes + comentarios) sobre vistas
+                engagement_pct = round(((likes + comentarios) / vistas) * 100, 2) if vistas > 0 else 0.0
+
+                vid_id = str(it.get("id") or "")
+                tit = str(snip.get("title") or "Short sin título")
+
+                todos_publicados.append({
+                    "id": vid_id,
+                    "titulo": tit,
+                    "cuenta_id": cid,
+                    "cuenta_nombre": cname,
+                    "vistas": vistas,
+                    "likes": likes,
+                    "comentarios": comentarios,
+                    "engagement_pct": engagement_pct,
+                    "dt_utc": dt_pub_utc,
+                    "dt_local": dt_pub_local,
+                    "fecha_dia": dt_pub_local.strftime("%Y-%m-%d"),
+                    "hora_local": dt_pub_local.strftime("%H:%M"),
+                    "url": f"https://youtube.com/shorts/{vid_id}",
+                })
+        except Exception as e_pub:
+            print(f"[!] No se pudieron leer métricas de videos de '{cname}': {e_pub}")
+            continue
+
+    todos_publicados.sort(key=lambda x: x["dt_utc"], reverse=True)
+    return todos_publicados[:total_max]
+
+
 if __name__ == "__main__":
     print("==============================================================================")
     print(" ⚡ SUBIDOR AUTOMÁTICO DE SHORTS A YOUTUBE")

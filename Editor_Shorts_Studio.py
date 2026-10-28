@@ -4677,11 +4677,11 @@ def iniciar_aplicacion_gui() -> None:
     ).pack(anchor="w")
 
     # Tarjeta Píldora Compacta de Shorts Restantes Hoy + Botón '+' para agregar API JSON (+6 Shorts/día)
-    quota_pill = ctk.CTkFrame(header, fg_color=CARD_BG, corner_radius=20, border_width=1, border_color=CARD_BORDER)
+    quota_pill = ctk.CTkFrame(header, fg_color=CARD_BG, corner_radius=16, border_width=1, border_color=CARD_BORDER)
     quota_pill.pack(side="right", padx=(10, 0), pady=4)
 
     quota_top = ctk.CTkFrame(quota_pill, fg_color="transparent")
-    quota_top.pack(fill="both", expand=True, padx=10, pady=4)
+    quota_top.pack(fill="both", expand=True, padx=(12, 6), pady=4)
 
     def agregar_api_json_gui(parent_win: Optional[tk.Misc] = None) -> None:
         from tkinter import filedialog
@@ -4721,44 +4721,39 @@ def iniciar_aplicacion_gui() -> None:
         except Exception as e_ap:
             messagebox.showerror("Error", f"No se pudo importar el archivo JSON:\n{e_ap}", parent=parent_win or root)
 
-    btn_cuota_info = ctk.CTkButton(
+    lbl_cuota_info = ctk.CTkLabel(
         quota_top,
-        text="🔋 6/6 Shorts hoy",
-        command=lambda: agregar_api_json_gui(root),
-        height=30,
-        corner_radius=14,
-        fg_color="transparent",
-        hover_color="#1f2637",
-        text_color=GREEN_ACCENT,
+        text="6/6 Shorts hoy",
         font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        text_color=GREEN_ACCENT,
     )
-    btn_cuota_info.pack(side="left", padx=(2, 4))
+    lbl_cuota_info.pack(side="left", padx=(0, 8), pady=2)
 
     btn_add_api_top = ctk.CTkButton(
         quota_top,
         text="+",
         command=lambda: agregar_api_json_gui(root),
-        width=28,
-        height=28,
-        corner_radius=14,
+        width=26,
+        height=26,
+        corner_radius=13,
         fg_color=PURPLE_MAIN,
         hover_color=PURPLE_HOVER,
         text_color="#ffffff",
-        font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
-    btn_add_api_top.pack(side="left", padx=(0, 2))
+    btn_add_api_top.pack(side="left", padx=(0, 2), pady=2)
 
     def refrescar_barra_cuota() -> None:
         max_tot, n_apis = obtener_max_shorts_pool_dia()
         usados_h, disp_h, _pct = obtener_estado_cuota_diaria()
         color_b = GREEN_ACCENT if disp_h >= 3 else ("#facc15" if disp_h >= 1 else "#ef4444")
-        btn_cuota_info.configure(
-            text=f"🔋 {disp_h}/{max_tot} Shorts restantes",
+        lbl_cuota_info.configure(
+            text=f"{disp_h}/{max_tot} Shorts restantes",
             text_color=color_b,
         )
 
     def sincronizar_cuota_async() -> None:
-        btn_cuota_info.configure(text="🔄 Sincronizando...", text_color=CYAN_ACCENT)
+        lbl_cuota_info.configure(text="Sincronizando...", text_color=CYAN_ACCENT)
 
         def _worker_sync() -> None:
             sincronizar_cuota_real_youtube()
@@ -5521,9 +5516,9 @@ def iniciar_aplicacion_gui() -> None:
                 if solo_guardar:
                     btn_auto_1clic.configure(
                         text="💾  CREAR Y GUARDAR SHORTS EN CARPETA",
-                        fg_color=GREEN_ACCENT,
-                        hover_color="#059669",
-                        text_color="#052e16",
+                        fg_color=PURPLE_MAIN,
+                        hover_color=PURPLE_HOVER,
+                        text_color="#ffffff",
                     )
                 else:
                     btn_auto_1clic.configure(
@@ -5619,7 +5614,7 @@ def iniciar_aplicacion_gui() -> None:
             command=actualizar_modo_vista,
             corner_radius=14,
             height=32,
-            selected_color=GREEN_ACCENT,
+            selected_color=PURPLE_MAIN,
         ).pack(fill="x", padx=18, pady=(0, 10))
 
         row_ord = ctk.CTkFrame(card_modo, fg_color="transparent")
@@ -6090,6 +6085,35 @@ def iniciar_aplicacion_gui() -> None:
             filtrados = list(_CACHE_SHORTS_PROGRAMADOS)
             return filtrados, "en todas las cuentas", "Todas las cuentas"
 
+    _CACHE_VIDEOS_PUBLICADOS: List[Dict[str, Any]] = []
+
+    def _obtener_publicados_filtrados() -> Tuple[List[Dict[str, Any]], str, str]:
+        """
+        Retorna (items_filtrados, etiqueta_contexto, nombre_canal).
+        Filtra _CACHE_VIDEOS_PUBLICADOS según estado_seleccion_cuentas ('una', 'grupo', 'todas').
+        """
+        modo_act = str(estado_seleccion_cuentas.get("modo") or "una")
+        cid_act = str(estado_seleccion_cuentas.get("cuenta_id") or "principal")
+        g_ids = set(str(g) for g in (estado_seleccion_cuentas.get("grupo_ids") or []))
+
+        try:
+            from subir_a_youtube import listar_cuentas_vinculadas
+            cuentas = listar_cuentas_vinculadas()
+        except Exception:
+            cuentas = []
+        mapa_nombres = {str(c.get("id") or "principal"): str(c.get("nombre") or c.get("id") or "Canal") for c in cuentas}
+
+        if modo_act == "una":
+            nom_c = mapa_nombres.get(cid_act, cid_act)
+            filtrados = [x for x in _CACHE_VIDEOS_PUBLICADOS if str(x.get("cuenta_id")) == cid_act]
+            return filtrados, f"en {nom_c}", nom_c
+        elif modo_act == "grupo":
+            filtrados = [x for x in _CACHE_VIDEOS_PUBLICADOS if str(x.get("cuenta_id")) in g_ids]
+            return filtrados, f"en grupo ({len(g_ids)} canales)", f"Grupo ({len(g_ids)})"
+        else:
+            filtrados = list(_CACHE_VIDEOS_PUBLICADOS)
+            return filtrados, "en todas las cuentas", "Todas las cuentas"
+
     def _actualizar_pildora_cola() -> None:
         if "btn_cola_programados" not in locals() and "btn_cola_programados" not in globals():
             return
@@ -6098,20 +6122,20 @@ def iniciar_aplicacion_gui() -> None:
         total_global = len(_CACHE_SHORTS_PROGRAMADOS)
 
         if c == 1:
-            texto = f"📆  1 Short programado en cola {txt_ctx}  ·  Ver fecha y hora ▾"
+            texto = f"📆  1 Short programado en cola {txt_ctx}  ·  Ver cola y métricas ▾"
             color_txt = CYAN_ACCENT
             color_bd = "#2e3852"
             color_bg = "#111624"
         elif c > 1:
-            texto = f"📆  {c} Shorts programados en cola {txt_ctx}  ·  Ver fechas ▾"
+            texto = f"📆  {c} Shorts programados en cola {txt_ctx}  ·  Ver cola y métricas ▾"
             color_txt = CYAN_ACCENT
             color_bd = "#2e3852"
             color_bg = "#111624"
         else:
             if total_global > 0:
-                texto = f"📆  0 Shorts programados {txt_ctx} ({total_global} en otros canales)  ·  Ver cola ▾"
+                texto = f"📆  0 Shorts programados {txt_ctx} ({total_global} en otros)  ·  Ver métricas ▾"
             else:
-                texto = f"📆  Sin Shorts programados en cola  ·  Ver calendario ▾"
+                texto = f"📆  Sin Shorts en cola  ·  📊 Ver métricas de videos publicados ▾"
             color_txt = TEXT_MUTED
             color_bd = CARD_BORDER
             color_bg = CARD_BG
@@ -6129,12 +6153,15 @@ def iniciar_aplicacion_gui() -> None:
     def sincronizar_cola_programados_async() -> None:
         def _worker_cola() -> None:
             try:
-                from subir_a_youtube import obtener_shorts_programados
+                from subir_a_youtube import obtener_shorts_programados, obtener_metricas_ultimos_videos
                 prog = obtener_shorts_programados()
+                pubs = obtener_metricas_ultimos_videos(total_max=10)
                 _CACHE_SHORTS_PROGRAMADOS.clear()
                 _CACHE_SHORTS_PROGRAMADOS.extend(prog)
+                _CACHE_VIDEOS_PUBLICADOS.clear()
+                _CACHE_VIDEOS_PUBLICADOS.extend(pubs)
             except Exception as e_c:
-                print(f"[!] Error al sincronizar cola: {e_c}")
+                print(f"[!] Error al sincronizar cola y métricas: {e_c}")
             try:
                 root.after(0, _actualizar_pildora_cola)
             except Exception:
@@ -6144,9 +6171,9 @@ def iniciar_aplicacion_gui() -> None:
 
     def abrir_ventana_shorts_programados() -> None:
         win_p = ctk.CTkToplevel(root)
-        win_p.title("Shorts Programados en YouTube")
-        win_p.geometry("680x620")
-        win_p.minsize(620, 500)
+        win_p.title("Shorts Programados y Rendimiento")
+        win_p.geometry("740x680")
+        win_p.minsize(660, 520)
         win_p.configure(fg_color=BG_DARK)
         win_p.transient(root)
         aplicar_icono_ventana(win_p)
@@ -6160,14 +6187,14 @@ def iniciar_aplicacion_gui() -> None:
 
         ctk.CTkLabel(
             tit_f,
-            text="📆 Shorts Programados en Cola",
+            text="📆 Shorts Programados y Rendimiento",
             font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(anchor="w")
 
         lbl_sub = ctk.CTkLabel(
             tit_f,
-            text="Próximos videos a publicarse automáticamente según su schedule.",
+            text="Próximos videos a publicarse y overview de estadísticas de tus videos subidos.",
             font=ctk.CTkFont(family="Segoe UI", size=11),
             text_color=TEXT_MUTED,
         )
@@ -6200,18 +6227,42 @@ def iniciar_aplicacion_gui() -> None:
                 items_a_mostrar, txt_ctx, _ = _obtener_programados_filtrados()
                 titulo_filtro = txt_ctx
 
+            # ==========================================================
+            # SECCIÓN 1: SHORTS PROGRAMADOS EN COLA
+            # ==========================================================
+            sec_prog_header = ctk.CTkFrame(scroll_f, fg_color="transparent")
+            sec_prog_header.pack(fill="x", padx=10, pady=(4, 6))
+
+            ctk.CTkLabel(
+                sec_prog_header,
+                text="📆  Shorts Programados en Cola",
+                font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+                text_color=TEXT_MAIN,
+            ).pack(side="left")
+
+            ctk.CTkLabel(
+                sec_prog_header,
+                text=f"{len(items_a_mostrar)} en cola",
+                font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                text_color=CYAN_ACCENT,
+                fg_color="#0e2a3a",
+                corner_radius=8,
+                padx=8,
+                pady=2,
+            ).pack(side="right")
+
             if not items_a_mostrar:
                 empty_card = ctk.CTkFrame(scroll_f, fg_color=CARD_BG, corner_radius=14, border_width=1, border_color=CARD_BORDER)
-                empty_card.pack(fill="x", padx=16, pady=24)
+                empty_card.pack(fill="x", padx=10, pady=(2, 10))
                 ctk.CTkLabel(
                     empty_card,
                     text=f"🎉 No tienes Shorts programados {titulo_filtro}.",
-                    font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+                    font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
                     text_color=TEXT_MAIN,
-                ).pack(pady=(16, 4))
+                ).pack(pady=(14, 2))
                 ctk.CTkLabel(
                     empty_card,
-                    text="Todos tus videos ya se encuentran publicados o en modo público directo.",
+                    text="Todos tus videos ya se encuentran publicados o listos para programar.",
                     font=ctk.CTkFont(family="Segoe UI", size=11),
                     text_color=TEXT_MUTED,
                 ).pack(pady=(0, 12))
@@ -6220,78 +6271,174 @@ def iniciar_aplicacion_gui() -> None:
                 if total_tot > 0 and modo_v != "todas":
                     ctk.CTkButton(
                         empty_card,
-                        text=f"👀 Ver todos los canales ({total_tot} programados en total)",
+                        text=f"👀 Ver todas las cuentas ({total_tot} programados en total)",
                         command=lambda: [vista_var.set("todas"), _actualizar_pestanas(), _render_vista()],
                         corner_radius=12,
-                        height=32,
+                        height=30,
                         fg_color=PURPLE_MAIN,
                         hover_color=PURPLE_HOVER,
                         text_color="#ffffff",
                         font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-                    ).pack(pady=(0, 14))
+                    ).pack(pady=(0, 12))
+            else:
+                from collections import OrderedDict
+                grupos: Dict[str, List[Dict[str, Any]]] = OrderedDict()
+                for it in items_a_mostrar:
+                    f_dia = str(it.get("fecha_dia") or "Sin fecha")
+                    grupos.setdefault(f_dia, []).append(it)
 
-                lbl_sub.configure(text=f"0 videos programados {titulo_filtro}.")
-                return
+                lbl_sub.configure(
+                    text=f"{len(items_a_mostrar)} Short(s) programados {titulo_filtro} repartidos en {len(grupos)} día(s)."
+                )
 
-            from collections import OrderedDict
-            grupos: Dict[str, List[Dict[str, Any]]] = OrderedDict()
-            for it in items_a_mostrar:
-                f_dia = str(it.get("fecha_dia") or "Sin fecha")
-                grupos.setdefault(f_dia, []).append(it)
-
-            lbl_sub.configure(
-                text=f"{len(items_a_mostrar)} Short(s) programados {titulo_filtro} repartidos en {len(grupos)} día(s)."
-            )
-
-            hoy = _dt.date.today()
-            for f_dia, lista_dia in grupos.items():
-                try:
-                    d_obj = _dt.date.fromisoformat(f_dia)
-                    if d_obj == hoy:
-                        dia_label = f"🔥 HOY · {d_obj.day:02d} {MESES_ES[d_obj.month]} ({len(lista_dia)} Short{'s' if len(lista_dia) > 1 else ''})"
-                        color_dia = CYAN_ACCENT
-                    elif d_obj == hoy + _dt.timedelta(days=1):
-                        dia_label = f"✨ MAÑANA · {d_obj.day:02d} {MESES_ES[d_obj.month]} ({len(lista_dia)} Short{'s' if len(lista_dia) > 1 else ''})"
-                        color_dia = "#c084fc"
-                    else:
-                        dias_es = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-                        nom_dia = dias_es[d_obj.weekday()]
-                        dia_label = f"📅 {nom_dia} · {d_obj.day:02d} {MESES_ES[d_obj.month]} ({len(lista_dia)} Short{'s' if len(lista_dia) > 1 else ''})"
+                hoy = _dt.date.today()
+                for f_dia, lista_dia in grupos.items():
+                    try:
+                        d_obj = _dt.date.fromisoformat(f_dia)
+                        if d_obj == hoy:
+                            dia_label = f"🔥 HOY · {d_obj.day:02d} {MESES_ES[d_obj.month]} ({len(lista_dia)} Short{'s' if len(lista_dia) > 1 else ''})"
+                            color_dia = CYAN_ACCENT
+                        elif d_obj == hoy + _dt.timedelta(days=1):
+                            dia_label = f"✨ MAÑANA · {d_obj.day:02d} {MESES_ES[d_obj.month]} ({len(lista_dia)} Short{'s' if len(lista_dia) > 1 else ''})"
+                            color_dia = "#c084fc"
+                        else:
+                            dias_es = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+                            nom_dia = dias_es[d_obj.weekday()]
+                            dia_label = f"📅 {nom_dia} · {d_obj.day:02d} {MESES_ES[d_obj.month]} ({len(lista_dia)} Short{'s' if len(lista_dia) > 1 else ''})"
+                            color_dia = TEXT_MAIN
+                    except Exception:
+                        dia_label = f"📅 {f_dia} ({len(lista_dia)} Shorts)"
                         color_dia = TEXT_MAIN
-                except Exception:
-                    dia_label = f"📅 {f_dia} ({len(lista_dia)} Shorts)"
-                    color_dia = TEXT_MAIN
 
-                dia_header = ctk.CTkFrame(scroll_f, fg_color="transparent")
-                dia_header.pack(fill="x", padx=10, pady=(12, 4))
+                    dia_header = ctk.CTkFrame(scroll_f, fg_color="transparent")
+                    dia_header.pack(fill="x", padx=10, pady=(10, 4))
+                    ctk.CTkLabel(
+                        dia_header,
+                        text=dia_label,
+                        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+                        text_color=color_dia,
+                    ).pack(side="left")
+
+                    for it in lista_dia:
+                        item_card = ctk.CTkFrame(scroll_f, fg_color=CARD_BG, corner_radius=14, border_width=1, border_color=CARD_BORDER)
+                        item_card.pack(fill="x", padx=10, pady=3)
+
+                        row_top = ctk.CTkFrame(item_card, fg_color="transparent")
+                        row_top.pack(fill="x", padx=12, pady=(8, 4))
+
+                        ctk.CTkLabel(
+                            row_top,
+                            text=f"⏰ {it.get('hora_local', '--:--')} hs",
+                            font=ctk.CTkFont(family="Consolas", size=11, weight="bold"),
+                            text_color="#facc15",
+                            fg_color="#232938",
+                            corner_radius=8,
+                            padx=8,
+                            pady=2,
+                        ).pack(side="left", padx=(0, 6))
+
+                        ctk.CTkLabel(
+                            row_top,
+                            text=f"📺 {it.get('cuenta_nombre', 'Canal')[:24]}",
+                            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                            text_color="#c084fc",
+                            fg_color="#251a3a",
+                            corner_radius=8,
+                            padx=8,
+                            pady=2,
+                        ).pack(side="left", padx=(0, 6))
+
+                        ctk.CTkLabel(
+                            row_top,
+                            text="⏳ Programado",
+                            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+                            text_color=CYAN_ACCENT,
+                            fg_color="#122338",
+                            corner_radius=8,
+                            padx=8,
+                            pady=2,
+                        ).pack(side="left")
+
+                        url_v = it.get("url") or ""
+                        if url_v:
+                            ctk.CTkButton(
+                                row_top,
+                                text="🔗 Ver en YouTube",
+                                command=lambda u=url_v: webbrowser.open(u),
+                                width=115,
+                                height=24,
+                                corner_radius=10,
+                                fg_color="#1e2436",
+                                hover_color="#2b354f",
+                                text_color=CYAN_ACCENT,
+                                font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+                            ).pack(side="right")
+
+                        lbl_tit = ctk.CTkLabel(
+                            item_card,
+                            text=str(it.get("titulo") or "Short sin título"),
+                            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+                            text_color=TEXT_MAIN,
+                            anchor="w",
+                            justify="left",
+                            wraplength=640,
+                        )
+                        lbl_tit.pack(fill="x", padx=12, pady=(2, 10))
+
+            # ==========================================================
+            # SECCIÓN 2: OVERVIEW DE VIDEOS PREVIAMENTE SUBIDOS (ÚLTIMOS 10)
+            # ==========================================================
+            div_pub = ctk.CTkFrame(scroll_f, height=2, fg_color="#1e2538")
+            div_pub.pack(fill="x", padx=10, pady=(24, 14))
+
+            sec_pub_header = ctk.CTkFrame(scroll_f, fg_color="transparent")
+            sec_pub_header.pack(fill="x", padx=10, pady=(0, 8))
+
+            ctk.CTkLabel(
+                sec_pub_header,
+                text="📊  Videos Previamente Subidos — Overview de Rendimiento",
+                font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+                text_color=CYAN_ACCENT,
+            ).pack(side="left")
+
+            if modo_v == "todas":
+                pubs_a_mostrar = list(_CACHE_VIDEOS_PUBLICADOS[:10])
+            else:
+                pubs_f, _, _ = _obtener_publicados_filtrados()
+                pubs_a_mostrar = pubs_f[:10]
+
+            ctk.CTkLabel(
+                sec_pub_header,
+                text=f"{len(pubs_a_mostrar)} video{'s' if len(pubs_a_mostrar) != 1 else ''} recientes (máx 10)",
+                font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                text_color=TEXT_MUTED,
+                fg_color="#182030",
+                corner_radius=8,
+                padx=8,
+                pady=2,
+            ).pack(side="right")
+
+            if not pubs_a_mostrar:
+                empty_pub_card = ctk.CTkFrame(scroll_f, fg_color=CARD_BG, corner_radius=14, border_width=1, border_color=CARD_BORDER)
+                empty_pub_card.pack(fill="x", padx=10, pady=6)
                 ctk.CTkLabel(
-                    dia_header,
-                    text=dia_label,
-                    font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-                    text_color=color_dia,
-                ).pack(side="left")
+                    empty_pub_card,
+                    text="⏳ Aún no se cargaron métricas de videos publicados para esta vista.\nToca '🔄 Refrescar' arriba para sincronizar con YouTube en vivo.",
+                    font=ctk.CTkFont(family="Segoe UI", size=11),
+                    text_color=TEXT_MUTED,
+                    justify="center",
+                ).pack(pady=16)
+            else:
+                for it_pub in pubs_a_mostrar:
+                    card_pub_v = ctk.CTkFrame(scroll_f, fg_color=CARD_BG, corner_radius=14, border_width=1, border_color=CARD_BORDER)
+                    card_pub_v.pack(fill="x", padx=10, pady=4)
 
-                for it in lista_dia:
-                    item_card = ctk.CTkFrame(scroll_f, fg_color=CARD_BG, corner_radius=14, border_width=1, border_color=CARD_BORDER)
-                    item_card.pack(fill="x", padx=10, pady=3)
-
-                    row_top = ctk.CTkFrame(item_card, fg_color="transparent")
-                    row_top.pack(fill="x", padx=12, pady=(8, 4))
-
-                    ctk.CTkLabel(
-                        row_top,
-                        text=f"⏰ {it.get('hora_local', '--:--')} hs",
-                        font=ctk.CTkFont(family="Consolas", size=11, weight="bold"),
-                        text_color="#facc15",
-                        fg_color="#232938",
-                        corner_radius=8,
-                        padx=8,
-                        pady=2,
-                    ).pack(side="left", padx=(0, 6))
+                    row_p_top = ctk.CTkFrame(card_pub_v, fg_color="transparent")
+                    row_p_top.pack(fill="x", padx=12, pady=(8, 2))
 
                     ctk.CTkLabel(
-                        row_top,
-                        text=f"📺 {it.get('cuenta_nombre', 'Canal')[:24]}",
+                        row_p_top,
+                        text=f"📺 {it_pub.get('cuenta_nombre', 'Canal')[:24]}",
                         font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
                         text_color="#c084fc",
                         fg_color="#251a3a",
@@ -6301,22 +6448,22 @@ def iniciar_aplicacion_gui() -> None:
                     ).pack(side="left", padx=(0, 6))
 
                     ctk.CTkLabel(
-                        row_top,
-                        text="⏳ Programado",
-                        font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
-                        text_color=CYAN_ACCENT,
-                        fg_color="#122338",
+                        row_p_top,
+                        text=f"📅 {it_pub.get('fecha_dia', '')} · {it_pub.get('hora_local', '')} hs",
+                        font=ctk.CTkFont(family="Consolas", size=10),
+                        text_color=TEXT_MUTED,
+                        fg_color="#182030",
                         corner_radius=8,
                         padx=8,
                         pady=2,
                     ).pack(side="left")
 
-                    url_v = it.get("url") or ""
-                    if url_v:
+                    u_pub = it_pub.get("url") or ""
+                    if u_pub:
                         ctk.CTkButton(
-                            row_top,
+                            row_p_top,
                             text="🔗 Ver en YouTube",
-                            command=lambda u=url_v: webbrowser.open(u),
+                            command=lambda u=u_pub: webbrowser.open(u),
                             width=115,
                             height=24,
                             corner_radius=10,
@@ -6326,16 +6473,75 @@ def iniciar_aplicacion_gui() -> None:
                             font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
                         ).pack(side="right")
 
-                    lbl_tit = ctk.CTkLabel(
-                        item_card,
-                        text=str(it.get("titulo") or "Short sin título"),
+                    lbl_tit_pub = ctk.CTkLabel(
+                        card_pub_v,
+                        text=str(it_pub.get("titulo") or "Video sin título"),
                         font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
                         text_color=TEXT_MAIN,
                         anchor="w",
                         justify="left",
-                        wraplength=570,
+                        wraplength=640,
                     )
-                    lbl_tit.pack(fill="x", padx=12, pady=(2, 10))
+                    lbl_tit_pub.pack(fill="x", padx=12, pady=(4, 6))
+
+                    # Fila de métricas: Vistas, Likes, Comentarios, Engagement
+                    row_metrics = ctk.CTkFrame(card_pub_v, fg_color="transparent")
+                    row_metrics.pack(fill="x", padx=12, pady=(0, 10))
+
+                    v_num = int(it_pub.get("vistas") or 0)
+                    l_num = int(it_pub.get("likes") or 0)
+                    c_num = int(it_pub.get("comentarios") or 0)
+                    eng_num = float(it_pub.get("engagement_pct") or 0.0)
+
+                    # Badge Vistas
+                    ctk.CTkLabel(
+                        row_metrics,
+                        text=f"👁️  {v_num:,} vistas",
+                        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                        text_color="#38bdf8",
+                        fg_color="#0e2338",
+                        corner_radius=8,
+                        padx=10,
+                        pady=3,
+                    ).pack(side="left", padx=(0, 8))
+
+                    # Badge Likes
+                    ctk.CTkLabel(
+                        row_metrics,
+                        text=f"👍  {l_num:,} likes",
+                        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                        text_color="#4ade80",
+                        fg_color="#0f291e",
+                        corner_radius=8,
+                        padx=10,
+                        pady=3,
+                    ).pack(side="left", padx=(0, 8))
+
+                    # Badge Comentarios
+                    ctk.CTkLabel(
+                        row_metrics,
+                        text=f"💬  {c_num:,} comentarios",
+                        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                        text_color="#e879f9",
+                        fg_color="#2b1535",
+                        corner_radius=8,
+                        padx=10,
+                        pady=3,
+                    ).pack(side="left", padx=(0, 8))
+
+                    # Badge Engagement %
+                    col_eng = "#facc15" if eng_num >= 10.0 else ("#38bdf8" if eng_num >= 4.0 else TEXT_MUTED)
+                    bg_eng = "#2b2208" if eng_num >= 10.0 else ("#0f2338" if eng_num >= 4.0 else "#182030")
+                    ctk.CTkLabel(
+                        row_metrics,
+                        text=f"📈  {eng_num:.1f}% engagement",
+                        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                        text_color=col_eng,
+                        fg_color=bg_eng,
+                        corner_radius=8,
+                        padx=10,
+                        pady=3,
+                    ).pack(side="left")
 
         def _actualizar_pestanas() -> None:
             items_f, _, nom_f = _obtener_programados_filtrados()
@@ -6376,7 +6582,7 @@ def iniciar_aplicacion_gui() -> None:
 
         def _refrescar_en_vivo() -> None:
             btn_refrescar.configure(text="🔄 ...", state="disabled")
-            if not _CACHE_SHORTS_PROGRAMADOS:
+            if not _CACHE_SHORTS_PROGRAMADOS and not _CACHE_VIDEOS_PUBLICADOS:
                 for w in scroll_f.winfo_children():
                     w.destroy()
                 ctk.CTkLabel(
@@ -6388,12 +6594,15 @@ def iniciar_aplicacion_gui() -> None:
 
             def _worker_fetch() -> None:
                 try:
-                    from subir_a_youtube import obtener_shorts_programados
+                    from subir_a_youtube import obtener_shorts_programados, obtener_metricas_ultimos_videos
                     items_prog = obtener_shorts_programados()
+                    items_pubs = obtener_metricas_ultimos_videos(total_max=10)
                     _CACHE_SHORTS_PROGRAMADOS.clear()
                     _CACHE_SHORTS_PROGRAMADOS.extend(items_prog)
+                    _CACHE_VIDEOS_PUBLICADOS.clear()
+                    _CACHE_VIDEOS_PUBLICADOS.extend(items_pubs)
                 except Exception as e_f:
-                    print(f"[!] Error refrescando programados: {e_f}")
+                    print(f"[!] Error refrescando programados y métricas: {e_f}")
 
                 def _ui_update() -> None:
                     try:
@@ -6429,7 +6638,7 @@ def iniciar_aplicacion_gui() -> None:
         btn_refrescar.pack(side="right")
 
         _actualizar_pestanas()
-        if _CACHE_SHORTS_PROGRAMADOS:
+        if _CACHE_SHORTS_PROGRAMADOS or _CACHE_VIDEOS_PUBLICADOS:
             _render_vista()
         else:
             _refrescar_en_vivo()
