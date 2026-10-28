@@ -305,7 +305,7 @@ def iniciar_aplicacion_gui() -> None:
             "min_views_millones": "1.0M+ vistas",
             "cantidad_total": "2 Shorts",
             "shorts_por_dia": "2 / día",
-            "modo_horario": "Horarios Pico (Auto)",
+            "modo_horario": "Horarios Pico",
             "intervalo_horas": "Cada 8h",
             "cuenta_destino": "Canal Principal",
             "modo_cuentas": "una",
@@ -338,7 +338,7 @@ def iniciar_aplicacion_gui() -> None:
                     "min_views_millones": str(leido.get("min_views_millones", "1.0M+ vistas")),
                     "cantidad_total": str(leido.get("cantidad_total", "2 Shorts")),
                     "shorts_por_dia": str(leido.get("shorts_por_dia", "2 / día")),
-                    "modo_horario": str(leido.get("modo_horario", "Horarios Pico (Auto)")),
+                    "modo_horario": ("Horarios Pico" if "Pico" in str(leido.get("modo_horario", "Horarios Pico")) else "Cada X hs"),
                     "intervalo_horas": str(leido.get("intervalo_horas", "Cada 8h")),
                     "cuenta_destino": str(leido.get("cuenta_destino", "Canal Principal")),
                     "modo_cuentas": str(leido.get("modo_cuentas", "una")),
@@ -491,11 +491,10 @@ def iniciar_aplicacion_gui() -> None:
     def _formatear_boton_fecha(iso_str: str) -> str:
         try:
             d = _dt.date.fromisoformat(iso_str)
-            hoy = _dt.date.today()
-            pref = " · Hoy" if d == hoy else (" · Mañana" if d == hoy + _dt.timedelta(days=1) else "")
-            return f"{d.day:02d} {MESES_ES[d.month][:3]} {d.year}{pref}"
+            return f"{d.day:02d} {MESES_ES[d.month]}"
         except Exception:
             return f"{iso_str}"
+
 
     # ==========================================================================
     # ENCABEZADO SUPERIOR + BARRA DE CUOTA DIARIA REAL DE GOOGLE + BOTÓN AJUSTES
@@ -670,30 +669,50 @@ def iniciar_aplicacion_gui() -> None:
         button_color="#2d354d",
     ).pack(side="left")
 
-    add_canal_row = ctk.CTkFrame(card_canales, fg_color="transparent")
-    add_canal_row.pack(fill="x", padx=20, pady=(0, 8))
-
-    entry_nuevo_canal = ctk.CTkEntry(
-        add_canal_row,
-        placeholder_text="Pega el link del canal (https://youtube.com/@canal) o escribe @canal...",
-        corner_radius=16,
-        height=38,
-        fg_color=INPUT_BG,
-        border_width=1,
-        border_color="#2a3147",
-        text_color="#ffffff",
-        font=ctk.CTkFont(family="Consolas", size=13),
-    )
-    entry_nuevo_canal.pack(side="left", fill="x", expand=True, padx=(0, 8))
+    canales_body_row = ctk.CTkFrame(card_canales, fg_color="transparent")
+    canales_body_row.pack(fill="x", padx=20, pady=(0, 12))
 
     chips_container = ctk.CTkFrame(
-        card_canales,
+        canales_body_row,
         corner_radius=14,
         fg_color=INPUT_BG,
         border_width=1,
         border_color="#1f2537",
     )
-    chips_container.pack(fill="x", padx=20, pady=(0, 12))
+    chips_container.pack(side="left", fill="both", expand=True, padx=(0, 10))
+
+    def agregar_canal_gui() -> None:
+        dialog = ctk.CTkInputDialog(
+            text="Ingresa el link o @nombre del canal de YouTube:\n(ejemplo: https://youtube.com/@canal o @canal)",
+            title="Agregar Canal Fuente",
+        )
+        try:
+            aplicar_icono_ventana(dialog)
+        except Exception:
+            pass
+        raw = dialog.get_input()
+        if not raw:
+            return
+        url_norm = normalizar_url_canal_shorts(raw.strip())
+        if not url_norm:
+            return
+        if url_norm not in lista_canales:
+            lista_canales.append(url_norm)
+            _guardar_memoria()
+        renderizar_chips_canales()
+
+    btn_add_canal = ctk.CTkButton(
+        canales_body_row,
+        text="+ Agregar Canal",
+        command=agregar_canal_gui,
+        corner_radius=16,
+        height=40,
+        width=135,
+        fg_color=PURPLE_MAIN,
+        hover_color=PURPLE_HOVER,
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+    )
+    btn_add_canal.pack(side="right", anchor="center")
 
     def renderizar_chips_canales() -> None:
         for w in chips_container.winfo_children():
@@ -701,7 +720,7 @@ def iniciar_aplicacion_gui() -> None:
         if not lista_canales:
             ctk.CTkLabel(
                 chips_container,
-                text="Aún no agregaste canales. Pega el link de un canal arriba y toca '+ Agregar'.",
+                text="No hay canales fuente agregados. Toca '+ Agregar Canal' a la derecha para sumar canales.",
                 font=ctk.CTkFont(family="Segoe UI", size=12),
                 text_color=TEXT_MUTED,
             ).pack(padx=12, pady=12)
@@ -752,49 +771,6 @@ def iniciar_aplicacion_gui() -> None:
                 font=ctk.CTkFont(size=12, weight="bold"),
             ).pack(side="right", padx=(0, 6), pady=4)
         autoajustar_tamano_ventana()
-
-    def agregar_canal_gui() -> None:
-        raw = entry_nuevo_canal.get().strip()
-        if not raw:
-            try:
-                raw = root.clipboard_get().strip()
-            except Exception:
-                pass
-        url_norm = normalizar_url_canal_shorts(raw)
-        if not url_norm:
-            return
-        if url_norm not in lista_canales:
-            lista_canales.append(url_norm)
-            _guardar_memoria()
-        entry_nuevo_canal.delete(0, tk.END)
-        renderizar_chips_canales()
-
-    ctk.CTkButton(
-        add_canal_row,
-        text="Pegar",
-        command=lambda: (
-            entry_nuevo_canal.delete(0, tk.END),
-            entry_nuevo_canal.insert(0, root.clipboard_get().strip()),
-        ),
-        corner_radius=16,
-        height=38,
-        width=85,
-        fg_color="#1e2538",
-        hover_color="#2b3550",
-        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-    ).pack(side="left", padx=(0, 6))
-
-    ctk.CTkButton(
-        add_canal_row,
-        text="+ Agregar Canal",
-        command=agregar_canal_gui,
-        corner_radius=16,
-        height=38,
-        width=135,
-        fg_color=PURPLE_MAIN,
-        hover_color=PURPLE_HOVER,
-        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-    ).pack(side="right")
 
     # --- TARJETA MODO B: LINK DE VIDEO (INDIVIDUAL O MÚLTIPLES LINKS) ---
     card_link = ctk.CTkFrame(contenedor_paso1, fg_color=CARD_BG, corner_radius=22, border_width=1, border_color=CARD_BORDER)
@@ -982,21 +958,7 @@ def iniciar_aplicacion_gui() -> None:
         text_color=TEXT_MAIN,
     ).pack(side="left")
 
-    # Selector de Estrategia de Horarios (Pico Automático vs Cada X horas desde hora elegida)
-    seg_estrategia = ctk.CTkSegmentedButton(
-        pub_header,
-        values=["Horarios Pico (Auto)", "Cada X hs (Manual)"],
-        variable=modo_horario_var,
-        corner_radius=16,
-        height=32,
-        fg_color=INPUT_BG,
-        selected_color=PURPLE_MAIN,
-        selected_hover_color=PURPLE_HOVER,
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-    )
-    seg_estrategia.pack(side="right")
-
-    # FILA 1: Cantidad Total + Shorts por Día + Privacidad + Switch Programar
+    # FILA 1: Cantidad Total + Shorts por Día + Visibilidad Base + Switch Programar
     row_plan1 = ctk.CTkFrame(card_pub, fg_color="transparent")
     row_plan1.pack(fill="x", padx=20, pady=(2, 8))
 
@@ -1038,6 +1000,11 @@ def iniciar_aplicacion_gui() -> None:
     )
     opt_por_dia.pack()
 
+    def _on_priv_change(val: str) -> None:
+        if programar_var.get() and val == "Público":
+            privacidad_var.set("Privado")
+        _guardar_memoria()
+
     box_priv = ctk.CTkFrame(row_plan1, fg_color="transparent")
     box_priv.pack(side="left", padx=(0, 12))
     ctk.CTkLabel(
@@ -1045,8 +1012,9 @@ def iniciar_aplicacion_gui() -> None:
     ).pack(anchor="w", pady=(0, 2))
     seg_priv = ctk.CTkSegmentedButton(
         box_priv,
-        values=["Privado", "Público", "Oculto"],
+        values=["Privado", "Oculto"] if programar_var.get() else ["Privado", "Público", "Oculto"],
         variable=privacidad_var,
+        command=_on_priv_change,
         corner_radius=14,
         height=34,
         fg_color=INPUT_BG,
@@ -1190,17 +1158,33 @@ def iniciar_aplicacion_gui() -> None:
 
         threading.Thread(target=_worker_vinc, daemon=True).start()
 
+    def _on_prog_toggle() -> None:
+        if programar_var.get():
+            if privacidad_var.get() == "Público":
+                privacidad_var.set("Privado")
+            try:
+                seg_priv.configure(values=["Privado", "Oculto"])
+            except Exception:
+                pass
+        else:
+            try:
+                seg_priv.configure(values=["Privado", "Público", "Oculto"])
+            except Exception:
+                pass
+        refrescar_plan_ui()
+
     sw_prog = ctk.CTkSwitch(
         row_plan1,
         text="Programar",
         variable=programar_var,
+        command=_on_prog_toggle,
         progress_color=PURPLE_MAIN,
         button_color="#ffffff",
         font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
     sw_prog.pack(side="right", pady=(14, 0))
 
-    # FILA 2: Fecha de Inicio + Controles de Hora / Intervalo + Vista Previa en Vivo
+    # FILA 2: Fecha de Inicio + Controles de Hora / Intervalo + Vista Previa + Toggle Horarios Pico / Cada X hs
     row_plan2 = ctk.CTkFrame(card_pub, fg_color="transparent")
     row_plan2.pack(fill="x", padx=20, pady=(0, 12))
 
@@ -1209,7 +1193,7 @@ def iniciar_aplicacion_gui() -> None:
         text=_formatear_boton_fecha(fecha_elegida_var.get()),
         corner_radius=16,
         height=34,
-        width=165,
+        width=110,
         fg_color=INPUT_BG,
         hover_color="#1c2233",
         border_width=1,
@@ -1235,6 +1219,7 @@ def iniciar_aplicacion_gui() -> None:
         frame_manual_horas,
         variable=hora_elegida_var,
         values=LISTA_HORAS_SCROLL,
+        command=refrescar_plan_ui,
         state="readonly",
         corner_radius=14,
         height=34,
@@ -1253,6 +1238,7 @@ def iniciar_aplicacion_gui() -> None:
         frame_manual_horas,
         variable=intervalo_horas_var,
         values=list(MAPA_INTERVALO_HS.keys()),
+        command=refrescar_plan_ui,
         corner_radius=14,
         height=34,
         width=102,
@@ -1272,10 +1258,25 @@ def iniciar_aplicacion_gui() -> None:
         text="",
         font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         text_color="#a7f3d0",
-        wraplength=540,
+        wraplength=380,
         justify="left",
     )
     lbl_preview_horarios.pack(anchor="w", padx=12, pady=6, fill="x")
+
+    # Selector de Estrategia a la derecha de los horarios (Horarios Pico / Cada X hs)
+    seg_estrategia = ctk.CTkSegmentedButton(
+        row_plan2,
+        values=["Horarios Pico", "Cada X hs"],
+        variable=modo_horario_var,
+        command=lambda _: refrescar_plan_ui(),
+        corner_radius=14,
+        height=34,
+        fg_color=INPUT_BG,
+        selected_color=PURPLE_MAIN,
+        selected_hover_color=PURPLE_HOVER,
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+    )
+    seg_estrategia.pack(side="right", padx=(8, 0))
 
     def calcular_lista_horarios_actual() -> List[Optional[str]]:
         es_canales = "Canales" in modo_fuente_var.get()
@@ -1302,6 +1303,19 @@ def iniciar_aplicacion_gui() -> None:
         _guardar_memoria()
         es_canales = "Canales" in modo_fuente_var.get()
         solo_guardar = accion_final_var.get() == "Guardar en carpeta"
+
+        if programar_var.get():
+            if privacidad_var.get() == "Público":
+                privacidad_var.set("Privado")
+            try:
+                seg_priv.configure(values=["Privado", "Oculto"])
+            except Exception:
+                pass
+        else:
+            try:
+                seg_priv.configure(values=["Privado", "Público", "Oculto"])
+            except Exception:
+                pass
 
         if es_canales:
             opt_cantidad_total.configure(state="normal")
@@ -1337,19 +1351,13 @@ def iniciar_aplicacion_gui() -> None:
             return
 
         slots = calcular_lista_horarios_actual()
-        hoy = _dt.date.today()
         partes_prev: List[str] = []
         for idx_s, s_str in enumerate(slots):
             if not s_str:
                 continue
             f_part, h_part = s_str.split(" ")
             d_obj = _dt.date.fromisoformat(f_part)
-            if d_obj == hoy:
-                d_txt = "Hoy"
-            elif d_obj == hoy + _dt.timedelta(days=1):
-                d_txt = "Mañana"
-            else:
-                d_txt = f"{d_obj.day:02d}/{d_obj.month:02d}"
+            d_txt = f"{d_obj.day:02d} {MESES_ES[d_obj.month]}"
             partes_prev.append(f"#{idx_s + 1} {d_txt} {h_part}")
 
         resumen_str = "  ·  ".join(partes_prev)
@@ -1503,7 +1511,7 @@ def iniciar_aplicacion_gui() -> None:
 
         ctk.CTkLabel(
             card_cfg,
-            text="Modelo de IA para Guiones (Argon 4 / Gemini)",
+            text="Modelo de IA para Guiones",
             font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(anchor="w", padx=18, pady=(10, 4))
@@ -1567,14 +1575,14 @@ def iniciar_aplicacion_gui() -> None:
 
         ctk.CTkLabel(
             top_api,
-            text="Clave API de Gemini Flash (Gratis)",
+            text="Clave API de Gemini Flash",
             font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(side="left")
 
         ctk.CTkButton(
             top_api,
-            text="Obtener Gratis",
+            text="Obtener",
             command=lambda: webbrowser.open("https://aistudio.google.com/apikey"),
             corner_radius=14,
             height=28,
@@ -1689,10 +1697,11 @@ def iniciar_aplicacion_gui() -> None:
     def abrir_selector_cuentas_popup() -> None:
         pop = ctk.CTkToplevel(root)
         pop.title("Elegir Cuenta o Grupo de Subida")
-        pop.geometry("490x560")
+        pop.geometry("490x520")
         pop.resizable(False, False)
         pop.configure(fg_color=BG_DARK)
         pop.transient(root)
+        aplicar_icono_ventana(pop)
         pop.grab_set()
 
         ctk.CTkLabel(
@@ -1700,14 +1709,7 @@ def iniciar_aplicacion_gui() -> None:
             text="Elegir Cuenta de Subida",
             font=ctk.CTkFont(family="Segoe UI", size=20, weight="bold"),
             text_color=TEXT_MAIN,
-        ).pack(anchor="w", padx=22, pady=(16, 2))
-
-        ctk.CTkLabel(
-            pop,
-            text="Cada cuenta recuerda sus propios Canales Fuente guardados.",
-            font=ctk.CTkFont(family="Segoe UI", size=12),
-            text_color=TEXT_MUTED,
-        ).pack(anchor="w", padx=22, pady=(0, 10))
+        ).pack(anchor="w", padx=22, pady=(16, 12))
 
         try:
             from subir_a_youtube import listar_cuentas_vinculadas
@@ -1719,7 +1721,12 @@ def iniciar_aplicacion_gui() -> None:
 
         modo_actual = str(estado_seleccion_cuentas.get("modo") or "una")
         cid_actual = str(estado_seleccion_cuentas.get("cuenta_id") or "")
+        if not cid_actual and cuentas_disp:
+            cid_actual = str(cuentas_disp[0].get("id") or "principal")
         grupo_actual = set(estado_seleccion_cuentas.get("grupo_ids") or [])
+
+        # Variable temporal para no alterar nada hasta tocar "Aplicar Selección"
+        cid_temp = tk.StringVar(value=cid_actual)
 
         # Selector superior de modo: 1 Cuenta | Todas las Cuentas | Grupo Seleccionado
         mapa_modo_seg = {
@@ -1740,13 +1747,6 @@ def iniciar_aplicacion_gui() -> None:
         )
 
         vars_checks_grupo: Dict[str, tk.BooleanVar] = {}
-
-        def _seleccionar_cuenta_unica(cid_elegido: str) -> None:
-            _sincronizar_canales_de_cuenta_activa(cid_elegido, guardar_previo=True)
-            estado_seleccion_cuentas["modo"] = "una"
-            refrescar_selector_cuentas_ui()
-            _guardar_memoria()
-            pop.destroy()
 
         def _render_lista_popup(*_args: object) -> None:
             for w in lista_scroll.winfo_children():
@@ -1776,7 +1776,7 @@ def iniciar_aplicacion_gui() -> None:
                 c_nom = str(c_it.get("nombre") or c_id)
                 c_av = str(c_it.get("avatar_path") or "")
                 n_can = len(canales_por_cuenta.get(c_id, lista_canales if c_id == cid_actual else []))
-                es_activa = (m_sel == "una" and c_id == cid_actual)
+                es_activa = (m_sel == "una" and c_id == cid_temp.get())
 
                 item_f = ctk.CTkFrame(
                     lista_scroll,
@@ -1818,16 +1818,20 @@ def iniciar_aplicacion_gui() -> None:
                 ).pack(anchor="w")
 
                 if m_sel == "una":
+                    def _marcar_esta(cid_x=c_id):
+                        cid_temp.set(cid_x)
+                        _render_lista_popup()
+
                     ctk.CTkButton(
                         item_f,
-                        text="Activa" if es_activa else "Elegir",
-                        command=lambda cid_x=c_id: _seleccionar_cuenta_unica(cid_x),
+                        text="Seleccionada" if es_activa else "Seleccionar",
+                        command=_marcar_esta,
                         corner_radius=12,
                         height=30,
-                        width=84,
-                        fg_color=GREEN_ACCENT if es_activa else PURPLE_MAIN,
-                        hover_color="#059669" if es_activa else PURPLE_HOVER,
-                        text_color="#052e16" if es_activa else "#ffffff",
+                        width=100,
+                        fg_color=GREEN_ACCENT if es_activa else "#1e2538",
+                        hover_color="#059669" if es_activa else "#2e3955",
+                        text_color="#052e16" if es_activa else TEXT_MAIN,
                         font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
                     ).pack(side="right", padx=10)
                 elif m_sel == "grupo":
@@ -1895,7 +1899,11 @@ def iniciar_aplicacion_gui() -> None:
                 estado_seleccion_cuentas["modo"] = "grupo"
                 estado_seleccion_cuentas["grupo_ids"] = elegidos_g
             else:
+                # Modo 1 Cuenta: aplicar la cuenta elegida en cid_temp
+                nuevo_cid = cid_temp.get() or (str(cuentas_disp[0].get("id") or "principal") if cuentas_disp else "principal")
+                _sincronizar_canales_de_cuenta_activa(nuevo_cid, guardar_previo=True)
                 estado_seleccion_cuentas["modo"] = "una"
+
             refrescar_selector_cuentas_ui()
             _guardar_memoria()
             pop.destroy()
@@ -2044,12 +2052,12 @@ def iniciar_aplicacion_gui() -> None:
         c_pubs = len(pubs_f)
 
         if c_pubs > 0:
-            texto = f"Overview de Rendimiento: {c_pubs} video{'s' if c_pubs != 1 else ''} recientes  ·  Ver métricas ▾"
+            texto = f"{c_pubs} video{'s' if c_pubs != 1 else ''} recientes  ·  Ver métricas ▾"
             color_txt = "#c084fc"
             color_bd = "#382752"
             color_bg = "#161124"
         else:
-            texto = "Overview de Rendimiento: Videos Publicados  ·  Ver métricas ▾"
+            texto = "Videos Publicados  ·  Ver métricas ▾"
             color_txt = TEXT_MUTED
             color_bd = CARD_BORDER
             color_bg = CARD_BG
@@ -2301,8 +2309,6 @@ def iniciar_aplicacion_gui() -> None:
 
         if _CACHE_SHORTS_PROGRAMADOS:
             _render_vista()
-            if time.time() - _TS_ACTUALIZACION_COLA > 45:
-                _sync_silencioso_programados(forzar_render=False)
         else:
             loading_card = ctk.CTkFrame(scroll_f, fg_color=CARD_BG, corner_radius=14, border_width=1, border_color=CARD_BORDER)
             loading_card.pack(fill="x", padx=10, pady=(20, 10))
@@ -2548,8 +2554,6 @@ def iniciar_aplicacion_gui() -> None:
 
         if _CACHE_VIDEOS_PUBLICADOS:
             _render_vista()
-            if time.time() - _TS_ACTUALIZACION_METRICAS > 45:
-                _sync_silencioso_overview(forzar_render=False)
         else:
             loading_card = ctk.CTkFrame(scroll_f, fg_color=CARD_BG, corner_radius=14, border_width=1, border_color=CARD_BORDER)
             loading_card.pack(fill="x", padx=10, pady=(20, 10))
@@ -2674,11 +2678,12 @@ def iniciar_aplicacion_gui() -> None:
         pop.configure(fg_color=BG_DARK)
         pop.resizable(False, False)
         pop.transient(root)
+        aplicar_icono_ventana(pop)
         pop.grab_set()
 
         bx = max(40, btn_calendario.winfo_rootx() - 40)
         by = btn_calendario.winfo_rooty() + btn_calendario.winfo_height() + 6
-        pop.geometry(f"330x330+{bx}+{by}")
+        pop.geometry(f"330x280+{bx}+{by}")
 
         wrap = ctk.CTkFrame(pop, fg_color=CARD_BG, corner_radius=20, border_width=1, border_color=CARD_BORDER)
         wrap.pack(fill="both", expand=True, padx=10, pady=10)
@@ -2705,10 +2710,7 @@ def iniciar_aplicacion_gui() -> None:
         btn_next.pack(side="right")
 
         grid_frame = ctk.CTkFrame(wrap, fg_color="transparent")
-        grid_frame.pack(padx=10, pady=2)
-
-        atajos_row = ctk.CTkFrame(wrap, fg_color="transparent")
-        atajos_row.pack(fill="x", padx=10, pady=(8, 10))
+        grid_frame.pack(padx=10, pady=(2, 10))
 
         def _elegir_fecha(d_sel: _dt.date) -> None:
             iso = d_sel.strftime("%Y-%m-%d")
@@ -2717,20 +2719,6 @@ def iniciar_aplicacion_gui() -> None:
             btn_calendario.configure(text=_formatear_boton_fecha(iso))
             refrescar_plan_ui()
             pop.destroy()
-
-        for lbl_at, delta_d in [("Hoy", 0), ("Mañana", 1), ("Pasado", 2)]:
-            d_target = hoy + _dt.timedelta(days=delta_d)
-            ctk.CTkButton(
-                atajos_row,
-                text=lbl_at,
-                command=lambda dt=d_target: _elegir_fecha(dt),
-                corner_radius=12,
-                height=28,
-                fg_color="#1e2538",
-                hover_color=PURPLE_MAIN,
-                text_color=CYAN_ACCENT,
-                font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            ).pack(side="left", expand=True, fill="x", padx=3)
 
         def _dibujar_mes() -> None:
             for w in grid_frame.winfo_children():

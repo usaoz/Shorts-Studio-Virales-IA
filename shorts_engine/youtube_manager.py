@@ -462,7 +462,7 @@ def calcular_horarios_inteligentes(
     cantidad_total: int,
     por_dia: int,
     fecha_base_iso: str,
-    modo_horario: str = "Horarios Pico (Auto)",
+    modo_horario: str = "Horarios Pico",
     hora_inicio: str = "13:00",
     intervalo_hs: int = 8,
 ) -> List[str]:
