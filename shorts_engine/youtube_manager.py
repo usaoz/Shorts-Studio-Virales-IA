@@ -50,11 +50,11 @@ def descargar_video_youtube(url: str) -> Path:
     cmd = [
         *cmd_base,
         *args_js,
-        "--extractor-args", "youtube:player_client=android,web",
+        "--remote-components", "ejs:github",
         "--write-info-json",
-        "-f", "bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/best",
+        "-f", "bv*+ba/best",
         "--merge-output-format", "mp4",
-        "-S", "res:1080,fps:60,vcodec:h264,br",
+        "-S", "res:1080,fps:60,br",
         "-o", "video_input.%(ext)s",
         url_limpia,
     ]
@@ -93,12 +93,38 @@ def descargar_video_youtube(url: str) -> Path:
         except Exception:
             pass
 
+    ruta_res: Optional[Path] = None
     if DEFAULT_VIDEO_INPUT.exists():
-        return DEFAULT_VIDEO_INPUT
+        ruta_res = DEFAULT_VIDEO_INPUT
+    else:
+        descargados = [p for p in sorted(BASE_DIR.glob("video_input.*")) if not p.name.endswith(".json")]
+        if descargados:
+            ruta_res = descargados[0]
 
-    descargados = [p for p in sorted(BASE_DIR.glob("video_input.*")) if not p.name.endswith(".json")]
-    if descargados:
-        return descargados[0]
+    if ruta_res is not None:
+        try:
+            cmd_probe = [
+                "ffprobe", "-v", "error",
+                "-select_streams", "v:0",
+                "-show_entries", "stream=width,height,bit_rate,r_frame_rate",
+                "-of", "json",
+                str(ruta_res),
+            ]
+            res_p = subprocess.run(cmd_probe, capture_output=True, text=True, check=False)
+            if res_p.returncode == 0:
+                st = json.loads(res_p.stdout).get("streams", [{}])[0]
+                w_dl = int(st.get("width") or 0)
+                h_dl = int(st.get("height") or 0)
+                br_dl = int(st.get("bit_rate") or 0) // 1000
+                fps_dl = st.get("r_frame_rate", "")
+                print(f"[+] Video fuente descargado: {w_dl}x{h_dl} @ {fps_dl} ({br_dl} kbps)")
+                if min(w_dl, h_dl) < 720:
+                    print(f"[!] AVISO: El video en YouTube solo estaba disponible en {w_dl}x{h_dl}. Se reescalará a 1080x1920 con algoritmo Lanczos.")
+                else:
+                    print(f"[+] Resolución HD confirmada en el video descargado ({w_dl}x{h_dl}).")
+        except Exception:
+            pass
+        return ruta_res
 
     raise FileNotFoundError("No se encontró el archivo 'video_input.mp4' luego de la descarga.")
 

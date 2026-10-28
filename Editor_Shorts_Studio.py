@@ -346,7 +346,7 @@ def iniciar_aplicacion_gui() -> None:
                     "cantidad_total": str(leido.get("cantidad_total", "2 Shorts")),
                     "shorts_por_dia": str(leido.get("shorts_por_dia", "2 / día")),
                     "modo_horario": ("Horarios Pico" if "Pico" in str(leido.get("modo_horario", "Horarios Pico")) else "Cada X hs"),
-                    "intervalo_horas": str(leido.get("intervalo_horas", "Cada 8h")),
+                    "intervalo_horas": str(re.sub(r"\D", "", str(leido.get("intervalo_horas", "8"))) or "8"),
                     "cuenta_destino": str(leido.get("cuenta_destino", "Canal Principal")),
                     "modo_cuentas": str(leido.get("modo_cuentas", "una")),
                     "cuenta_activa_id": str(leido.get("cuenta_activa_id", "")),
@@ -1221,7 +1221,7 @@ def iniciar_aplicacion_gui() -> None:
     # Controles extra según la estrategia (se insertan entre el título y las opciones fijas X Shorts / X día)
     frame_controles_estrategia_extra = ctk.CTkFrame(pub_header, fg_color="transparent")
 
-    # Subframe para "Cada X hs"
+    # Subframe para "Cada X hs" (Edición manual: Desde HH:MM, Cada N hs)
     frame_sub_cada_x_hs = ctk.CTkFrame(frame_controles_estrategia_extra, fg_color="transparent")
 
     lbl_desde = ctk.CTkLabel(
@@ -1232,24 +1232,20 @@ def iniciar_aplicacion_gui() -> None:
     )
     lbl_desde.pack(side="left", padx=(0, 4))
 
-    LISTA_HORAS_SCROLL = [f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)]
-    combo_hora = ctk.CTkComboBox(
+    entry_hora_desde = ctk.CTkEntry(
         frame_sub_cada_x_hs,
-        variable=hora_elegida_var,
-        values=LISTA_HORAS_SCROLL,
-        state="normal",
-        corner_radius=12,
+        textvariable=hora_elegida_var,
+        placeholder_text="13:00",
+        corner_radius=10,
         height=30,
-        width=88,
+        width=74,
         fg_color=INPUT_BG,
         border_color="#2a3147",
-        button_color="#252d42",
-        button_hover_color="#333e5a",
-        dropdown_fg_color="#141824",
-        dropdown_hover_color=PURPLE_MAIN,
+        text_color="#ffffff",
+        justify="center",
         font=ctk.CTkFont(family="Consolas", size=12, weight="bold"),
     )
-    combo_hora.pack(side="left", padx=(0, 8))
+    entry_hora_desde.pack(side="left", padx=(0, 8))
 
     lbl_cada = ctk.CTkLabel(
         frame_sub_cada_x_hs,
@@ -1259,21 +1255,30 @@ def iniciar_aplicacion_gui() -> None:
     )
     lbl_cada.pack(side="left", padx=(0, 4))
 
-    opt_intervalo = ctk.CTkOptionMenu(
+    entry_intervalo = ctk.CTkEntry(
         frame_sub_cada_x_hs,
-        variable=intervalo_horas_var,
-        values=list(MAPA_INTERVALO_HS.keys()),
-        corner_radius=12,
+        textvariable=intervalo_horas_var,
+        placeholder_text="8",
+        corner_radius=10,
         height=30,
-        width=98,
+        width=42,
         fg_color=INPUT_BG,
-        button_color="#252d42",
-        button_hover_color="#333e5a",
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        border_color="#2a3147",
+        text_color="#ffffff",
+        justify="center",
+        font=ctk.CTkFont(family="Consolas", size=12, weight="bold"),
     )
-    opt_intervalo.pack(side="left")
+    entry_intervalo.pack(side="left", padx=(0, 4))
 
-    # Subframe para "Horario Específico" (permite elegir o escribir libremente ej: 7:52 o 07:52)
+    lbl_hs = ctk.CTkLabel(
+        frame_sub_cada_x_hs,
+        text="hs",
+        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        text_color=TEXT_MUTED,
+    )
+    lbl_hs.pack(side="left")
+
+    # Subframe para "Horario Específico" (Edición manual con máscara HH:MM)
     frame_sub_horario_especifico = ctk.CTkFrame(frame_controles_estrategia_extra, fg_color="transparent")
 
     lbl_a_las = ctk.CTkLabel(
@@ -1284,23 +1289,20 @@ def iniciar_aplicacion_gui() -> None:
     )
     lbl_a_las.pack(side="left", padx=(0, 4))
 
-    combo_hora_esp = ctk.CTkComboBox(
+    entry_hora_esp = ctk.CTkEntry(
         frame_sub_horario_especifico,
-        variable=hora_elegida_var,
-        values=["07:52", "08:00", "09:30", "12:00", "13:00", "15:00", "18:00", "19:00", "20:00", "21:00"],
-        state="normal",
-        corner_radius=12,
+        textvariable=hora_elegida_var,
+        placeholder_text="07:52",
+        corner_radius=10,
         height=30,
-        width=95,
+        width=78,
         fg_color=INPUT_BG,
         border_color="#2a3147",
-        button_color="#252d42",
-        button_hover_color="#333e5a",
-        dropdown_fg_color="#141824",
-        dropdown_hover_color=PURPLE_MAIN,
+        text_color="#ffffff",
+        justify="center",
         font=ctk.CTkFont(family="Consolas", size=12, weight="bold"),
     )
-    combo_hora_esp.pack(side="left")
+    entry_hora_esp.pack(side="left")
 
     def _cargar_imagen_avatar_ctk(avatar_path_str: str, size_px: int = 24) -> Optional[ctk.CTkImage]:
         if not avatar_path_str:
@@ -1495,13 +1497,17 @@ def iniciar_aplicacion_gui() -> None:
         por_d = MAPA_POR_DIA.get(shorts_por_dia_var.get(), 2)
         if not programar_var.get():
             return [None] * cant_t
-        interv = MAPA_INTERVALO_HS.get(intervalo_horas_var.get(), 8)
+        raw_int = re.sub(r"\D", "", intervalo_horas_var.get())
+        interv = max(1, min(24, int(raw_int))) if raw_int else 8
+        h_cand = hora_elegida_var.get().strip()
+        if ":" not in h_cand or len(h_cand) < 4:
+            h_cand = "13:00"
         slots = calcular_horarios_inteligentes(
             cantidad_total=cant_t,
             por_dia=por_d,
             fecha_base_iso=fecha_elegida_var.get().strip(),
             modo_horario=modo_horario_var.get(),
-            hora_inicio=hora_elegida_var.get().strip() or "13:00",
+            hora_inicio=h_cand,
             intervalo_hs=interv,
         )
         return [s for s in slots]
@@ -1559,14 +1565,55 @@ def iniciar_aplicacion_gui() -> None:
     opt_estrategia.configure(command=refrescar_plan_ui)
     opt_cantidad_total.configure(command=refrescar_plan_ui)
     opt_por_dia.configure(command=refrescar_plan_ui)
-    combo_hora.configure(command=refrescar_plan_ui)
-    combo_hora_esp.configure(command=refrescar_plan_ui)
-    try:
-        combo_hora_esp._entry.bind("<KeyRelease>", lambda _e: refrescar_plan_ui())
-        combo_hora._entry.bind("<KeyRelease>", lambda _e: refrescar_plan_ui())
-    except Exception:
-        pass
-    opt_intervalo.configure(command=refrescar_plan_ui)
+
+    _en_formato_hora = [False]
+    _prev_hora = [hora_elegida_var.get()]
+
+    def _on_hora_escribir(*_args: object) -> None:
+        if _en_formato_hora[0]:
+            return
+        val = hora_elegida_var.get()
+        prev = _prev_hora[0]
+        is_backspace = len(val) < len(prev)
+        digitos = [c for c in val if c.isdigit()][:4]
+        if not digitos:
+            nuevo = ""
+        elif is_backspace:
+            nuevo = val if all(c.isdigit() or c == ":" for c in val) else "".join(digitos)
+        elif len(digitos) == 2 and len(prev.replace(":", "")) < 2:
+            nuevo = "".join(digitos) + ":"
+        elif len(digitos) > 2:
+            h = min(23, int("".join(digitos[:2])))
+            m_raw = "".join(digitos[2:])
+            if len(m_raw) == 2:
+                m_raw = f"{min(59, int(m_raw)):02d}"
+            nuevo = f"{h:02d}:{m_raw}"
+        else:
+            nuevo = "".join(digitos)
+
+        if nuevo != val:
+            _en_formato_hora[0] = True
+            hora_elegida_var.set(nuevo)
+            _en_formato_hora[0] = False
+        _prev_hora[0] = nuevo
+        refrescar_plan_ui()
+
+    _en_formato_interv = [False]
+
+    def _on_intervalo_escribir(*_args: object) -> None:
+        if _en_formato_interv[0]:
+            return
+        val = intervalo_horas_var.get()
+        digitos = [c for c in val if c.isdigit()][:2]
+        nuevo = "".join(digitos)
+        if nuevo != val:
+            _en_formato_interv[0] = True
+            intervalo_horas_var.set(nuevo)
+            _en_formato_interv[0] = False
+        refrescar_plan_ui()
+
+    hora_elegida_var.trace_add("write", _on_hora_escribir)
+    intervalo_horas_var.trace_add("write", _on_intervalo_escribir)
 
     def refrescar_texto_boton_accion() -> None:
         """Actualiza el texto y estilo de los botones de acción para todas las combinaciones de Fuente, Contenido y Subida/Guardado."""
@@ -1625,7 +1672,7 @@ def iniciar_aplicacion_gui() -> None:
                         text=txt_guardar,
                         fg_color="#182235",
                         hover_color="#23324f",
-                        text_color="#38bdf8",
+                        text_color="#ffffff",
                     )
         except Exception:
             pass
@@ -3047,7 +3094,7 @@ def iniciar_aplicacion_gui() -> None:
         hover_color="#23324f",
         border_width=1,
         border_color="#334668",
-        text_color="#38bdf8",
+        text_color="#ffffff",
         font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         command=lambda: ejecutar_flujo_1_clic(solo_guardar_override=True),
     )

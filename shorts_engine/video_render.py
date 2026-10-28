@@ -745,9 +745,9 @@ def extraer_frames_segmento_video(
     if modo_encuadre == "blur":
         filtro_vf = (
             f"split[bg][fg];"
-            f"[bg]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,"
+            f"[bg]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase:flags=lanczos,"
             f"crop={WIDTH}:{HEIGHT},boxblur=24:4,eq=brightness=-0.12[bg_b];"
-            f"[fg]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease[fg_s];"
+            f"[fg]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease:flags=lanczos[fg_s];"
             f"[bg_b][fg_s]overlay=(W-w)/2:(H-h)/2,fps={fps_extraccion:.3f}"
         )
         cmd_ff = [
@@ -761,7 +761,7 @@ def extraer_frames_segmento_video(
         ]
     else:
         filtro_vf = (
-            f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,"
+            f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase:flags=lanczos,"
             f"crop={WIDTH}:{HEIGHT},"
             f"fps={fps_extraccion:.3f}"
         )
@@ -810,7 +810,7 @@ def extraer_frames_segmento_video(
             h, w, _ = frame_rgb.shape
             scale = max(WIDTH / float(w), HEIGHT / float(h))
             nw, nh = int(round(w * scale)), int(round(h * scale))
-            resized = cv2.resize(frame_rgb, (nw, nh), interpolation=cv2.INTER_LINEAR)
+            resized = cv2.resize(frame_rgb, (nw, nh), interpolation=cv2.INTER_LANCZOS4)
             x0 = (nw - WIDTH) // 2
             y0 = (nh - HEIGHT) // 2
             frames_raw.append(resized[y0 : y0 + HEIGHT, x0 : x0 + WIDTH].copy())
@@ -866,12 +866,12 @@ def detectar_encoder_video() -> Tuple[str, List[str]]:
         return _ENCODER_SELECCIONADO
 
     candidatos: List[Tuple[str, List[str]]] = [
-        # NVIDIA NVENC
-        ("h264_nvenc", ["-c:v", "h264_nvenc", "-preset", "p4", "-b:v", "14M", "-pix_fmt", "yuv420p"]),
-        # AMD Radeon AMF
-        ("h264_amf", ["-c:v", "h264_amf", "-quality", "quality", "-b:v", "14M", "-pix_fmt", "yuv420p"]),
+        # NVIDIA NVENC (preset p6 alta calidad, 16M bitrate para 1080p)
+        ("h264_nvenc", ["-c:v", "h264_nvenc", "-preset", "p6", "-tune", "hq", "-b:v", "16M", "-maxrate", "20M", "-bufsize", "32M", "-pix_fmt", "yuv420p"]),
+        # AMD Radeon AMF (modo calidad, 16M bitrate para 1080p)
+        ("h264_amf", ["-c:v", "h264_amf", "-quality", "quality", "-rc", "vbr_peak", "-b:v", "16M", "-maxrate", "20M", "-pix_fmt", "yuv420p"]),
         # Intel Quick Sync Video
-        ("h264_qsv", ["-c:v", "h264_qsv", "-preset", "veryfast", "-b:v", "14M", "-pix_fmt", "yuv420p"]),
+        ("h264_qsv", ["-c:v", "h264_qsv", "-preset", "veryslow", "-b:v", "16M", "-maxrate", "20M", "-pix_fmt", "yuv420p"]),
     ]
 
     for nombre, args in candidatos:
@@ -896,9 +896,9 @@ def detectar_encoder_video() -> Tuple[str, List[str]]:
         except Exception:
             continue
 
-    # Fallback universal por CPU (funciona en cualquier máquina)
+    # Fallback universal por CPU (libx264 CRF 17 calidad casi sin pérdidas)
     args_cpu = [
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+        "-c:v", "libx264", "-preset", "medium", "-crf", "17",
         "-threads", str(CPU_THREADS), "-pix_fmt", "yuv420p",
     ]
     _ENCODER_SELECCIONADO = ("libx264", args_cpu)
@@ -1235,6 +1235,10 @@ async def editar_video_con_guion(
         "-i", "-",
         "-i", str(ruta_audio_final),
         *args_codec,
+        "-colorspace", "bt709",
+        "-color_primaries", "bt709",
+        "-color_trc", "bt709",
+        "-color_range", "tv",
         "-c:a", "aac",
         "-b:a", "192k",
         "-shortest",
