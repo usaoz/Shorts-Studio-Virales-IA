@@ -1196,6 +1196,10 @@ _REEMPLAZOS_FONETICOS_TTS = [
     (r"\bPRO\b", "PRÓ"),
     (r"\bsuvs\b", "súbs"),
     (r"\bsubs\b", "súbs"),
+    (r"\b[Ll]ike\b", "láik"),
+    (r"\b[Ll]ikes\b", "láiks"),
+    (r"\b[Dd]eja\b", "Dejá"),
+    (r"\b[Dd]ejá\b", "Dejá"),
 ]
 
 _PALABRAS_HYPE_YOUTUBER = {
@@ -3074,20 +3078,30 @@ async def editar_video_con_guion(
         archivos_audio_seg.append(ruta_mix_wav)
         datos_segmentos.append([seg, total_frames_seg, dur_seg_exacta, palabras_sub, rms_env])
 
-    # 2.5 Generar Outro automático de 1 segundo ("¡Deja tu like!") con freeze-frame y flecha
+    # 2.5 Generar Outro automático de 1 segundo ("¡Dejá tu like!") con freeze-frame y flecha
     dur_outro_seg = 1.0
     total_frames_outro = int(round(FPS * dur_outro_seg))
-    texto_outro = "¡Deja tu like!"
+    texto_outro_tts = "¡Dejá tu láik!"
     ruta_mp3_outro = TEMP_DIR / "seg_outro_like.mp3"
     ruta_wav_outro = ruta_mp3_outro.with_suffix(".wav")
 
-    print("[*] Generando audio y mezcla para Outro final de 1 segundo (¡Deja tu like!)...")
+    # Si la voz configurada es Giuseppe (italiana), usamos Tomás para un llamado nativo en español con energía YouTuber
+    voz_outro = config.voz_narrador
+    if "it-IT" in str(voz_outro):
+        voz_outro = "es-AR-TomasNeural"
+
+    print(f"[*] Generando audio y mezcla para Outro final de 1 segundo (¡Dejá tu like!) con voz {voz_outro}...")
     dur_voz_outro, palabras_sub_outro, _, _ = await generar_voz_y_timestamps_segmento(
-        texto_outro,
+        texto_outro_tts,
         ruta_mp3_outro,
-        voz_edge=config.voz_narrador,
+        voz_edge=voz_outro,
         dur_objetivo_seg=dur_outro_seg,
     )
+    # Asegurar texto limpio y llamativo en los subtítulos de pantalla
+    if palabras_sub_outro and len(palabras_sub_outro) >= 3:
+        palabras_sub_outro[0].texto = "¡DEJA"
+        palabras_sub_outro[1].texto = "TU"
+        palabras_sub_outro[2].texto = "LIKE! 👍"
     rms_env_outro = calcular_envolvente_rms(ruta_wav_outro, FPS)
     ruta_mix_outro_wav = TEMP_DIR / "seg_outro_mix.wav"
     gestor_sfx.mezclar_audio_segmento(
@@ -3442,7 +3456,9 @@ def descargar_video_youtube(url: str) -> Path:
         *args_js,
         "--extractor-args", "youtube:player_client=android,web",
         "--write-info-json",
-        "-S", "res,ext:mp4:m4a",
+        "-f", "bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/best",
+        "--merge-output-format", "mp4",
+        "-S", "res:1080,fps:60,vcodec:h264,br",
         "-o", "video_input.%(ext)s",
         url_limpia,
     ]
@@ -4794,40 +4810,44 @@ def iniciar_aplicacion_gui() -> None:
     )
     entry_nuevo_canal.pack(side="left", fill="x", expand=True, padx=(0, 8))
 
-    chips_scroll = ctk.CTkScrollableFrame(
+    chips_container = ctk.CTkFrame(
         card_canales,
-        height=58,
         corner_radius=14,
         fg_color=INPUT_BG,
         border_width=1,
         border_color="#1f2537",
-        orientation="horizontal",
     )
-    chips_scroll.pack(fill="x", padx=20, pady=(0, 12))
+    chips_container.pack(fill="x", padx=20, pady=(0, 12))
 
     def renderizar_chips_canales() -> None:
-        for w in chips_scroll.winfo_children():
+        for w in chips_container.winfo_children():
             w.destroy()
         lbl_modo_orden.configure(text=f"🔄 {orden_canales_var.get()}  ·  🔥 {min_views_var.get()}")
         if not lista_canales:
             ctk.CTkLabel(
-                chips_scroll,
+                chips_container,
                 text="Aún no agregaste canales. Pega el link de un canal arriba y toca '+ Agregar'.",
                 font=ctk.CTkFont(family="Segoe UI", size=11),
                 text_color=TEXT_MUTED,
             ).pack(padx=12, pady=12)
             return
 
+        row_frame = None
+        MAX_POR_FILA = 3
         for idx_c, c_url in enumerate(lista_canales):
+            if idx_c % MAX_POR_FILA == 0:
+                row_frame = ctk.CTkFrame(chips_container, fg_color="transparent")
+                row_frame.pack(fill="x", padx=8, pady=3)
+
             es_turno = (idx_c == (estado_rotacion["idx"] % len(lista_canales))) and ("Rotación" in orden_canales_var.get())
             chip = ctk.CTkFrame(
-                chips_scroll,
+                row_frame,
                 fg_color="#251d42" if es_turno else "#1b2234",
                 corner_radius=14,
                 border_width=1,
                 border_color=PURPLE_MAIN if es_turno else "#2c3652",
             )
-            chip.pack(side="left", padx=5, pady=6)
+            chip.pack(side="left", padx=5, pady=2)
 
             pref_turno = "▶ " if es_turno else ""
             ctk.CTkLabel(
@@ -5260,8 +5280,10 @@ def iniciar_aplicacion_gui() -> None:
         text="",
         font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
         text_color="#a7f3d0",
+        wraplength=540,
+        justify="left",
     )
-    lbl_preview_horarios.pack(anchor="w", padx=12, pady=6)
+    lbl_preview_horarios.pack(anchor="w", padx=12, pady=6, fill="x")
 
     def calcular_lista_horarios_actual() -> List[Optional[str]]:
         es_canales = "Canales" in modo_fuente_var.get()
@@ -5307,7 +5329,7 @@ def iniciar_aplicacion_gui() -> None:
         slots = calcular_lista_horarios_actual()
         hoy = _dt.date.today()
         partes_prev: List[str] = []
-        for idx_s, s_str in enumerate(slots[:4]):
+        for idx_s, s_str in enumerate(slots):
             if not s_str:
                 continue
             f_part, h_part = s_str.split(" ")
@@ -5319,13 +5341,13 @@ def iniciar_aplicacion_gui() -> None:
             else:
                 d_txt = f"{d_obj.day:02d}/{d_obj.month:02d}"
             partes_prev.append(f"#{idx_s + 1} {d_txt} {h_part}")
-        if len(slots) > 4:
-            partes_prev.append(f"+{len(slots) - 4} más")
 
         resumen_str = "  ·  ".join(partes_prev)
         lbl_preview_horarios.configure(
-            text=f"🎯 Salidas: {resumen_str}",
+            text=f"🎯 Salidas ({len(partes_prev)}): {resumen_str}",
             text_color="#a7f3d0",
+            wraplength=540,
+            justify="left",
         )
 
     seg_estrategia.configure(command=refrescar_plan_ui)
