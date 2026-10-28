@@ -140,3 +140,17 @@ class PalabraSubtitulo:
     inicio_seg: float
     fin_seg: float
     forzar_destaque: bool = False
+
+HORARIOS_PICO_OPTIMOS: Dict[int, List[str]] = {
+    1: ["19:00"],
+    2: ["13:00", "20:00"],
+    3: ["12:30", "17:30", "21:00"],
+    4: ["11:00", "15:00", "18:30", "21:30"],
+    5: ["10:00", "13:00", "16:00", "19:00", "22:00"],
+    6: ["09:30", "12:00", "14:30", "17:00", "19:30", "22:00"],
+}
+
+
+def _quitar_acentos(texto: str) -> str:
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn")

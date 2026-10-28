@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 import re
+import json
 import unicodedata
 from pathlib import Path
 from typing import List, Optional, Set, Tuple
 from .config import (
     DEFAULT_GUION_TXT, DEFAULT_VIDEO_INPUT,
     ConfigGuion, SegmentoVideoGuion,
-    MODO_ENCUADRE_DEFAULT, EDGE_VOICE_DEFAULT,
+    MODO_ENCUADRE_DEFAULT, EDGE_VOICE_DEFAULT, VOCES_DISPONIBLES,
     VOLUMEN_AUDIO_VIDEO_ORIGINAL, VOLUMEN_MUSICA_FONDO,
     DURACION_CALLOUTS_DEFAULT
 )

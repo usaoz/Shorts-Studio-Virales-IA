@@ -5,6 +5,7 @@ import json
 import math
 import os
 import random
+import re
 import shutil
 import subprocess
 import time
@@ -16,15 +17,15 @@ from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageFo
 
 from .config import (
     WIDTH, HEIGHT, FPS, CPU_THREADS, WIN_NO_WINDOW, WIN_STARTUPINFO,
-    BASE_DIR, ASSETS_DIR, EMOJIS_DIR, FOTOS_DIR, SFX_DIR, MUSICA_DIR,
+    BASE_DIR, ASSETS_DIR, EMOJIS_DIR, FONTS_DIR, FOTOS_DIR, SFX_DIR, MUSICA_DIR,
     TEMP_DIR, OUTPUT_DIR, ConfigGuion, SegmentoVideoGuion, PalabraSubtitulo,
     MODO_ENCUADRE_DEFAULT, VOLUMEN_VOZ_NARRADOR, VOLUMEN_AUDIO_VIDEO_ORIGINAL,
-    VOLUMEN_MUSICA_FONDO, SUBTITLE_OFFSET_SEC, DURACION_CALLOUTS_DEFAULT
+    VOLUMEN_MUSICA_FONDO, SUBTITLE_OFFSET_SEC, DURACION_CALLOUTS_DEFAULT, _quitar_acentos
 )
 from .parser_guion import cargar_guion_video
-from .subtitulos import renderizar_subtitulos_luminosos, cargar_fuente
+from .subtitulos import renderizar_subtitulos_luminosos, cargar_fuente, asegurar_fuente_mrbeast
 from .audio_tts import (
-    alinear_palabras_con_onda_real, masterizar_voz_estudio_ffmpeg,
+    generar_voz_y_timestamps_segmento, alinear_palabras_con_onda_real, masterizar_voz_estudio_ffmpeg,
     intentar_voz_elevenlabs, GestorAudioSFX
 )
 from .vision_tracker import RastreadorObjetivosVideo

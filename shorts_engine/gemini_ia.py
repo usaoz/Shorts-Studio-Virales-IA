@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
+import cv2
 import json
 import re
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-from PIL import Image
+from PIL import Image, ImageDraw
+from .video_render import obtener_info_video
+from .youtube_manager import ULTIMA_INFO_YTDLP
 from .config import (
     BASE_DIR, TEMP_DIR, DEFAULT_GUION_TXT, PROMPT_IA_PATH, PROMPT_COMPACTO_PATH,
     WIN_NO_WINDOW, WIN_STARTUPINFO

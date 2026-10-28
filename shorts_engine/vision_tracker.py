@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 import cv2
+import math
 import numpy as np
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from PIL import Image
-from .config import WIDTH, HEIGHT, FPS, TEMP_DIR, ASSETS_DIR
+from .config import WIDTH, HEIGHT, FPS, TEMP_DIR, ASSETS_DIR, _quitar_acentos
 
 # ==============================================================================
 # 6. SEGUIMIENTO INTELIGENTE DE OBJETIVOS (OPTICAL FLOW + SALIENCIA EN MOVIMIENTO)

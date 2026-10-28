@@ -14,7 +14,7 @@ import numpy as np
 from .config import (
     TEMP_DIR, SFX_DIR, WIN_NO_WINDOW, WIN_STARTUPINFO,
     ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID, EDGE_VOICE_DEFAULT,
-    EDGE_PITCH_DEFAULT, HAS_EDGE_TTS, PalabraSubtitulo
+    EDGE_PITCH_DEFAULT, HAS_EDGE_TTS, PalabraSubtitulo, SUBTITLE_OFFSET_SEC, VOLUMEN_VOZ_NARRADOR, _quitar_acentos
 )
 if HAS_EDGE_TTS:
     import edge_tts
