@@ -273,17 +273,22 @@ def generar_guion_con_gemini_flash(
         prompt_final,
     ]
 
-    # Plan escalonado con timeout duro por hilo (Google requiere timeout HTTP >= 12000 ms):
-    # - `gemini-3.6-flash` es el modelo más potente con cuota gratuita activa (`Free Tier`) para Video+Mosaico.
-    # - `gemini-4-argon` solo tiene cuota > 0 si la cuenta tiene facturación (Tier 1) activa en Google AI Studio.
-    plan_intentos: List[Tuple[str, List[object], float]] = [
-        (modelo_preferido, partes_con_video, 20.0),
-        ("gemini-3.6-flash", partes_con_video, 16.0),
-        ("gemini-3.8-flash", partes_con_video, 16.0),
-        ("gemini-3.5-flash-lite", partes_con_video, 16.0),
-        ("gemini-3.6-flash", partes_solo_mosaico, 14.0),
-        ("gemini-3.5-flash-lite", partes_solo_mosaico, 15.0),
+    # Plan escalonado con reintentos y timeouts realistas para multimodalidad (video + mosaico):
+    candidatos_base: List[Tuple[str, List[object], float]] = [
+        (modelo_preferido, partes_con_video, 45.0),
+        ("gemini-3.6-flash", partes_con_video, 45.0),
+        ("gemini-3.8-flash", partes_con_video, 45.0),
+        ("gemini-3.5-flash-lite", partes_con_video, 40.0),
+        ("gemini-3.6-flash", partes_solo_mosaico, 35.0),
+        ("gemini-3.5-flash-lite", partes_solo_mosaico, 35.0),
     ]
+    plan_intentos: List[Tuple[str, List[object], float]] = []
+    vistos: Set[Tuple[str, int]] = set()
+    for m, c, t in candidatos_base:
+        k_id = (m, len(c))
+        if k_id not in vistos:
+            vistos.add(k_id)
+            plan_intentos.append((m, c, t))
 
     ultimo_err: Optional[Exception] = None
     texto_respuesta = ""
@@ -292,8 +297,8 @@ def generar_guion_con_gemini_flash(
         cli = genai.Client(
             api_key=key_limpia,
             http_options=types.HttpOptions(
-                timeout=max(12000, int(timeout_s * 1000)),
-                retry_options=types.HttpRetryOptions(attempts=1),
+                timeout=max(20000, int(timeout_s * 1000)),
+                retry_options=types.HttpRetryOptions(attempts=2),
             ),
         )
         resp = cli.models.generate_content(

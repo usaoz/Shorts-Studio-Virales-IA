@@ -1,8 +1,8 @@
-TITULO_SUPERIOR: Gym vs Boxeo Broma Epica
-TITULO_YOUTUBE: ¡La pelea definitiva en el arcade! 🥊💥 #shorts
-DESCRIPCION_YOUTUBE: Una chica reta a un experto en boxeo en las maquinitas del salón de juegos y el resultado es increíble. ¡No podrás creer lo que pasa! #shorts #viral #arcade #humor
+TITULO_SUPERIOR: Reto Galletas Locas Hermanas
+TITULO_YOUTUBE: ¡Increíble reto de galletas entre hermanas! #shorts
+DESCRIPCION_YOUTUBE: Mira cómo estas dos hermanas compiten en un reto divertido para ver quién se come todo más rápido. ¿Quién ganará esta alocada prueba? #shorts #humor #retos #viral
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-28 20:00
+SCHEDULE: auto
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
@@ -10,7 +10,8 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | izquierda | ninguno | ¡Mira cómo esta pareja llega decidida a ganarle al juego de boxeo en el salón! ¡Todos miran asombrados!
-00:05 - 00:10 | zoom_in | whoosh+boxing_bell | diablo:izquierda | ninguna | ninguno | ¡El chico musculoso se prepara con guantes rojos para dar un golpe brutal y destrozar el récord actual! ¡Atentos al poder!
-00:10 - 00:15 | alerta_roja | riser_suction | risa:derecha | ninguna | 50,45:grande | ¡Pero antes de golpear, ella interviene con un toque mágico de un dedo y desata una destrucción total! ¡Increíble!
-00:15 - 00:20 | temblor | punch+kids_yeyy | fiesta:izquierda | ninguna | ninguno | ¡Una avalancha gigante de papeles cae cubriendo al boxeador por completo mientras ella celebra feliz con su peluche! ¡Victoria épica total!
+00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | 28,45 | ninguno | ¡Mira cómo la hermana mayor le dice que mire a la pared para robarse todas las deliciosas galletas!
+00:05 - 00:10 | zoom_in | whoosh+ding | risa:izquierda | ninguna | ninguno | ¡La pequeña se voltea y descubre que solo le dejaron una solitaria galleta en el plato brillante!
+00:10 - 00:15 | alerta_roja | riser_suction | diablo:derecha | ninguna | 50,38 | ¡Ahora arranca el desafío definitivo donde quien termine primero todas las galletas se lleva un gran premio!
+00:15 - 00:20 | zoom_out | whoosh | sorprendido:izquierda | ninguna | ninguno | ¡La hermana mayor se come solo una uva y le entrega rápidamente el plato entero a su pequeña compañera!
+00:20 - 00:25 | brillo_epico | cash_ting+party_horn | fiesta:derecha | ninguna | ninguno | ¡La pequeña celebra feliz porque logró comer primero y reclama su merecido regalo de limpieza!
