@@ -4453,8 +4453,9 @@ def iniciar_aplicacion_gui() -> None:
             "privacidad": "Privado",
             "voz": list(VOCES_DISPONIBLES.keys())[0],
             "encuadre": list(encuadre_map.keys())[0],
-            "modo_fuente": "Canales Automáticos",
+            "modo_fuente": "Canales Seleccionados",
             "modo_contenido": "IA Automática",
+            "accion_final": "Subir automáticamente",
             "modelo_ia": list(MAPA_MODELOS_IA.keys())[0],
             "orden_canales": "Rotación (En fila)",
             "min_views_millones": "1.0M+ vistas",
@@ -4485,8 +4486,9 @@ def iniciar_aplicacion_gui() -> None:
                     "privacidad": str(leido.get("privacidad", "Privado")),
                     "voz": str(leido.get("voz", def_data["voz"])),
                     "encuadre": str(leido.get("encuadre", def_data["encuadre"])),
-                    "modo_fuente": str(leido.get("modo_fuente", "Canales Automáticos")),
-                    "modo_contenido": str(leido.get("modo_contenido", "IA Automática")),
+                    "modo_fuente": "Canales Seleccionados" if "Canal" in str(leido.get("modo_fuente", "Canales Seleccionados")) else "Link de Video",
+                    "modo_contenido": "Personalizado" if "Personalizado" in str(leido.get("modo_contenido", "IA Automática")) else "IA Automática",
+                    "accion_final": "Guardar en carpeta" if "Guardar" in str(leido.get("accion_final", "Subir automáticamente")) else "Subir automáticamente",
                     "modelo_ia": str(leido.get("modelo_ia", def_data["modelo_ia"])),
                     "orden_canales": str(leido.get("orden_canales", "Rotación (En fila)")),
                     "min_views_millones": str(leido.get("min_views_millones", "1.0M+ vistas")),
@@ -4517,6 +4519,7 @@ def iniciar_aplicacion_gui() -> None:
     encuadre_var = tk.StringVar(value=str(mem["encuadre"]))
     modo_fuente_var = tk.StringVar(value=str(mem["modo_fuente"]))
     modo_contenido_var = tk.StringVar(value=str(mem["modo_contenido"]))
+    accion_final_var = tk.StringVar(value=str(mem.get("accion_final", "Subir automáticamente")))
     modelo_ia_var = tk.StringVar(value=str(mem["modelo_ia"]))
     orden_canales_var = tk.StringVar(value=str(mem["orden_canales"]))
     min_views_var = tk.StringVar(value=str(mem["min_views_millones"]))
@@ -4617,6 +4620,7 @@ def iniciar_aplicacion_gui() -> None:
                         "encuadre": encuadre_var.get(),
                         "modo_fuente": modo_fuente_var.get(),
                         "modo_contenido": modo_contenido_var.get(),
+                        "accion_final": accion_final_var.get(),
                         "modelo_ia": modelo_ia_var.get(),
                         "orden_canales": orden_canales_var.get(),
                         "min_views_millones": min_views_var.get(),
@@ -4919,52 +4923,172 @@ def iniciar_aplicacion_gui() -> None:
         font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     ).pack(side="right")
 
-    # --- TARJETA MODO B: LINK INDIVIDUAL MANUAL ---
+    # --- TARJETA MODO B: LINK DE VIDEO (INDIVIDUAL O MÚLTIPLES LINKS) ---
     card_link = ctk.CTkFrame(contenedor_paso1, fg_color=CARD_BG, corner_radius=22, border_width=1, border_color=CARD_BORDER)
 
+    top_link_row = ctk.CTkFrame(card_link, fg_color="transparent")
+    top_link_row.pack(fill="x", padx=22, pady=(14, 8))
+
     ctk.CTkLabel(
-        card_link,
-        text="🔗  Link del Short de YouTube (Modo Individual)",
+        top_link_row,
+        text="🔗  Links de Videos de YouTube",
         font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
         text_color=TEXT_MAIN,
-    ).pack(anchor="w", padx=22, pady=(14, 6))
+    ).pack(side="left")
 
-    url_row = ctk.CTkFrame(card_link, fg_color="transparent")
-    url_row.pack(fill="x", padx=22, pady=(0, 14))
-
-    entry_url = ctk.CTkEntry(
-        url_row,
-        placeholder_text="https://www.youtube.com/shorts/...",
-        corner_radius=18,
-        height=42,
-        fg_color=INPUT_BG,
-        border_width=1,
-        border_color="#2a3147",
-        text_color="#ffffff",
-        font=ctk.CTkFont(family="Consolas", size=13),
+    lbl_contador_links = ctk.CTkLabel(
+        top_link_row,
+        text="1 Video",
+        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        text_color=CYAN_ACCENT,
+        fg_color="#0e2a3a",
+        corner_radius=10,
+        padx=10,
+        pady=2,
     )
-    entry_url.pack(side="left", fill="x", expand=True, padx=(0, 10))
+    lbl_contador_links.pack(side="right")
 
-    def pegar_url() -> None:
+    filas_links_container = ctk.CTkFrame(card_link, fg_color="transparent")
+    filas_links_container.pack(fill="x", padx=22, pady=(0, 14))
+
+    lista_filas_links: List[Dict[str, object]] = []
+
+    def obtener_links_ingresados() -> List[str]:
+        links: List[str] = []
+        for fd in lista_filas_links:
+            ent = fd.get("entry")
+            if ent and ent.winfo_exists():
+                v = ent.get().strip().strip('"')
+                if v:
+                    links.append(v)
+        return links
+
+    def _actualizar_ui_filas_links() -> None:
+        nonlocal entry_url
+        tot = len(lista_filas_links)
+        for fd in lista_filas_links:
+            btn_d = fd.get("btn_del")
+            if btn_d is not None and isinstance(btn_d, ctk.CTkButton):
+                if tot > 1:
+                    if not btn_d.winfo_ismapped():
+                        btn_d.pack(side="left", padx=(4, 0))
+                else:
+                    btn_d.pack_forget()
+
+        if lista_filas_links:
+            entry_url = lista_filas_links[0]["entry"]
+
+        cant = len(lista_filas_links)
+        lbl_contador_links.configure(text=f"{cant} {'Video' if cant == 1 else 'Videos'}")
         try:
-            texto_clip = root.clipboard_get().strip()
-            entry_url.delete(0, tk.END)
-            entry_url.insert(0, texto_clip)
-        except Exception:
+            refrescar_plan_ui()
+        except (NameError, Exception):
             pass
 
-    ctk.CTkButton(
-        url_row,
-        text="📋 Pegar",
-        command=pegar_url,
-        corner_radius=18,
-        height=42,
-        width=110,
-        fg_color="#1e2538",
-        hover_color="#2b3550",
-        text_color=TEXT_MAIN,
-        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-    ).pack(side="right")
+    def _agregar_fila_link(valor_inicial: str = "") -> None:
+        if len(lista_filas_links) >= 12:
+            messagebox.showinfo("Límite alcanzado", "Puedes agregar hasta 12 links simultáneos.", parent=root)
+            return
+
+        idx_f = len(lista_filas_links)
+        row_f = ctk.CTkFrame(filas_links_container, fg_color="transparent")
+        row_f.pack(fill="x", pady=(0, 8))
+
+        ph = "https://www.youtube.com/shorts/..." if idx_f == 0 else f"Link #{idx_f + 1} (https://www.youtube.com/shorts/...)"
+        ent = ctk.CTkEntry(
+            row_f,
+            placeholder_text=ph,
+            corner_radius=18,
+            height=42,
+            fg_color=INPUT_BG,
+            border_width=1,
+            border_color="#2a3147",
+            text_color="#ffffff",
+            font=ctk.CTkFont(family="Consolas", size=13),
+        )
+        ent.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        if valor_inicial:
+            ent.insert(0, valor_inicial)
+
+        def _pegar_en_este(e=ent) -> None:
+            try:
+                clip = root.clipboard_get().strip()
+                lineas = [l.strip().strip('"') for l in clip.splitlines() if l.strip()]
+                if not lineas:
+                    return
+                e.delete(0, tk.END)
+                e.insert(0, lineas[0])
+                for l_extra in lineas[1:]:
+                    if len(lista_filas_links) < 12:
+                        _agregar_fila_link(l_extra)
+                _actualizar_ui_filas_links()
+            except Exception:
+                pass
+
+        btn_peg = ctk.CTkButton(
+            row_f,
+            text="📋 Pegar",
+            command=_pegar_en_este,
+            corner_radius=18,
+            height=42,
+            width=90,
+            fg_color="#1e2538",
+            hover_color="#2b3550",
+            text_color=TEXT_MAIN,
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        )
+        btn_peg.pack(side="left", padx=(0, 4))
+
+        btn_add = ctk.CTkButton(
+            row_f,
+            text="➕",
+            command=lambda: _agregar_fila_link(),
+            corner_radius=18,
+            height=42,
+            width=42,
+            fg_color=PURPLE_MAIN,
+            hover_color=PURPLE_HOVER,
+            text_color="#ffffff",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        )
+        btn_add.pack(side="left")
+
+        fila_record: Dict[str, object] = {
+            "frame": row_f,
+            "entry": ent,
+            "btn_pegar": btn_peg,
+            "btn_add": btn_add,
+            "btn_del": None,
+        }
+
+        def _quitar_este(rf=row_f, fr=fila_record) -> None:
+            try:
+                rf.destroy()
+            except Exception:
+                pass
+            if fr in lista_filas_links:
+                lista_filas_links.remove(fr)
+            _actualizar_ui_filas_links()
+
+        btn_del = ctk.CTkButton(
+            row_f,
+            text="✕",
+            command=_quitar_este,
+            corner_radius=18,
+            height=42,
+            width=42,
+            fg_color="#261b23",
+            hover_color="#dc2626",
+            text_color="#f87171",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        )
+        fila_record["btn_del"] = btn_del
+
+        lista_filas_links.append(fila_record)
+        _actualizar_ui_filas_links()
+
+    entry_url = None
+    _agregar_fila_link()
 
     # ==========================================================================
     # PASO 2 UNIFICADO: PLAN DE SUBIDA, CANTIDAD POR DÍA Y HORARIOS INTELIGENTES
@@ -5287,9 +5411,13 @@ def iniciar_aplicacion_gui() -> None:
 
     def calcular_lista_horarios_actual() -> List[Optional[str]]:
         es_canales = "Canales" in modo_fuente_var.get()
-        cant_t = MAPA_CANTIDAD_TOTAL.get(cantidad_total_var.get(), 2) if es_canales else 1
+        if es_canales:
+            cant_t = MAPA_CANTIDAD_TOTAL.get(cantidad_total_var.get(), 2)
+        else:
+            cant_ingresados = len(obtener_links_ingresados())
+            cant_t = cant_ingresados if cant_ingresados > 0 else max(1, len(lista_filas_links))
         por_d = MAPA_POR_DIA.get(shorts_por_dia_var.get(), 2)
-        if not programar_var.get():
+        if not programar_var.get() or accion_final_var.get() == "Guardar en carpeta":
             return [None] * cant_t
         interv = MAPA_INTERVALO_HS.get(intervalo_horas_var.get(), 8)
         slots = calcular_horarios_inteligentes(
@@ -5305,12 +5433,24 @@ def iniciar_aplicacion_gui() -> None:
     def refrescar_plan_ui(*_args: object) -> None:
         _guardar_memoria()
         es_canales = "Canales" in modo_fuente_var.get()
+        solo_guardar = accion_final_var.get() == "Guardar en carpeta"
+
         if es_canales:
             opt_cantidad_total.configure(state="normal")
-            opt_por_dia.configure(state="normal")
+            opt_por_dia.configure(state="normal" if not solo_guardar else "disabled")
         else:
             opt_cantidad_total.configure(state="disabled")
             opt_por_dia.configure(state="disabled")
+
+        if solo_guardar:
+            sw_prog.configure(state="disabled")
+            lbl_preview_horarios.configure(
+                text="💾 Modo Guardar en Carpeta activo — Se generarán y guardarán los Reels en output_shorts sin subir a YouTube.",
+                text_color="#67e8f9",
+            )
+            return
+        else:
+            sw_prog.configure(state="normal")
 
         if "Pico" in modo_horario_var.get():
             frame_manual_horas.pack_forget()
@@ -5359,20 +5499,39 @@ def iniciar_aplicacion_gui() -> None:
     opt_intervalo.configure(command=refrescar_plan_ui)
 
     def refrescar_texto_boton_accion() -> None:
-        """Actualiza el texto y estilo del botón de acción según si está en IA Automática o Personalizado."""
+        """Actualiza el texto y estilo del botón de acción según IA/Personalizado y Subir/Guardar."""
         try:
+            solo_guardar = accion_final_var.get() == "Guardar en carpeta"
             if "Personalizado" in modo_contenido_var.get():
-                btn_auto_1clic.configure(
-                    text="✍️  ELEGIR SHORTS Y ARMAR GUIÓN / TÍTULO",
-                    fg_color="#0284c7",
-                    hover_color="#0369a1",
-                )
+                if solo_guardar:
+                    btn_auto_1clic.configure(
+                        text="✍️  ELEGIR SHORTS, PERSONALIZAR Y GUARDAR",
+                        fg_color="#0284c7",
+                        hover_color="#0369a1",
+                        text_color="#ffffff",
+                    )
+                else:
+                    btn_auto_1clic.configure(
+                        text="✍️  ELEGIR SHORTS Y ARMAR GUIÓN / TÍTULO",
+                        fg_color="#0284c7",
+                        hover_color="#0369a1",
+                        text_color="#ffffff",
+                    )
             else:
-                btn_auto_1clic.configure(
-                    text="🚀  CREAR Y SUBIR SHORT AHORA",
-                    fg_color=PURPLE_MAIN,
-                    hover_color=PURPLE_HOVER,
-                )
+                if solo_guardar:
+                    btn_auto_1clic.configure(
+                        text="💾  CREAR Y GUARDAR SHORTS EN CARPETA",
+                        fg_color=GREEN_ACCENT,
+                        hover_color="#059669",
+                        text_color="#052e16",
+                    )
+                else:
+                    btn_auto_1clic.configure(
+                        text="🚀  CREAR Y SUBIR SHORT EN 1 CLIC",
+                        fg_color=PURPLE_MAIN,
+                        hover_color=PURPLE_HOVER,
+                        text_color="#ffffff",
+                    )
         except Exception:
             pass
 
@@ -5394,7 +5553,7 @@ def iniciar_aplicacion_gui() -> None:
     def abrir_ventana_ajustes() -> None:
         win = ctk.CTkToplevel(root)
         win.title("Ajustes y Herramientas")
-        win.geometry("580x630")
+        win.geometry("580x695")
         win.resizable(False, False)
         win.configure(fg_color=BG_DARK)
         win.transient(root)
@@ -5408,7 +5567,7 @@ def iniciar_aplicacion_gui() -> None:
             text_color=TEXT_MAIN,
         ).pack(anchor="w", padx=24, pady=(16, 8))
 
-        # 1. Tarjeta de Modo de Trabajo, Título/Guión (IA vs Manual) y Selección de Canales
+        # 1. Tarjeta de Modo de Trabajo, Título/Guión (IA vs Manual), Acción Final y Selección de Canales
         card_modo = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
         card_modo.pack(fill="x", padx=24, pady=(0, 8))
 
@@ -5421,7 +5580,7 @@ def iniciar_aplicacion_gui() -> None:
 
         ctk.CTkSegmentedButton(
             card_modo,
-            values=["Canales Automáticos", "Link Manual"],
+            values=["Canales Seleccionados", "Link de Video"],
             variable=modo_fuente_var,
             command=actualizar_modo_vista,
             corner_radius=14,
@@ -5438,13 +5597,30 @@ def iniciar_aplicacion_gui() -> None:
 
         ctk.CTkSegmentedButton(
             card_modo,
-            values=["IA Automática", "Personalizado por mí"],
+            values=["IA Automática", "Personalizado"],
             variable=modo_contenido_var,
             command=actualizar_modo_vista,
             corner_radius=14,
             height=32,
             selected_color=PURPLE_MAIN,
         ).pack(fill="x", padx=18, pady=(0, 8))
+
+        ctk.CTkLabel(
+            card_modo,
+            text="🎯 Acción Final al Terminar de Crear Shorts",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text_color=TEXT_MAIN,
+        ).pack(anchor="w", padx=18, pady=(2, 4))
+
+        ctk.CTkSegmentedButton(
+            card_modo,
+            values=["Subir automáticamente", "Guardar en carpeta"],
+            variable=accion_final_var,
+            command=actualizar_modo_vista,
+            corner_radius=14,
+            height=32,
+            selected_color=GREEN_ACCENT,
+        ).pack(fill="x", padx=18, pady=(0, 10))
 
         row_ord = ctk.CTkFrame(card_modo, fg_color="transparent")
         row_ord.pack(fill="x", padx=18, pady=(0, 10))
@@ -7008,9 +7184,14 @@ def iniciar_aplicacion_gui() -> None:
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         ).pack(side="left")
 
+        txt_confirmar = (
+            "💾  COMENZAR EDICIÓN Y GUARDAR AHORA"
+            if (accion_final_var.get() == "Guardar en carpeta")
+            else "🚀  COMENZAR EDICIÓN Y SUBIDA AHORA"
+        )
         ctk.CTkButton(
             bot_row,
-            text="🚀  COMENZAR EDICIÓN Y SUBIDA AHORA",
+            text=txt_confirmar,
             command=_confirmar_m,
             corner_radius=18,
             height=42,
@@ -7040,17 +7221,30 @@ def iniciar_aplicacion_gui() -> None:
             )
             return
 
+        links_a_procesar: List[str] = []
+        if not es_modo_canales:
+            links_a_procesar = obtener_links_ingresados()
+            if not links_a_procesar:
+                if DEFAULT_VIDEO_INPUT.exists():
+                    links_a_procesar = [str(DEFAULT_VIDEO_INPUT)]
+                else:
+                    messagebox.showwarning(
+                        "Sin links ingresados",
+                        "Pega al menos un link de video de YouTube antes de comenzar.",
+                    )
+                    return
+
         if not editando_lock.acquire(blocking=False):
             return
 
-        entrada_video = entry_url.get().strip().strip('"')
         voz_elegida = VOCES_DISPONIBLES.get(voz_var.get(), EDGE_VOICE_DEFAULT)
         encuadre_elegido = encuadre_map.get(encuadre_var.get(), "full")
         min_v = MAPA_MIN_VIEWS.get(min_views_var.get(), 1_000_000)
-        cant_cola = MAPA_CANTIDAD_TOTAL.get(cantidad_total_var.get(), 2) if es_modo_canales else 1
+        cant_cola = MAPA_CANTIDAD_TOTAL.get(cantidad_total_var.get(), 2) if es_modo_canales else len(links_a_procesar)
         horarios_lote_plan = calcular_lista_horarios_actual()
         es_custom_activo = "Personalizado" in modo_contenido_var.get()
         pref_modelo_ia = MAPA_MODELOS_IA.get(modelo_ia_var.get(), "gemini-4-argon")
+        solo_guardar = accion_final_var.get() == "Guardar en carpeta"
 
         modo_priv = "private"
         if "público" in privacidad_var.get().lower() or "publico" in privacidad_var.get().lower():
@@ -7178,18 +7372,24 @@ def iniciar_aplicacion_gui() -> None:
                         copia_ms2 = [dict(x) for x in estados_milestones]
                         root.after(0, lambda cm=copia_ms2: _renderizar_milestones_ui(cm))
                 else:
-                    u_manual = entrada_video if entrada_video else str(DEFAULT_VIDEO_INPUT)
-                    c0 = cuentas_objetivo_lote[0]
-                    videos_seleccionados.append(
-                        {
-                            "url": u_manual,
-                            "titulo_orig": "Video por Link Directo",
-                            "vistas": 0,
-                            "canal": "Link Manual",
-                            "cuenta_id": str(c0.get("id") or "principal"),
-                            "cuenta_nombre": str(c0.get("nombre") or "Canal Principal"),
-                        }
-                    )
+                    for idx_u, u_link in enumerate(links_a_procesar):
+                        c_idx = idx_u % len(cuentas_objetivo_lote)
+                        c_reel = cuentas_objetivo_lote[c_idx]
+                        cid_reel = str(c_reel.get("id") or "principal")
+                        cnom_reel = str(c_reel.get("nombre") or cid_reel)
+                        videos_seleccionados.append(
+                            {
+                                "url": u_link,
+                                "titulo_orig": f"Video Link #{idx_u + 1}",
+                                "vistas": 0,
+                                "canal": "Link de Video",
+                                "cuenta_id": cid_reel,
+                                "cuenta_nombre": cnom_reel,
+                            }
+                        )
+                        estados_milestones[idx_u] = {"tipo": "pendiente", "texto": f"🎯 Reel {idx_u + 1}: Listo"}
+                    copia_ms2 = [dict(x) for x in estados_milestones]
+                    root.after(0, lambda cm=copia_ms2: _renderizar_milestones_ui(cm))
 
                 # ==================================================================
                 # FASE 1.5 (SOLO SI ESTÁ EN MODO PERSONALIZADO):
@@ -7331,47 +7531,55 @@ def iniciar_aplicacion_gui() -> None:
                     )
                     ultimo_video_generado[0] = ruta_final
 
-                    # Cuenta de YouTube asignada a este Reel en el lote
-                    id_cuenta_usar = str(info_sel.get("cuenta_id") or estado_seleccion_cuentas.get("cuenta_id") or "principal")
-                    nombre_cuenta_subida = str(info_sel.get("cuenta_nombre") or id_cuenta_usar)
+                    if solo_guardar:
+                        _actualizar_milestone_actual("subido", f"💾 Reel {num_actual}: ¡Guardado!")
+                        _set_subprogreso(
+                            1.0,
+                            f"💾 {pref_lote}Reel guardado en output_shorts ({ruta_final.name})",
+                            GREEN_ACCENT,
+                        )
+                    else:
+                        # Cuenta de YouTube asignada a este Reel en el lote
+                        id_cuenta_usar = str(info_sel.get("cuenta_id") or estado_seleccion_cuentas.get("cuenta_id") or "principal")
+                        nombre_cuenta_subida = str(info_sel.get("cuenta_nombre") or id_cuenta_usar)
 
-                    _actualizar_milestone_actual("activo", f"🚀 Reel {num_actual}: Subiendo a {nombre_cuenta_subida[:16]}...")
-                    root.after(
-                        0,
-                        lambda p=pref_lote, nc=nombre_cuenta_subida[:18]: btn_auto_1clic.configure(
-                            text=f"⏳  {p}SUBIENDO A {nc.upper()}..."
-                        ),
-                    )
-                    _set_subprogreso(
-                        0.92,
-                        f"🚀 {pref_lote}Subiendo y programando Short en '{nombre_cuenta_subida}'...",
-                        "#c084fc",
-                    )
+                        _actualizar_milestone_actual("activo", f"🚀 Reel {num_actual}: Subiendo a {nombre_cuenta_subida[:16]}...")
+                        root.after(
+                            0,
+                            lambda p=pref_lote, nc=nombre_cuenta_subida[:18]: btn_auto_1clic.configure(
+                                text=f"⏳  {p}SUBIENDO A {nc.upper()}..."
+                            ),
+                        )
+                        _set_subprogreso(
+                            0.92,
+                            f"🚀 {pref_lote}Subiendo y programando Short en '{nombre_cuenta_subida}'...",
+                            "#c084fc",
+                        )
 
-                    vid_id = subir_video(
-                        ruta_video=ruta_final,
-                        titulo=c_tit if (es_custom_activo and c_tit) else None,
-                        descripcion=c_desc if (es_custom_activo and c_desc) else None,
-                        estado_privacidad=modo_priv,
-                        publish_at=sched_actual,
-                        ruta_guion=DEFAULT_GUION_TXT,
-                        cuenta_id=id_cuenta_usar,
-                    )
-                    incrementar_cuota_diaria(video_id=vid_id)
-                    root.after(0, refrescar_barra_cuota)
-                    root.after(1500, sincronizar_cola_programados_async)
-                    url_short = f"https://youtube.com/shorts/{vid_id}"
-                    links_subidos.append(url_short)
+                        vid_id = subir_video(
+                            ruta_video=ruta_final,
+                            titulo=c_tit if (es_custom_activo and c_tit) else None,
+                            descripcion=c_desc if (es_custom_activo and c_desc) else None,
+                            estado_privacidad=modo_priv,
+                            publish_at=sched_actual,
+                            ruta_guion=DEFAULT_GUION_TXT,
+                            cuenta_id=id_cuenta_usar,
+                        )
+                        incrementar_cuota_diaria(video_id=vid_id)
+                        root.after(0, refrescar_barra_cuota)
+                        root.after(1500, sincronizar_cola_programados_async)
+                        url_short = f"https://youtube.com/shorts/{vid_id}"
+                        links_subidos.append(url_short)
 
-                    _actualizar_milestone_actual("subido", f"✅ Reel {num_actual}: ¡Subido!")
-                    _set_subprogreso(
-                        1.0,
-                        f"✅ {pref_lote}Reel {num_actual} subido con éxito ({sched_actual or modo_priv.upper()})",
-                        GREEN_ACCENT,
-                    )
+                        _actualizar_milestone_actual("subido", f"✅ Reel {num_actual}: ¡Subido!")
+                        _set_subprogreso(
+                            1.0,
+                            f"✅ {pref_lote}Reel {num_actual} subido con éxito ({sched_actual or modo_priv.upper()})",
+                            GREEN_ACCENT,
+                        )
 
                 # Si se programaron varios días, actualizar la fecha recordada al último día usado
-                if horarios_lote and horarios_lote[-1]:
+                if not solo_guardar and horarios_lote and horarios_lote[-1]:
                     ultima_f = str(horarios_lote[-1]).split(" ")[0]
                     fecha_elegida_var.set(ultima_f)
                     root.after(
@@ -7383,11 +7591,19 @@ def iniciar_aplicacion_gui() -> None:
                     )
 
                 def _on_ok() -> None:
-                    txt_fin = (
-                        f"✅ 100% — ¡Se subieron todos los Reels ({len(links_subidos)}/{cant_cola}) con éxito!"
-                        if cant_cola > 1
-                        else "✅ 100% — ¡Se subió el Reel a YouTube con éxito!"
-                    )
+                    if solo_guardar:
+                        txt_fin = (
+                            f"💾 100% — ¡Se crearon y guardaron todos los Reels ({len(videos_seleccionados)}) en output_shorts!"
+                            if cant_cola > 1
+                            else "💾 100% — ¡Se creó y guardó el Reel en output_shorts!"
+                        )
+                        root.after(800, abrir_carpeta_salida)
+                    else:
+                        txt_fin = (
+                            f"✅ 100% — ¡Se subieron todos los Reels ({len(links_subidos)}/{cant_cola}) con éxito!"
+                            if cant_cola > 1
+                            else "✅ 100% — ¡Se subió el Reel a YouTube con éxito!"
+                        )
                     _actualizar_progreso_ui(100.0, txt_fin, GREEN_ACCENT, GREEN_ACCENT)
                     root.after(2800, lambda: _mostrar_modo_progreso_activo(False) if not editando_lock.locked() else None)
 
