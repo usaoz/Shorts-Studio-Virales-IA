@@ -117,7 +117,7 @@ ESTADO_PUBLICACION: privado
 SCHEDULE: auto
 PARA_NINOS: no
 MODO_ENCUADRE: full
-VOLUMEN_VIDEO_ORIGINAL: 0
+TONO_VIDEO: [triste | inspiracional | fondo] (elige 'triste' si el video es de tristeza/drama, 'inspiracional' si es de superación/emoción/heroico, o 'fondo' para humor/curiosidad/dinámico)
 ARCHIVO_SALIDA: auto
 
 [GUION]

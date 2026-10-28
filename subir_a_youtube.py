@@ -915,7 +915,7 @@ def obtener_shorts_programados() -> List[Dict[str, Any]]:
     return todos
 
 
-def obtener_metricas_ultimos_videos(limite_por_cuenta: int = 15, total_max: int = 10) -> List[Dict[str, Any]]:
+def obtener_metricas_ultimos_videos(limite_por_cuenta: int = 20, total_max: int = 30) -> List[Dict[str, Any]]:
     """
     Consulta en la API de YouTube los videos más recientes ya subidos/publicados
     en todas las cuentas vinculadas, obteniendo sus métricas reales:

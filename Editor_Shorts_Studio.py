@@ -31,6 +31,7 @@ import asyncio
 import json
 import math
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -70,7 +71,8 @@ CPU_THREADS = max(4, (os.cpu_count() or 8))
 
 MODO_ENCUADRE_DEFAULT = "full"  # "full" (9:16 crop-fill) o "blur" (fondo borroso para horizontales)
 VOLUMEN_VOZ_NARRADOR = 1.48
-VOLUMEN_AUDIO_VIDEO_ORIGINAL = 0.16
+VOLUMEN_AUDIO_VIDEO_ORIGINAL = 0.0  # Muteado: el audio del video descargado se silencia para priorizar voz, ruidos y música
+VOLUMEN_MUSICA_FONDO = 0.12  # Nivel suave para música de fondo (rellena silencios sin tapar la voz)
 SUBTITLE_OFFSET_SEC = -0.02
 DURACION_CALLOUTS_DEFAULT = 1.8  # Segundos que permanecen visibles las flechas y círculos (Shorts ágiles)
 
@@ -105,6 +107,7 @@ EMOJIS_DIR = _resolver_carpeta_asset("emojis")
 FONTS_DIR = _resolver_carpeta_asset("fonts")
 FOTOS_DIR = _resolver_carpeta_asset("fotos")
 SFX_DIR = _resolver_carpeta_asset("sfx")
+MUSICA_DIR = _resolver_carpeta_asset("musica")
 TEMP_DIR = BASE_DIR / "temp_build"
 OUTPUT_DIR = BASE_DIR / "output_shorts"
 
@@ -146,6 +149,8 @@ class ConfigGuion:
     voz_narrador: str = EDGE_VOICE_DEFAULT
     archivo_salida: Optional[str] = None
     volumen_video_original: float = VOLUMEN_AUDIO_VIDEO_ORIGINAL
+    volumen_musica: float = VOLUMEN_MUSICA_FONDO
+    tono_video: str = "fondo"  # "triste", "inspiracional" o "fondo" (aleatorio entre fondos)
     duracion_callouts: float = DURACION_CALLOUTS_DEFAULT
     palabras_verdes_extra: Set[str] = field(default_factory=set)
     palabras_rojas_extra: Set[str] = field(default_factory=set)
@@ -537,6 +542,13 @@ def cargar_guion_video(ruta_guion: Path) -> ConfigGuion:
                             break
                 elif k_up in ("ARCHIVO_SALIDA", "SALIDA", "OUTPUT"):
                     config.archivo_salida = None if v_str.lower() in ("", "auto", "none", "-") else v_str
+                elif k_up in ("TONO_VIDEO", "TONO", "MOOD", "EMOCION"):
+                    config.tono_video = v_str.strip().lower()
+                elif k_up in ("VOLUMEN_MUSICA", "VOLUMEN_FONDO", "VOLUMEN_BGM"):
+                    try:
+                        config.volumen_musica = float(v_str.replace(",", "."))
+                    except ValueError:
+                        pass
                 elif k_up == "VOLUMEN_VIDEO_ORIGINAL":
                     try:
                         config.volumen_video_original = float(v_str.replace(",", "."))
@@ -2993,6 +3005,50 @@ def _limitar_circulos_guion(
         segmentos[-1].flecha = None
 
 
+def seleccionar_musica_fondo(tono: Optional[str] = None) -> Optional[Path]:
+    """
+    Selecciona la pista de música de fondo apropiada según el tono del video:
+    - 'triste' / 'sad' / 'drama' -> busca Triste.* en la carpeta /musica
+    - 'inspiracional' / 'emotivo' / 'superacion' -> busca Inspiracional.* en la carpeta /musica
+    - cualquier otro tono (o por defecto) -> elige aleatoriamente entre los fondos
+      (Fondo 1, Fondo 2, Fondo 3, Fondo 4 u otros temas generales en /musica).
+    """
+    MUSICA_DIR.mkdir(parents=True, exist_ok=True)
+    archivos = [
+        p for p in MUSICA_DIR.iterdir()
+        if p.is_file() and p.suffix.lower() in (".mp3", ".wav", ".m4a", ".aac", ".ogg")
+    ]
+    if not archivos:
+        return None
+
+    t_clean = (tono or "").strip().lower()
+
+    # 1. Tono Triste
+    if any(k in t_clean for k in ("trist", "sad", "dram", "pena", "llor", "depre")):
+        pistas_tristes = [p for p in archivos if "trist" in p.stem.lower() or "sad" in p.stem.lower()]
+        if pistas_tristes:
+            return random.choice(pistas_tristes)
+
+    # 2. Tono Inspiracional / Emotivo / Superación
+    if any(k in t_clean for k in ("inspirac", "motivac", "emotiv", "superac", "epico_final", "triumph")):
+        pistas_insp = [p for p in archivos if "inspirac" in p.stem.lower() or "insp" in p.stem.lower()]
+        if pistas_insp:
+            return random.choice(pistas_insp)
+
+    # 3. Fondos generales (excluir pistas específicas como Triste o Inspiracional a menos que sean las únicas)
+    fondos = [
+        p for p in archivos
+        if "trist" not in p.stem.lower()
+        and "sad" not in p.stem.lower()
+        and "inspirac" not in p.stem.lower()
+        and "insp" not in p.stem.lower()
+    ]
+    if fondos:
+        return random.choice(fondos)
+
+    return random.choice(archivos)
+
+
 async def editar_video_con_guion(
     ruta_video: Path,
     ruta_guion: Path,
@@ -3011,7 +3067,7 @@ async def editar_video_con_guion(
     print(" EDITOR SHORTS STUDIO v1.0 - AUTOMATIZACIÓN DE SHORTS (VOZ IA + TRACKING)")
     print("=" * 78)
 
-    for carpeta in [EMOJIS_DIR, FONTS_DIR, FOTOS_DIR, SFX_DIR, TEMP_DIR, OUTPUT_DIR]:
+    for carpeta in [EMOJIS_DIR, FONTS_DIR, FOTOS_DIR, SFX_DIR, MUSICA_DIR, TEMP_DIR, OUTPUT_DIR]:
         carpeta.mkdir(parents=True, exist_ok=True)
     asegurar_fuente_mrbeast()
 
@@ -3115,7 +3171,7 @@ async def editar_video_con_guion(
 
     _notificar_prog(0.38, "Masterizando pista de audio final con música de fondo...")
 
-    # 3. Unir el audio maestro de la voz + SFX + audio de fondo del video original
+    # 3. Unir el audio maestro de la voz IA + Efectos SFX (el audio original del video descargado se MUTEA completamente)
     ruta_voz_maestra = TEMP_DIR / "voz_maestra.wav"
     bloques_pcm = []
     for ruta_w in archivos_audio_seg:
@@ -3128,15 +3184,39 @@ async def editar_video_con_guion(
         for b in bloques_pcm:
             wf_master.writeframes(b)
 
+    # 3.5 Selección y mezcla inteligente de Música de Fondo desde /musica según el tono del Short
     ruta_audio_final = TEMP_DIR / "audio_final_combinado.wav"
-    if config.volumen_video_original > 0.001:
+    dur_total_audio = 0.0
+    try:
+        with wave.open(str(ruta_voz_maestra), "r") as wf_check:
+            dur_total_audio = wf_check.getnframes() / float(wf_check.getframerate())
+    except Exception:
+        dur_total_audio = dur_video_origen + dur_outro_seg
+
+    tono_efectivo = config.tono_video
+    if not tono_efectivo or tono_efectivo in ("auto", "fondo", "neutral"):
+        texto_completo = f"{config.titulo_youtube} {config.descripcion_youtube} {' '.join(s.texto_voz for s in config.segmentos)}".lower()
+        if any(w in texto_completo for w in ("triste", "tristeza", "llorando", "llorar", "pena", "depresivo", "lamentable", "tragedia")):
+            tono_efectivo = "triste"
+        elif any(w in texto_completo for w in ("inspiracional", "inspiracion", "motivacion", "superacion", "emotivo", "emocionante", "lagrimas de emocion", "salvar", "rescate")):
+            tono_efectivo = "inspiracional"
+
+    pista_musica = seleccionar_musica_fondo(tono_efectivo)
+
+    if pista_musica and pista_musica.exists():
+        vol_bgm = max(0.04, min(0.30, getattr(config, "volumen_musica", VOLUMEN_MUSICA_FONDO)))
+        fade_start = max(0.5, dur_total_audio - 1.8)
+        print(f"[*] Música de fondo elegida: '{pista_musica.name}' (tono: '{tono_efectivo}', volumen: {vol_bgm:.2f}).")
+        filter_str = (
+            f"[1:a]volume={vol_bgm:.2f},afade=t=out:st={fade_start:.2f}:d=1.8[bgm];"
+            f"[0:a][bgm]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.98:level=disabled[aout]"
+        )
         res_mix = subprocess.run(
             [
                 "ffmpeg", "-y",
                 "-i", str(ruta_voz_maestra),
-                "-stream_loop", "-1", "-i", str(ruta_video),
-                "-filter_complex",
-                f"[1:a]volume={config.volumen_video_original}[bg];[0:a][bg]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.98:level=disabled[aout]",
+                "-stream_loop", "-1", "-i", str(pista_musica),
+                "-filter_complex", filter_str,
                 "-map", "[aout]",
                 "-ar", "44100", "-ac", "1",
                 str(ruta_audio_final),
@@ -3148,8 +3228,12 @@ async def editar_video_con_guion(
             startupinfo=WIN_STARTUPINFO,
         )
         if res_mix.returncode != 0 or not ruta_audio_final.exists():
+            print("[!] Falló la mezcla de música de fondo, usando narración y SFX limpios.")
             ruta_audio_final = ruta_voz_maestra
+        else:
+            print(f"[+] Audio final masterizado con éxito (Voz IA + Ruidos/SFX + Música '{pista_musica.stem}').")
     else:
+        print("[*] No se encontró pista de música de fondo en /musica, usando narración y SFX limpios.")
         ruta_audio_final = ruta_voz_maestra
 
     # 4. Configurar nombre de archivo de salida y codificador FFmpeg (NVENC o libx264)
@@ -3655,7 +3739,7 @@ ESTADO_PUBLICACION: privado
 SCHEDULE: auto
 PARA_NINOS: no
 MODO_ENCUADRE: full
-VOLUMEN_VIDEO_ORIGINAL: 0.16
+TONO_VIDEO: fondo
 ARCHIVO_SALIDA: auto
 
 [GUION]
@@ -3747,7 +3831,7 @@ def generar_guion_con_gemini_flash(
         f"- En ESTADO_PUBLICACION escribe: {modo_privacidad}\n"
         f"- En SCHEDULE escribe: {schedule_str.strip() if schedule_str.strip() else 'no'}\n"
         f"- En PARA_NINOS escribe: no\n"
-        f"- En VOLUMEN_VIDEO_ORIGINAL escribe: 0.16 (para mantener la música de fondo suave mientras la voz habla encima todo el tiempo).\n"
+        f"- En TONO_VIDEO escribe 'triste' si el video es triste o dramático, 'inspiracional' si es emotivo, heroico o de superación, o 'fondo' para humor, curiosidad, acción y entretenimiento general.\n"
         f"- Recuerda usar FLECHA como máximo en 2 bloques clave de todo el guion y CIRCULO como máximo en 1 bloque.\n"
         f"Observa el video completo y el mosaico adjunto y entrega ÚNICAMENTE el bloque de guion:"
     )
@@ -5593,7 +5677,7 @@ def iniciar_aplicacion_gui() -> None:
     def abrir_ventana_ajustes() -> None:
         win = ctk.CTkToplevel(root)
         win.title("Ajustes y Herramientas")
-        win.geometry("600x730")
+        win.geometry("600x770")
         win.resizable(False, False)
         win.configure(fg_color=BG_DARK)
         win.transient(root)
@@ -5836,6 +5920,17 @@ def iniciar_aplicacion_gui() -> None:
 
         grid_t = ctk.CTkFrame(card_tools, fg_color="transparent")
         grid_t.pack(fill="x", padx=16, pady=(10, 10))
+
+        ctk.CTkButton(
+            grid_t,
+            text="🎵 Abrir Carpeta de Música de Fondo (Shorts)",
+            command=abrir_carpeta_musica,
+            corner_radius=14,
+            height=36,
+            fg_color="#1e2436",
+            hover_color="#2d354d",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+        ).pack(fill="x", padx=4, pady=(0, 6))
 
         ctk.CTkButton(
             grid_t,
@@ -6250,7 +6345,7 @@ def iniciar_aplicacion_gui() -> None:
             try:
                 from subir_a_youtube import obtener_shorts_programados, obtener_metricas_ultimos_videos
                 prog = obtener_shorts_programados()
-                pubs = obtener_metricas_ultimos_videos(total_max=10)
+                pubs = obtener_metricas_ultimos_videos(total_max=30)
                 _CACHE_SHORTS_PROGRAMADOS.clear()
                 _CACHE_SHORTS_PROGRAMADOS.extend(prog)
                 _CACHE_VIDEOS_PUBLICADOS.clear()
@@ -6581,8 +6676,8 @@ def iniciar_aplicacion_gui() -> None:
     def abrir_ventana_overview_rendimiento() -> None:
         win_o = ctk.CTkToplevel(root)
         win_o.title("Overview de Rendimiento — Videos Publicados")
-        win_o.geometry("750x660")
-        win_o.minsize(660, 520)
+        win_o.geometry("820x680")
+        win_o.minsize(760, 520)
         win_o.configure(fg_color=BG_DARK)
         win_o.transient(root)
         aplicar_icono_ventana(win_o)
@@ -6609,11 +6704,12 @@ def iniciar_aplicacion_gui() -> None:
         )
         lbl_sub.pack(anchor="w", pady=(2, 0))
 
-        # Barra de filtros (Canal seleccionado vs Todas las cuentas)
+        # Barra de filtros (Canal seleccionado vs Todas las cuentas) y Ordenamiento
         filter_bar = ctk.CTkFrame(win_o, fg_color="transparent")
         filter_bar.pack(fill="x", padx=24, pady=(0, 10))
 
         vista_var = tk.StringVar(value="filtro")
+        orden_var = tk.StringVar(value="✨ Nuevo")
 
         scroll_f = ctk.CTkScrollableFrame(
             win_o,
@@ -6630,26 +6726,51 @@ def iniciar_aplicacion_gui() -> None:
 
             modo_v = vista_var.get()
             if modo_v == "todas":
-                pubs_a_mostrar = list(_CACHE_VIDEOS_PUBLICADOS[:10])
+                candidatos = list(_CACHE_VIDEOS_PUBLICADOS)
                 titulo_filtro = "en todas las cuentas"
             else:
                 pubs_f, txt_ctx, _ = _obtener_publicados_filtrados()
-                pubs_a_mostrar = pubs_f[:10]
+                candidatos = list(pubs_f)
                 titulo_filtro = txt_ctx
+
+            criterio = orden_var.get()
+            if "Vistas" in criterio:
+                candidatos.sort(key=lambda x: int(x.get("vistas") or 0), reverse=True)
+                tag_criterio = "más vistos"
+            elif "Likes" in criterio:
+                candidatos.sort(key=lambda x: int(x.get("likes") or 0), reverse=True)
+                tag_criterio = "con más likes"
+            elif "Comentarios" in criterio:
+                candidatos.sort(key=lambda x: int(x.get("comentarios") or 0), reverse=True)
+                tag_criterio = "con más comentarios"
+            else:
+                def _sort_fecha(it_x: Dict[str, Any]) -> float:
+                    dt_u = it_x.get("dt_utc")
+                    if hasattr(dt_u, "timestamp"):
+                        try:
+                            return float(dt_u.timestamp())
+                        except Exception:
+                            pass
+                    return 0.0
+
+                candidatos.sort(key=_sort_fecha, reverse=True)
+                tag_criterio = "más recientes"
+
+            pubs_a_mostrar = candidatos[:10]
 
             sec_pub_header = ctk.CTkFrame(scroll_f, fg_color="transparent")
             sec_pub_header.pack(fill="x", padx=10, pady=(4, 8))
 
             ctk.CTkLabel(
                 sec_pub_header,
-                text="📈 Videos Publicados Recientemente",
+                text=f"📈 Videos — {tag_criterio.capitalize()}",
                 font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
                 text_color=CYAN_ACCENT,
             ).pack(side="left")
 
             ctk.CTkLabel(
                 sec_pub_header,
-                text=f"{len(pubs_a_mostrar)} video{'s' if len(pubs_a_mostrar) != 1 else ''} {titulo_filtro}",
+                text=f"{len(pubs_a_mostrar)} video{'s' if len(pubs_a_mostrar) != 1 else ''} {titulo_filtro} (Top 10)",
                 font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
                 text_color=TEXT_MUTED,
                 fg_color="#182030",
@@ -6738,7 +6859,7 @@ def iniciar_aplicacion_gui() -> None:
                         text_color=TEXT_MAIN,
                         anchor="w",
                         justify="left",
-                        wraplength=640,
+                        wraplength=710,
                     )
                     lbl_tit_pub.pack(fill="x", padx=12, pady=(4, 6))
 
@@ -6788,8 +6909,8 @@ def iniciar_aplicacion_gui() -> None:
 
         def _actualizar_pestanas() -> None:
             pubs_f, _, nom_f = _obtener_publicados_filtrados()
-            c_f = len(pubs_f[:10])
-            c_tot = len(_CACHE_VIDEOS_PUBLICADOS[:10])
+            c_f = len(pubs_f)
+            c_tot = len(_CACHE_VIDEOS_PUBLICADOS)
 
             tab_canal.configure(text=f"📺 Canal actual: {nom_f} ({c_f})")
             tab_todas.configure(text=f"🌐 Todas las cuentas ({c_tot})")
@@ -6823,6 +6944,29 @@ def iniciar_aplicacion_gui() -> None:
         )
         tab_todas.pack(side="left")
 
+        # Selector de ordenamiento: Nuevo / Vistas / Likes / Comentarios
+        sort_frame = ctk.CTkFrame(filter_bar, fg_color="transparent")
+        sort_frame.pack(side="right")
+
+        ctk.CTkLabel(
+            sort_frame,
+            text="Ordenar:",
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            text_color=TEXT_MUTED,
+        ).pack(side="left", padx=(0, 6))
+
+        seg_orden = ctk.CTkSegmentedButton(
+            sort_frame,
+            values=["✨ Nuevo", "👁️ Vistas", "👍 Likes", "💬 Comentarios"],
+            variable=orden_var,
+            command=lambda _: _render_vista(),
+            corner_radius=12,
+            height=30,
+            selected_color=PURPLE_MAIN,
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        )
+        seg_orden.pack(side="left")
+
         def _refrescar_en_vivo() -> None:
             btn_refrescar.configure(text="🔄 ...", state="disabled")
             if not _CACHE_VIDEOS_PUBLICADOS:
@@ -6838,7 +6982,7 @@ def iniciar_aplicacion_gui() -> None:
             def _worker_fetch() -> None:
                 try:
                     from subir_a_youtube import obtener_metricas_ultimos_videos
-                    items_pubs = obtener_metricas_ultimos_videos(total_max=10)
+                    items_pubs = obtener_metricas_ultimos_videos(total_max=30)
                     _CACHE_VIDEOS_PUBLICADOS.clear()
                     _CACHE_VIDEOS_PUBLICADOS.extend(items_pubs)
                 except Exception as e_f:
@@ -7280,6 +7424,13 @@ def iniciar_aplicacion_gui() -> None:
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         try:
             os.startfile(str(OUTPUT_DIR))
+        except Exception:
+            pass
+
+    def abrir_carpeta_musica() -> None:
+        MUSICA_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            os.startfile(str(MUSICA_DIR))
         except Exception:
             pass
 
