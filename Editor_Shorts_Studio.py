@@ -323,14 +323,21 @@ def iniciar_aplicacion_gui() -> None:
                 f_parsed = _dt.date.fromisoformat(fecha_str)
                 if f_parsed < _dt.date.today():
                     f_parsed = _dt.date.today()
+                mf_leido = str(leido.get("modo_fuente", "Canales Seleccionados"))
+                if "Editado" in mf_leido:
+                    mf_val = "Subir Video Editado"
+                elif "Link" in mf_leido:
+                    mf_val = "Link de Video"
+                else:
+                    mf_val = "Canales Seleccionados"
                 return {
-                    "activar_schedule": bool(leido.get("activar_schedule", True)),
+                    "activar_schedule": True,
                     "fecha": f_parsed.strftime("%Y-%m-%d"),
                     "hora": str(leido.get("hora", "13:00")),
                     "privacidad": str(leido.get("privacidad", "Privado")),
                     "voz": str(leido.get("voz", def_data["voz"])),
                     "encuadre": str(leido.get("encuadre", def_data["encuadre"])),
-                    "modo_fuente": "Canales Seleccionados" if "Canal" in str(leido.get("modo_fuente", "Canales Seleccionados")) else "Link de Video",
+                    "modo_fuente": mf_val,
                     "modo_contenido": "Personalizado" if "Personalizado" in str(leido.get("modo_contenido", "IA Automática")) else "IA Automática",
                     "accion_final": "Guardar en carpeta" if "Guardar" in str(leido.get("accion_final", "Subir automáticamente")) else "Subir automáticamente",
                     "modelo_ia": str(leido.get("modelo_ia", def_data["modelo_ia"])),
@@ -361,6 +368,12 @@ def iniciar_aplicacion_gui() -> None:
     privacidad_var = tk.StringVar(value=str(mem["privacidad"]))
     voz_var = tk.StringVar(value=str(mem["voz"]))
     encuadre_var = tk.StringVar(value=str(mem["encuadre"]))
+    lista_videos_editados_locales: List[Path] = []
+    if mem.get("videos_editados_guardados"):
+        for _p_str in mem["videos_editados_guardados"]:
+            _p = Path(_p_str)
+            if _p.exists() and _p not in lista_videos_editados_locales:
+                lista_videos_editados_locales.append(_p)
     modo_fuente_var = tk.StringVar(value=str(mem["modo_fuente"]))
     modo_contenido_var = tk.StringVar(value=str(mem["modo_contenido"]))
     accion_final_var = tk.StringVar(value=str(mem.get("accion_final", "Subir automáticamente")))
@@ -456,7 +469,8 @@ def iniciar_aplicacion_gui() -> None:
             SCHEDULE_MEM_FILE.write_text(
                 _json.dumps(
                     {
-                        "activar_schedule": programar_var.get(),
+                        "activar_schedule": True,
+                        "videos_editados_guardados": [str(p) for p in lista_videos_editados_locales],
                         "fecha": fecha_elegida_var.get(),
                         "hora": hora_elegida_var.get(),
                         "privacidad": privacidad_var.get(),
@@ -835,6 +849,147 @@ def iniciar_aplicacion_gui() -> None:
             pass
         autoajustar_tamano_ventana()
 
+    # --- TARJETA MODO C: SUBIR VIDEO YA EDITADO (DESDE CARPETA / DISCO) ---
+    card_video_editado = ctk.CTkFrame(contenedor_paso1, fg_color=CARD_BG, corner_radius=22, border_width=1, border_color=CARD_BORDER)
+
+    top_editado_row = ctk.CTkFrame(card_video_editado, fg_color="transparent")
+    top_editado_row.pack(fill="x", padx=20, pady=(12, 6))
+
+    ctk.CTkLabel(
+        top_editado_row,
+        text="Videos Editados para Subir",
+        font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
+        text_color=TEXT_MAIN,
+    ).pack(side="left")
+
+    editado_header_right = ctk.CTkFrame(top_editado_row, fg_color="transparent")
+    editado_header_right.pack(side="right")
+
+    lbl_contador_editados = ctk.CTkLabel(
+        editado_header_right,
+        text="0 Videos",
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        text_color=CYAN_ACCENT,
+        fg_color="#0e2a3a",
+        corner_radius=10,
+        padx=10,
+        pady=2,
+    )
+    lbl_contador_editados.pack(side="right", padx=(8, 0))
+
+    btn_abrir_carpeta_edit = ctk.CTkButton(
+        editado_header_right,
+        text="Abrir Carpeta",
+        command=lambda: abrir_carpeta_salida(),
+        height=30,
+        corner_radius=12,
+        fg_color=INPUT_BG,
+        hover_color="#1c2438",
+        border_width=1,
+        border_color=CARD_BORDER,
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+    )
+    btn_abrir_carpeta_edit.pack(side="right", padx=(8, 0))
+
+    def _renderizar_lista_videos_editados() -> None:
+        for w in filas_editados_container.winfo_children():
+            w.destroy()
+
+        cant_e = len(lista_videos_editados_locales)
+        lbl_contador_editados.configure(text=f"{cant_e} {'Video' if cant_e == 1 else 'Videos'}")
+
+        if not lista_videos_editados_locales:
+            empty_row = ctk.CTkFrame(filas_editados_container, fg_color="transparent")
+            empty_row.pack(fill="x", pady=6)
+            ctk.CTkLabel(
+                empty_row,
+                text="Ningún video seleccionado. Toca '+ Seleccionar Video(s) MP4' para elegir videos ya terminados de tu disco.",
+                font=ctk.CTkFont(family="Segoe UI", size=12),
+                text_color=TEXT_MUTED,
+            ).pack(anchor="w", padx=6)
+            return
+
+        for idx_ev, p_ev in enumerate(lista_videos_editados_locales):
+            f_row = ctk.CTkFrame(filas_editados_container, fg_color="#101522", corner_radius=12, border_width=1, border_color="#1c2538")
+            f_row.pack(fill="x", pady=2)
+
+            t_mb = ""
+            try:
+                sz = p_ev.stat().st_size / (1024 * 1024)
+                t_mb = f" · {sz:.1f} MB"
+            except Exception:
+                pass
+
+            ctk.CTkLabel(
+                f_row,
+                text=f"{idx_ev + 1}.  {p_ev.name}{t_mb}",
+                font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+                text_color=TEXT_MAIN,
+            ).pack(side="left", padx=12, pady=6)
+
+            def _remover_video_editado(idx_borrar: int = idx_ev) -> None:
+                if 0 <= idx_borrar < len(lista_videos_editados_locales):
+                    lista_videos_editados_locales.pop(idx_borrar)
+                    _guardar_memoria()
+                    _renderizar_lista_videos_editados()
+                    refrescar_plan_ui()
+                    refrescar_texto_boton_accion()
+                    autoajustar_tamano_ventana()
+
+            ctk.CTkButton(
+                f_row,
+                text="X",
+                command=_remover_video_editado,
+                width=26,
+                height=26,
+                corner_radius=8,
+                fg_color="transparent",
+                hover_color="#ef4444",
+                text_color="#ef4444",
+                font=ctk.CTkFont(size=12, weight="bold"),
+            ).pack(side="right", padx=6, pady=4)
+
+    def _seleccionar_videos_editados_dialog() -> None:
+        try:
+            from tkinter import filedialog
+            archivos = filedialog.askopenfilenames(
+                title="Seleccionar Video(s) ya Editados para Subir",
+                initialdir=str(OUTPUT_DIR if OUTPUT_DIR.exists() else BASE_DIR),
+                filetypes=[
+                    ("Videos MP4", "*.mp4"),
+                    ("Todos los Videos", "*.mp4 *.mov *.mkv *.webm"),
+                    ("Todos los archivos", "*.*"),
+                ],
+                parent=root,
+            )
+            if archivos:
+                for a_str in archivos:
+                    p_obj = Path(a_str)
+                    if p_obj.exists() and p_obj not in lista_videos_editados_locales:
+                        lista_videos_editados_locales.append(p_obj)
+                _guardar_memoria()
+                _renderizar_lista_videos_editados()
+                refrescar_plan_ui()
+                refrescar_texto_boton_accion()
+                autoajustar_tamano_ventana()
+        except Exception as e_fd:
+            messagebox.showerror("Error al seleccionar videos", str(e_fd), parent=root)
+
+    btn_seleccionar_editados = ctk.CTkButton(
+        editado_header_right,
+        text="+ Seleccionar Video(s) MP4",
+        command=_seleccionar_videos_editados_dialog,
+        height=30,
+        corner_radius=12,
+        fg_color=PURPLE_MAIN,
+        hover_color=PURPLE_HOVER,
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+    )
+    btn_seleccionar_editados.pack(side="right")
+
+    filas_editados_container = ctk.CTkFrame(card_video_editado, fg_color="transparent")
+    filas_editados_container.pack(fill="x", padx=20, pady=(4, 12))
+
     def _agregar_fila_link(valor_inicial: str = "") -> None:
         if len(lista_filas_links) >= 12:
             messagebox.showinfo("Límite alcanzado", "Puedes agregar hasta 12 links simultáneos.", parent=root)
@@ -949,7 +1104,7 @@ def iniciar_aplicacion_gui() -> None:
     card_pub.pack(fill="x", padx=28, pady=(0, 12))
 
     pub_header = ctk.CTkFrame(card_pub, fg_color="transparent")
-    pub_header.pack(fill="x", padx=20, pady=(12, 6))
+    pub_header.pack(fill="x", padx=20, pady=(12, 10))
 
     ctk.CTkLabel(
         pub_header,
@@ -958,71 +1113,70 @@ def iniciar_aplicacion_gui() -> None:
         text_color=TEXT_MAIN,
     ).pack(side="left")
 
-    # FILA 1: Cantidad Total + Shorts por Día + Visibilidad Base + Switch Programar
-    row_plan1 = ctk.CTkFrame(card_pub, fg_color="transparent")
-    row_plan1.pack(fill="x", padx=20, pady=(2, 8))
+    pub_header_controls = ctk.CTkFrame(pub_header, fg_color="transparent")
+    pub_header_controls.pack(side="right")
 
-    box_cant = ctk.CTkFrame(row_plan1, fg_color="transparent")
+    box_cant = ctk.CTkFrame(pub_header_controls, fg_color="transparent")
     box_cant.pack(side="left", padx=(0, 10))
     ctk.CTkLabel(
-        box_cant, text="Cantidad Total", font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"), text_color=TEXT_MUTED
+        box_cant, text="Cantidad Total", font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"), text_color=TEXT_MUTED
     ).pack(anchor="w", pady=(0, 2))
     opt_cantidad_total = ctk.CTkOptionMenu(
         box_cant,
         variable=cantidad_total_var,
         values=list(MAPA_CANTIDAD_TOTAL.keys()),
-        corner_radius=14,
-        height=34,
-        width=118,
+        corner_radius=12,
+        height=30,
+        width=110,
         fg_color=INPUT_BG,
         button_color="#252d42",
         button_hover_color="#333e5a",
-        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
     opt_cantidad_total.pack()
 
-    box_pordia = ctk.CTkFrame(row_plan1, fg_color="transparent")
-    box_pordia.pack(side="left", padx=(0, 14))
+    box_pordia = ctk.CTkFrame(pub_header_controls, fg_color="transparent")
+    box_pordia.pack(side="left", padx=(0, 12))
     ctk.CTkLabel(
-        box_pordia, text="Shorts por Día", font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"), text_color=TEXT_MUTED
+        box_pordia, text="Shorts por Día", font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"), text_color=TEXT_MUTED
     ).pack(anchor="w", pady=(0, 2))
     opt_por_dia = ctk.CTkOptionMenu(
         box_pordia,
         variable=shorts_por_dia_var,
         values=list(MAPA_POR_DIA.keys()),
-        corner_radius=14,
-        height=34,
-        width=112,
+        corner_radius=12,
+        height=30,
+        width=105,
         fg_color=INPUT_BG,
         button_color="#252d42",
         button_hover_color="#333e5a",
-        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
     opt_por_dia.pack()
 
     def _on_priv_change(val: str) -> None:
-        if programar_var.get() and val == "Público":
+        if val == "Público":
             privacidad_var.set("Privado")
         _guardar_memoria()
 
-    box_priv = ctk.CTkFrame(row_plan1, fg_color="transparent")
-    box_priv.pack(side="left", padx=(0, 12))
+    box_priv = ctk.CTkFrame(pub_header_controls, fg_color="transparent")
+    box_priv.pack(side="left")
     ctk.CTkLabel(
-        box_priv, text="Visibilidad Base", font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"), text_color=TEXT_MUTED
+        box_priv, text="Visibilidad Base", font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"), text_color=TEXT_MUTED
     ).pack(anchor="w", pady=(0, 2))
     seg_priv = ctk.CTkSegmentedButton(
         box_priv,
-        values=["Privado", "Oculto"] if programar_var.get() else ["Privado", "Público", "Oculto"],
+        values=["Privado", "Oculto"],
         variable=privacidad_var,
         command=_on_priv_change,
-        corner_radius=14,
-        height=34,
+        corner_radius=12,
+        height=30,
         fg_color=INPUT_BG,
         selected_color=PURPLE_MAIN,
         selected_hover_color=PURPLE_HOVER,
         unselected_color=INPUT_BG,
         unselected_hover_color="#1a2030",
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
     )
     seg_priv.pack()
 
@@ -1158,31 +1312,7 @@ def iniciar_aplicacion_gui() -> None:
 
         threading.Thread(target=_worker_vinc, daemon=True).start()
 
-    def _on_prog_toggle() -> None:
-        if programar_var.get():
-            if privacidad_var.get() == "Público":
-                privacidad_var.set("Privado")
-            try:
-                seg_priv.configure(values=["Privado", "Oculto"])
-            except Exception:
-                pass
-        else:
-            try:
-                seg_priv.configure(values=["Privado", "Público", "Oculto"])
-            except Exception:
-                pass
-        refrescar_plan_ui()
-
-    sw_prog = ctk.CTkSwitch(
-        row_plan1,
-        text="Programar",
-        variable=programar_var,
-        command=_on_prog_toggle,
-        progress_color=PURPLE_MAIN,
-        button_color="#ffffff",
-        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-    )
-    sw_prog.pack(side="right", pady=(14, 0))
+    # Programar está siempre activo (todos los Shorts se programan en sus horarios inteligentes)
 
     # FILA 2: Fecha de Inicio + Controles de Hora / Intervalo + Vista Previa + Toggle Horarios Pico / Cada X hs
     row_plan2 = ctk.CTkFrame(card_pub, fg_color="transparent")
@@ -1276,12 +1406,14 @@ def iniciar_aplicacion_gui() -> None:
     seg_estrategia.pack(side="right", padx=(8, 0))
 
     def calcular_lista_horarios_actual() -> List[Optional[str]]:
-        es_canales = "Canales" in modo_fuente_var.get()
-        if es_canales:
+        mf = modo_fuente_var.get()
+        if "Canales" in mf:
             cant_t = MAPA_CANTIDAD_TOTAL.get(cantidad_total_var.get(), 2)
-        else:
+        elif "Link" in mf:
             cant_ingresados = len(obtener_links_ingresados())
             cant_t = cant_ingresados if cant_ingresados > 0 else max(1, len(lista_filas_links))
+        else:
+            cant_t = len(lista_videos_editados_locales) if lista_videos_editados_locales else 1
         por_d = MAPA_POR_DIA.get(shorts_por_dia_var.get(), 2)
         if not programar_var.get() or accion_final_var.get() == "Guardar en carpeta":
             return [None] * cant_t
@@ -1298,21 +1430,17 @@ def iniciar_aplicacion_gui() -> None:
 
     def refrescar_plan_ui(*_args: object) -> None:
         _guardar_memoria()
-        es_canales = "Canales" in modo_fuente_var.get()
+        mf = modo_fuente_var.get()
+        es_canales = "Canales" in mf
+        es_editado = "Editado" in mf
         solo_guardar = accion_final_var.get() == "Guardar en carpeta"
 
-        if programar_var.get():
-            if privacidad_var.get() == "Público":
-                privacidad_var.set("Privado")
-            try:
-                seg_priv.configure(values=["Privado", "Oculto"])
-            except Exception:
-                pass
-        else:
-            try:
-                seg_priv.configure(values=["Privado", "Público", "Oculto"])
-            except Exception:
-                pass
+        if privacidad_var.get() == "Público":
+            privacidad_var.set("Privado")
+        try:
+            seg_priv.configure(values=["Privado", "Oculto"])
+        except Exception:
+            pass
 
         if es_canales:
             opt_cantidad_total.configure(state="normal")
@@ -1321,16 +1449,13 @@ def iniciar_aplicacion_gui() -> None:
             opt_cantidad_total.configure(state="disabled")
             opt_por_dia.configure(state="disabled")
 
-        if solo_guardar:
-            sw_prog.configure(state="disabled")
+        if solo_guardar and not es_editado:
             lbl_preview_horarios.configure(
                 text="Modo Guardar en Carpeta activo — Se generarán y guardarán los Reels en output_shorts sin subir a YouTube.",
                 text_color="#67e8f9",
             )
             autoajustar_tamano_ventana()
             return
-        else:
-            sw_prog.configure(state="normal")
 
         if "Pico" in modo_horario_var.get():
             frame_manual_horas.pack_forget()
@@ -1370,14 +1495,30 @@ def iniciar_aplicacion_gui() -> None:
     opt_cantidad_total.configure(command=refrescar_plan_ui)
     opt_por_dia.configure(command=refrescar_plan_ui)
     seg_priv.configure(command=refrescar_plan_ui)
-    sw_prog.configure(command=refrescar_plan_ui)
     combo_hora.configure(command=refrescar_plan_ui)
     opt_intervalo.configure(command=refrescar_plan_ui)
 
     def refrescar_texto_boton_accion() -> None:
-        """Actualiza el texto y estilo del botón de acción según IA/Personalizado y Subir/Guardar."""
+        """Actualiza el texto y estilo del botón de acción según IA/Personalizado, Subir/Guardar y modo fuente."""
         try:
+            mf = modo_fuente_var.get()
+            es_editado = "Editado" in mf
             solo_guardar = accion_final_var.get() == "Guardar en carpeta"
+
+            if es_editado:
+                c_edit = len(lista_videos_editados_locales)
+                if c_edit > 1:
+                    txt_b = f"IMPORTAR {c_edit} VIDEOS DE CARPETA Y SUBIR"
+                else:
+                    txt_b = "IMPORTAR VIDEO DE CARPETA Y SUBIR"
+                btn_auto_1clic.configure(
+                    text=txt_b,
+                    fg_color=PURPLE_MAIN,
+                    hover_color=PURPLE_HOVER,
+                    text_color="#ffffff",
+                )
+                return
+
             if "Personalizado" in modo_contenido_var.get():
                 if solo_guardar:
                     btn_auto_1clic.configure(
@@ -1414,12 +1555,19 @@ def iniciar_aplicacion_gui() -> None:
     def actualizar_modo_vista(*_args: object) -> None:
         _guardar_memoria()
         renderizar_chips_canales()
-        if "Canales" in modo_fuente_var.get():
-            card_link.pack_forget()
+        _renderizar_lista_videos_editados()
+        card_canales.pack_forget()
+        card_link.pack_forget()
+        card_video_editado.pack_forget()
+
+        mf = modo_fuente_var.get()
+        if "Canales" in mf:
             card_canales.pack(fill="x")
-        else:
-            card_canales.pack_forget()
+        elif "Link" in mf:
             card_link.pack(fill="x")
+        else:
+            card_video_editado.pack(fill="x")
+
         refrescar_plan_ui()
         refrescar_texto_boton_accion()
         autoajustar_tamano_ventana()
@@ -1457,7 +1605,7 @@ def iniciar_aplicacion_gui() -> None:
 
         ctk.CTkSegmentedButton(
             card_modo,
-            values=["Canales Seleccionados", "Link de Video"],
+            values=["Canales Seleccionados", "Link de Video", "Subir Video Editado"],
             variable=modo_fuente_var,
             command=actualizar_modo_vista,
             corner_radius=14,
@@ -2017,17 +2165,17 @@ def iniciar_aplicacion_gui() -> None:
         c = len(items_f)
 
         if c == 1:
-            texto = "1 Short programado en cola  ·  Ver cola ▾"
+            texto = "1 Short programado  ·  Ver cola ▾"
             color_txt = CYAN_ACCENT
             color_bd = "#2e3852"
             color_bg = "#111624"
         elif c > 1:
-            texto = f"{c} Shorts programados en cola  ·  Ver cola ▾"
+            texto = f"{c} Shorts programados  ·  Ver cola ▾"
             color_txt = CYAN_ACCENT
             color_bd = "#2e3852"
             color_bg = "#111624"
         else:
-            texto = "Sin Shorts en cola  ·  Ver cola de subidas ▾"
+            texto = "Sin Shorts programados  ·  Ver cola de subidas ▾"
             color_txt = TEXT_MUTED
             color_bd = CARD_BORDER
             color_bg = CARD_BG
@@ -2049,12 +2197,12 @@ def iniciar_aplicacion_gui() -> None:
         c_pubs = len(pubs_f)
 
         if c_pubs > 0:
-            texto = f"{c_pubs} video{'s' if c_pubs != 1 else ''} recientes  ·  Ver métricas ▾"
+            texto = f"{c_pubs} Short{'s' if c_pubs != 1 else ''} reciente{'s' if c_pubs != 1 else ''}  ·  Ver métricas ▾"
             color_txt = "#c084fc"
             color_bd = "#382752"
             color_bg = "#161124"
         else:
-            texto = "Videos Publicados  ·  Ver métricas ▾"
+            texto = "Shorts Publicados  ·  Ver métricas ▾"
             color_txt = TEXT_MUTED
             color_bd = CARD_BORDER
             color_bg = CARD_BG
@@ -2160,7 +2308,7 @@ def iniciar_aplicacion_gui() -> None:
                 empty_card.pack(fill="x", padx=10, pady=(20, 10))
                 ctk.CTkLabel(
                     empty_card,
-                    text="No tienes Shorts programados en cola.",
+                    text="No tienes Shorts programados.",
                     font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
                     text_color=TEXT_MAIN,
                 ).pack(pady=(16, 2))
@@ -2818,8 +2966,11 @@ def iniciar_aplicacion_gui() -> None:
     btn_auto_1clic.pack(fill="x")
     refrescar_texto_boton_accion()
 
+    row_pildoras_inferiores = ctk.CTkFrame(contenedor_accion_y_progreso, fg_color="transparent")
+    row_pildoras_inferiores.pack(fill="x", pady=(10, 0))
+
     btn_cola_programados = ctk.CTkButton(
-        contenedor_accion_y_progreso,
+        row_pildoras_inferiores,
         text="Consultando cola de Shorts...",
         command=lambda: abrir_ventana_shorts_programados(),
         corner_radius=16,
@@ -2831,12 +2982,12 @@ def iniciar_aplicacion_gui() -> None:
         text_color=CYAN_ACCENT,
         font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
-    btn_cola_programados.pack(fill="x", pady=(10, 0))
+    btn_cola_programados.pack(side="left", fill="both", expand=True, padx=(0, 6))
     _actualizar_pildora_cola()
 
     btn_rendimiento_videos = ctk.CTkButton(
-        contenedor_accion_y_progreso,
-        text="Consultando rendimiento de videos...",
+        row_pildoras_inferiores,
+        text="Consultando métricas de Shorts...",
         command=lambda: abrir_ventana_overview_rendimiento(),
         corner_radius=16,
         height=38,
@@ -2847,7 +2998,7 @@ def iniciar_aplicacion_gui() -> None:
         text_color="#c084fc",
         font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
-    btn_rendimiento_videos.pack(fill="x", pady=(6, 0))
+    btn_rendimiento_videos.pack(side="right", fill="both", expand=True, padx=(6, 0))
     _actualizar_pildora_rendimiento()
 
     progress_card = ctk.CTkFrame(
@@ -2863,20 +3014,16 @@ def iniciar_aplicacion_gui() -> None:
     def _mostrar_modo_progreso_activo(activo: bool) -> None:
         if activo:
             btn_auto_1clic.pack_forget()
-            btn_cola_programados.pack_forget()
-            btn_rendimiento_videos.pack_forget()
+            row_pildoras_inferiores.pack_forget()
             progress_card.pack(fill="x")
-            btn_cola_programados.pack(fill="x", pady=(10, 0))
-            btn_rendimiento_videos.pack(fill="x", pady=(6, 0))
+            row_pildoras_inferiores.pack(fill="x", pady=(10, 0))
         else:
             progress_card.pack_forget()
-            btn_cola_programados.pack_forget()
-            btn_rendimiento_videos.pack_forget()
+            row_pildoras_inferiores.pack_forget()
             btn_auto_1clic.configure(state="normal")
             refrescar_texto_boton_accion()
             btn_auto_1clic.pack(fill="x")
-            btn_cola_programados.pack(fill="x", pady=(10, 0))
-            btn_rendimiento_videos.pack(fill="x", pady=(6, 0))
+            row_pildoras_inferiores.pack(fill="x", pady=(10, 0))
         autoajustar_tamano_ventana()
 
     prog_top_row = ctk.CTkFrame(progress_card, fg_color="transparent")
@@ -3417,7 +3564,10 @@ def iniciar_aplicacion_gui() -> None:
             abrir_ventana_ajustes()
             return
 
-        es_modo_canales = "Canales" in modo_fuente_var.get()
+        mf_act = modo_fuente_var.get()
+        es_modo_canales = "Canales" in mf_act
+        es_modo_editado = "Editado" in mf_act
+
         if es_modo_canales and not lista_canales:
             messagebox.showwarning(
                 "Sin canales cargados",
@@ -3425,8 +3575,15 @@ def iniciar_aplicacion_gui() -> None:
             )
             return
 
+        if es_modo_editado and not lista_videos_editados_locales:
+            messagebox.showwarning(
+                "Sin videos seleccionados",
+                "Toca '+ Seleccionar Video(s) MP4' para elegir tus videos editados antes de importar y subir.",
+            )
+            return
+
         links_a_procesar: List[str] = []
-        if not es_modo_canales:
+        if not es_modo_canales and not es_modo_editado:
             links_a_procesar = obtener_links_ingresados()
             if not links_a_procesar:
                 if DEFAULT_VIDEO_INPUT.exists():
@@ -3444,7 +3601,12 @@ def iniciar_aplicacion_gui() -> None:
         voz_elegida = VOCES_DISPONIBLES.get(voz_var.get(), EDGE_VOICE_DEFAULT)
         encuadre_elegido = encuadre_map.get(encuadre_var.get(), "full")
         min_v = MAPA_MIN_VIEWS.get(min_views_var.get(), 1_000_000)
-        cant_cola = MAPA_CANTIDAD_TOTAL.get(cantidad_total_var.get(), 2) if es_modo_canales else len(links_a_procesar)
+        if es_modo_canales:
+            cant_cola = MAPA_CANTIDAD_TOTAL.get(cantidad_total_var.get(), 2)
+        elif es_modo_editado:
+            cant_cola = len(lista_videos_editados_locales)
+        else:
+            cant_cola = len(links_a_procesar)
         horarios_lote_plan = calcular_lista_horarios_actual()
         es_custom_activo = "Personalizado" in modo_contenido_var.get()
         pref_modelo_ia = MAPA_MODELOS_IA.get(modelo_ia_var.get(), "gemini-4-argon")
@@ -3583,6 +3745,27 @@ def iniciar_aplicacion_gui() -> None:
                         estados_milestones[idx_sel] = {"tipo": "pendiente", "texto": f"Reel {num_s}: Elegido"}
                         copia_ms2 = [dict(x) for x in estados_milestones]
                         root.after(0, lambda cm=copia_ms2: _renderizar_milestones_ui(cm))
+                elif es_modo_editado:
+                    for idx_ed, p_ed in enumerate(lista_videos_editados_locales):
+                        c_idx = idx_ed % len(cuentas_objetivo_lote)
+                        c_reel = cuentas_objetivo_lote[c_idx]
+                        cid_reel = str(c_reel.get("id") or "principal")
+                        cnom_reel = str(c_reel.get("nombre") or cid_reel)
+                        nombre_limpio = p_ed.stem.replace("_", " ").replace("-", " ").title()
+                        videos_seleccionados.append(
+                            {
+                                "url": str(p_ed),
+                                "ruta_archivo_local": str(p_ed),
+                                "titulo_orig": nombre_limpio,
+                                "vistas": 0,
+                                "canal": "Video Editado Local",
+                                "cuenta_id": cid_reel,
+                                "cuenta_nombre": cnom_reel,
+                            }
+                        )
+                        estados_milestones[idx_ed] = {"tipo": "pendiente", "texto": f"Reel {idx_ed + 1}: Video Listo"}
+                    copia_ms2 = [dict(x) for x in estados_milestones]
+                    root.after(0, lambda cm=copia_ms2: _renderizar_milestones_ui(cm))
                 else:
                     for idx_u, u_link in enumerate(links_a_procesar):
                         c_idx = idx_u % len(cuentas_objetivo_lote)
@@ -3676,71 +3859,104 @@ def iniciar_aplicacion_gui() -> None:
                         ruta_video_usar = descargar_video_youtube(url_descargar)
                         registrar_video_usado(url_descargar)
 
-                    # Verificar si el usuario personalizó Título / Descripción / Guión para este Reel
-                    custom_data = datos_custom_reels[idx_lote] if idx_lote < len(datos_custom_reels) else {}
-                    c_tit = custom_data.get("titulo", "").strip() if es_custom_activo else ""
-                    c_desc = custom_data.get("descripcion", "").strip() if es_custom_activo else ""
-                    c_guion = custom_data.get("guion", "").strip() if es_custom_activo else ""
+                    if es_modo_editado:
+                        # Modo Subir Video Editado: el video ya está terminado en el disco, no se renderiza de nuevo
+                        ruta_final = ruta_video_usar
+                        ultimo_video_generado[0] = ruta_final
+                        _actualizar_milestone_actual("activo", f"Reel {num_actual}: Video Listo")
+                        _set_subprogreso(0.35, f"{pref_lote}Procesando video editado ({ruta_final.name})...", CYAN_ACCENT)
 
-                    guion_ya_listo = False
-                    if es_custom_activo and c_guion:
-                        _actualizar_milestone_actual("activo", f"Reel {num_actual}: Guión propio...")
-                        _set_subprogreso(0.26, f"{pref_lote}Aplicando tu guión y título personalizados...")
-                        guion_ya_listo = _aplicar_custom_a_guion_txt(
-                            idx_reel=idx_lote,
-                            ruta_video=ruta_video_usar,
-                            custom_tit=c_tit,
-                            custom_desc=c_desc,
-                            custom_guion=c_guion,
-                            sched_str=sched_str,
-                            modo_priv="privado" if modo_priv == "private" else modo_priv,
-                        )
+                        custom_data = datos_custom_reels[idx_lote] if idx_lote < len(datos_custom_reels) else {}
+                        c_tit = custom_data.get("titulo", "").strip() if es_custom_activo else ""
+                        c_desc = custom_data.get("descripcion", "").strip() if es_custom_activo else ""
 
-                    if not guion_ya_listo:
-                        _actualizar_milestone_actual("activo", f"Reel {num_actual}: Creando guión IA...")
+                        if es_custom_activo and c_tit:
+                            d_final = c_desc or f"{c_tit} #Shorts"
+                            DEFAULT_GUION_TXT.write_text(f"TITULO_SUPERIOR: {c_tit}\nDESCRIPCION_YOUTUBE: {d_final}\n\n[GUION]\n", encoding="utf-8")
+                            _set_subprogreso(0.65, f"{pref_lote}Título personalizado asignado...", CYAN_ACCENT)
+                        else:
+                            _actualizar_milestone_actual("activo", f"Reel {num_actual}: Título con IA...")
+                            root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}GENERANDO TÍTULO CON IA..."))
+                            _set_subprogreso(0.45, f"{pref_lote}Analizando video para título viral ({pref_modelo_ia})...", CYAN_ACCENT)
+                            try:
+                                generar_guion_con_gemini_flash(
+                                    ruta_video=ruta_final,
+                                    api_key=api_k,
+                                    schedule_str=sched_str,
+                                    modo_privacidad="privado" if modo_priv == "private" else modo_priv,
+                                    contexto_titulo_orig=titulo_orig,
+                                    modelo_preferido=pref_modelo_ia,
+                                )
+                            except Exception as e_ia:
+                                print(f"[!] Aviso al generar título IA: {e_ia}. Usando nombre de archivo.")
+                                DEFAULT_GUION_TXT.write_text(f"TITULO_SUPERIOR: {titulo_orig or ruta_final.stem}\n\n[GUION]\n", encoding="utf-8")
+                            _set_subprogreso(0.65, f"{pref_lote}Título listo...", CYAN_ACCENT)
+                    else:
+                        # Verificar si el usuario personalizó Título / Descripción / Guión para este Reel
+                        custom_data = datos_custom_reels[idx_lote] if idx_lote < len(datos_custom_reels) else {}
+                        c_tit = custom_data.get("titulo", "").strip() if es_custom_activo else ""
+                        c_desc = custom_data.get("descripcion", "").strip() if es_custom_activo else ""
+                        c_guion = custom_data.get("guion", "").strip() if es_custom_activo else ""
+
+                        guion_ya_listo = False
+                        if es_custom_activo and c_guion:
+                            _actualizar_milestone_actual("activo", f"Reel {num_actual}: Guión propio...")
+                            _set_subprogreso(0.26, f"{pref_lote}Aplicando tu guión y título personalizados...")
+                            guion_ya_listo = _aplicar_custom_a_guion_txt(
+                                idx_reel=idx_lote,
+                                ruta_video=ruta_video_usar,
+                                custom_tit=c_tit,
+                                custom_desc=c_desc,
+                                custom_guion=c_guion,
+                                sched_str=sched_str,
+                                modo_priv="privado" if modo_priv == "private" else modo_priv,
+                            )
+
+                        if not guion_ya_listo:
+                            _actualizar_milestone_actual("activo", f"Reel {num_actual}: Creando guión IA...")
+                            root.after(
+                                0,
+                                lambda p=pref_lote: btn_auto_1clic.configure(
+                                    text=f"{p}CREANDO GUIÓN VIRAL CON IA..."
+                                ),
+                            )
+                            _set_subprogreso(
+                                0.22,
+                                f"{pref_lote}Analizando video completo y contexto real con IA ({pref_modelo_ia})...",
+                            )
+                            generar_guion_con_gemini_flash(
+                                ruta_video=ruta_video_usar,
+                                api_key=api_k,
+                                schedule_str=sched_str,
+                                modo_privacidad="privado" if modo_priv == "private" else modo_priv,
+                                contexto_titulo_orig=titulo_orig,
+                                modelo_preferido=pref_modelo_ia,
+                            )
+                            if es_custom_activo and (c_tit or c_desc):
+                                _sobreescribir_campos_custom_en_guion_txt(c_tit, c_desc)
+
+                        _actualizar_milestone_actual("activo", f"Reel {num_actual}: Editando 60 FPS...")
                         root.after(
                             0,
                             lambda p=pref_lote: btn_auto_1clic.configure(
-                                text=f"{p}CREANDO GUIÓN VIRAL CON IA..."
+                                text=f"{p}RENDERIZANDO SHORT CON GPU..."
                             ),
                         )
-                        _set_subprogreso(
-                            0.22,
-                            f"{pref_lote}Analizando video completo y contexto real con IA ({pref_modelo_ia})...",
-                        )
-                        generar_guion_con_gemini_flash(
-                            ruta_video=ruta_video_usar,
-                            api_key=api_k,
-                            schedule_str=sched_str,
-                            modo_privacidad="privado" if modo_priv == "private" else modo_priv,
-                            contexto_titulo_orig=titulo_orig,
-                            modelo_preferido=pref_modelo_ia,
-                        )
-                        if es_custom_activo and (c_tit or c_desc):
-                            _sobreescribir_campos_custom_en_guion_txt(c_tit, c_desc)
 
-                    _actualizar_milestone_actual("activo", f"Reel {num_actual}: Editando 60 FPS...")
-                    root.after(
-                        0,
-                        lambda p=pref_lote: btn_auto_1clic.configure(
-                            text=f"{p}RENDERIZANDO SHORT CON GPU..."
-                        ),
-                    )
+                        def _cb_edicion(pct_edit: float, txt_edit: str) -> None:
+                            # Mapea 0..100% de la edición al tramo 0.30 .. 0.88 del Reel actual
+                            frac_interna = 0.30 + (max(0.0, min(100.0, pct_edit)) / 100.0) * 0.58
+                            _set_subprogreso(frac_interna, f"{pref_lote}{txt_edit}", CYAN_ACCENT)
 
-                    def _cb_edicion(pct_edit: float, txt_edit: str) -> None:
-                        # Mapea 0..100% de la edición al tramo 0.30 .. 0.88 del Reel actual
-                        frac_interna = 0.30 + (max(0.0, min(100.0, pct_edit)) / 100.0) * 0.58
-                        _set_subprogreso(frac_interna, f"{pref_lote}{txt_edit}", CYAN_ACCENT)
-
-                    ruta_final = asyncio.run(
-                        editar_video_con_guion(
-                            ruta_video=ruta_video_usar,
-                            ruta_guion=DEFAULT_GUION_TXT,
-                            voz_override=voz_elegida,
-                            modo_encuadre_override=encuadre_elegido,
-                            progreso_cb=_cb_edicion,
+                        ruta_final = asyncio.run(
+                            editar_video_con_guion(
+                                ruta_video=ruta_video_usar,
+                                ruta_guion=DEFAULT_GUION_TXT,
+                                voz_override=voz_elegida,
+                                modo_encuadre_override=encuadre_elegido,
+                                progreso_cb=_cb_edicion,
+                            )
                         )
-                    )
                     ultimo_video_generado[0] = ruta_final
 
                     if solo_guardar:
@@ -3841,6 +4057,7 @@ def iniciar_aplicacion_gui() -> None:
         threading.Thread(target=tarea_auto_total, daemon=True).start()
 
     btn_auto_1clic.configure(command=ejecutar_flujo_1_clic)
+    root.after(10, actualizar_modo_vista)
     root.after(200, vaciar_cola_logs)
     root.after(700, sincronizar_cola_programados_async)
     root.after(60, autoajustar_tamano_ventana)
