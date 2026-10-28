@@ -3914,6 +3914,7 @@ def iniciar_aplicacion_gui() -> None:
         titulo: str,
         ruta_guion: Path,
         on_decision: Callable[[str, str], None],
+        es_modo_editado: bool = False,
     ) -> None:
         win_r = ctk.CTkToplevel(root)
         win_r.title("Shorts Studio · Revisión Previa")
@@ -3929,6 +3930,7 @@ def iniciar_aplicacion_gui() -> None:
         duracion_total = 1.0
         arrastrando_slider = False
         cancelado_reproductor = False
+        txt_feedback: Optional[ctk.CTkTextbox] = None
 
         def _limpiar() -> None:
             nonlocal cancelado_reproductor
@@ -3947,7 +3949,7 @@ def iniciar_aplicacion_gui() -> None:
         win_r.protocol("WM_DELETE_WINDOW", _al_cerrar_x)
 
         def _responder(acc: str) -> None:
-            fb = txt_feedback.get("1.0", "end").strip()
+            fb = txt_feedback.get("1.0", "end").strip() if txt_feedback is not None else ""
             _limpiar()
             win_r.destroy()
             on_decision(acc, fb)
@@ -4099,14 +4101,14 @@ def iniciar_aplicacion_gui() -> None:
         badge.pack(anchor="w", pady=(0, 4))
         ctk.CTkLabel(
             badge,
-            text="MODO REVISIÓN PREVIA",
+            text="MODO REVISIÓN · VIDEO EDITADO" if es_modo_editado else "MODO REVISIÓN PREVIA",
             font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
             text_color="#c084fc",
         ).pack(padx=10, pady=2)
 
         ctk.CTkLabel(
             top_der,
-            text="Tu Short está listo para publicar",
+            text="Video editado listo para publicar" if es_modo_editado else "Tu Short está listo para publicar",
             font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(anchor="w")
@@ -4119,54 +4121,86 @@ def iniciar_aplicacion_gui() -> None:
             text_color=TEXT_MUTED,
         ).pack(anchor="w", pady=(2, 0))
 
-        # Tarjeta 1: Re-editar con indicaciones
-        card_reeditar = ctk.CTkFrame(
-            col_der,
-            fg_color=CARD_BG,
-            corner_radius=12,
-            border_width=1,
-            border_color=CARD_BORDER,
-        )
-        card_reeditar.pack(fill="x", pady=(0, 8))
+        if not es_modo_editado:
+            # Tarjeta 1: Re-editar con indicaciones (solo videos generados desde cero)
+            card_reeditar = ctk.CTkFrame(
+                col_der,
+                fg_color=CARD_BG,
+                corner_radius=12,
+                border_width=1,
+                border_color=CARD_BORDER,
+            )
+            card_reeditar.pack(fill="x", pady=(0, 8))
 
-        ctk.CTkLabel(
-            card_reeditar,
-            text="Re-editar Guion con tus Indicaciones",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-            text_color=TEXT_MAIN,
-        ).pack(anchor="w", padx=12, pady=(8, 2))
+            ctk.CTkLabel(
+                card_reeditar,
+                text="Re-editar Guion con tus Indicaciones",
+                font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+                text_color=TEXT_MAIN,
+            ).pack(anchor="w", padx=12, pady=(8, 2))
 
-        ctk.CTkLabel(
-            card_reeditar,
-            text="Agregá contexto, corregí si entendió mal o pedí otro tono narrativo:",
-            font=ctk.CTkFont(family="Segoe UI", size=11),
-            text_color=TEXT_MUTED,
-        ).pack(anchor="w", padx=12, pady=(0, 4))
+            ctk.CTkLabel(
+                card_reeditar,
+                text="Agregá contexto, corregí si entendió mal o pedí otro tono narrativo:",
+                font=ctk.CTkFont(family="Segoe UI", size=11),
+                text_color=TEXT_MUTED,
+            ).pack(anchor="w", padx=12, pady=(0, 4))
 
-        txt_feedback = ctk.CTkTextbox(
-            card_reeditar,
-            height=58,
-            corner_radius=8,
-            fg_color=INPUT_BG,
-            font=ctk.CTkFont(family="Segoe UI", size=11),
-            text_color=TEXT_MAIN,
-        )
-        txt_feedback.pack(fill="x", padx=12, pady=(0, 8))
+            txt_feedback = ctk.CTkTextbox(
+                card_reeditar,
+                height=58,
+                corner_radius=8,
+                fg_color=INPUT_BG,
+                font=ctk.CTkFont(family="Segoe UI", size=11),
+                text_color=TEXT_MAIN,
+            )
+            txt_feedback.pack(fill="x", padx=12, pady=(0, 8))
 
-        btn_reeditar = ctk.CTkButton(
-            card_reeditar,
-            text="Re-editar Short con IA",
-            command=lambda: _responder("reeditar"),
-            height=34,
-            corner_radius=10,
-            fg_color=PURPLE_MAIN,
-            hover_color=PURPLE_HOVER,
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-            text_color="#ffffff",
-        )
-        btn_reeditar.pack(fill="x", padx=12, pady=(0, 10))
+            btn_reeditar = ctk.CTkButton(
+                card_reeditar,
+                text="Re-editar Short con IA",
+                command=lambda: _responder("reeditar"),
+                height=34,
+                corner_radius=10,
+                fg_color=PURPLE_MAIN,
+                hover_color=PURPLE_HOVER,
+                font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+                text_color="#ffffff",
+            )
+            btn_reeditar.pack(fill="x", padx=12, pady=(0, 10))
+        else:
+            # Tarjeta informativa para Video Editado (sin opciones de re-editar guion)
+            card_info_edit = ctk.CTkFrame(
+                col_der,
+                fg_color=CARD_BG,
+                corner_radius=12,
+                border_width=1,
+                border_color=CARD_BORDER,
+            )
+            card_info_edit.pack(fill="x", pady=(0, 8))
 
-        # Tarjeta 2: Decisiones de Publicación (Subir, Buscar Otro, Descartar)
+            ctk.CTkLabel(
+                card_info_edit,
+                text="Video Editado Localmente",
+                font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+                text_color=TEXT_MAIN,
+            ).pack(anchor="w", padx=12, pady=(8, 2))
+
+            tam_mb = ""
+            try:
+                tam_mb = f" · {ruta_video.stat().st_size / (1024 * 1024):.1f} MB"
+            except Exception:
+                pass
+
+            ctk.CTkLabel(
+                card_info_edit,
+                text=f"Archivo: {ruta_video.name}{tam_mb}\nEste video ya está editado y listo. Previsualizalo en el reproductor antes de subirlo.",
+                font=ctk.CTkFont(family="Segoe UI", size=11),
+                text_color=TEXT_MUTED,
+                justify="left",
+            ).pack(anchor="w", padx=12, pady=(0, 8))
+
+        # Tarjeta 2: Decisiones de Publicación (Subir, Buscar Otro / Siguiente, Descartar)
         card_acciones = ctk.CTkFrame(
             col_der,
             fg_color=CARD_BG,
@@ -4202,7 +4236,7 @@ def iniciar_aplicacion_gui() -> None:
 
         btn_otro = ctk.CTkButton(
             row_sec,
-            text="Buscar Otro Video",
+            text="Siguiente Video" if es_modo_editado else "Buscar Otro Video",
             command=lambda: _responder("buscar_otro"),
             height=32,
             corner_radius=10,
@@ -4226,7 +4260,7 @@ def iniciar_aplicacion_gui() -> None:
         )
         btn_cancelar.grid(row=0, column=1, padx=(4, 0), sticky="ew")
 
-        # Tarjeta 3: Guion Generado
+        # Tarjeta 3: Guion / Metadatos Asignados
         card_guion = ctk.CTkFrame(
             col_der,
             fg_color=CARD_BG,
@@ -4238,7 +4272,7 @@ def iniciar_aplicacion_gui() -> None:
 
         ctk.CTkLabel(
             card_guion,
-            text="Guion y Narración generada por la IA:",
+            text="Título y Descripción para YouTube:" if es_modo_editado else "Guion y Narración generada por la IA:",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
             text_color=TEXT_MUTED,
         ).pack(anchor="w", padx=12, pady=(6, 2))
@@ -4973,6 +5007,7 @@ def iniciar_aplicacion_gui() -> None:
                                             datos_dec.update({"accion": acc, "feedback": fb}),
                                             ev_decision.set(),
                                         ),
+                                        es_modo_editado=es_modo_editado,
                                     )
 
                                 root.after(0, _mostrar_rev)
