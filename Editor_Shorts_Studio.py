@@ -397,9 +397,18 @@ def iniciar_aplicacion_gui() -> None:
             if isinstance(v_cp, list):
                 canales_por_cuenta[str(k_cp)] = [str(x) for x in v_cp if str(x).strip()]
 
+    cid_mem = str(mem.get("cuenta_activa_id") or "")
+    if cid_mem and cid_mem in canales_por_cuenta and canales_por_cuenta[cid_mem]:
+        lista_canales = list(canales_por_cuenta[cid_mem])
+    elif not lista_canales and canales_por_cuenta:
+        for _c_list in canales_por_cuenta.values():
+            if _c_list:
+                lista_canales = list(_c_list)
+                break
+
     estado_seleccion_cuentas: Dict[str, object] = {
         "modo": str(mem.get("modo_cuentas") or "una"),  # "una" | "todas" | "grupo"
-        "cuenta_id": str(mem.get("cuenta_activa_id") or ""),
+        "cuenta_id": cid_mem,
         "grupo_ids": [str(x) for x in (mem.get("grupo_cuentas_ids") or []) if str(x).strip()],
     }
     cache_avatares_ctk: Dict[str, ctk.CTkImage] = {}
@@ -469,7 +478,8 @@ def iniciar_aplicacion_gui() -> None:
         try:
             cid_act = str(estado_seleccion_cuentas.get("cuenta_id") or "")
             if cid_act and str(estado_seleccion_cuentas.get("modo") or "una") == "una":
-                canales_por_cuenta[cid_act] = list(lista_canales)
+                if lista_canales or cid_act not in canales_por_cuenta or not canales_por_cuenta[cid_act]:
+                    canales_por_cuenta[cid_act] = list(lista_canales)
             SCHEDULE_MEM_FILE.write_text(
                 _json.dumps(
                     {
@@ -1362,8 +1372,11 @@ def iniciar_aplicacion_gui() -> None:
             if cid_act not in canales_por_cuenta:
                 canales_por_cuenta[cid_act] = list(lista_canales)
             elif str(estado_seleccion_cuentas.get("modo") or "una") == "una":
-                lista_canales.clear()
-                lista_canales.extend(canales_por_cuenta[cid_act])
+                if canales_por_cuenta[cid_act]:
+                    lista_canales.clear()
+                    lista_canales.extend(canales_por_cuenta[cid_act])
+                elif lista_canales:
+                    canales_por_cuenta[cid_act] = list(lista_canales)
 
         modo_act = str(estado_seleccion_cuentas.get("modo") or "una")
         grupo_ids = [g for g in (estado_seleccion_cuentas.get("grupo_ids") or []) if g in dict_por_id]
@@ -1561,6 +1574,7 @@ def iniciar_aplicacion_gui() -> None:
             justify="left",
         )
         autoajustar_tamano_ventana()
+        refrescar_texto_boton_accion()
 
     opt_estrategia.configure(command=refrescar_plan_ui)
     opt_cantidad_total.configure(command=refrescar_plan_ui)
@@ -1569,32 +1583,66 @@ def iniciar_aplicacion_gui() -> None:
     _en_formato_hora = [False]
     _prev_hora = [hora_elegida_var.get()]
 
+    def _filtrar_tecla_no_digito(event: tk.Event) -> Optional[str]:
+        if event.keysym in ("BackSpace", "Delete", "Left", "Right", "Tab", "Home", "End", "Return"):
+            return None
+        if event.state & 4:  # Ctrl+C, Ctrl+V, etc.
+            return None
+        if event.char and not event.char.isdigit():
+            return "break"
+        return None
+
+    try:
+        entry_hora_desde._entry.bind("<KeyPress>", _filtrar_tecla_no_digito)
+        entry_hora_esp._entry.bind("<KeyPress>", _filtrar_tecla_no_digito)
+        entry_intervalo._entry.bind("<KeyPress>", _filtrar_tecla_no_digito)
+    except Exception:
+        pass
+
     def _on_hora_escribir(*_args: object) -> None:
         if _en_formato_hora[0]:
             return
+        w_foc = root.focus_get()
+        pos_antes = 0
+        if w_foc in (getattr(entry_hora_esp, "_entry", None), getattr(entry_hora_desde, "_entry", None)):
+            try:
+                pos_antes = w_foc.index(tk.INSERT)
+            except Exception:
+                pos_antes = len(hora_elegida_var.get())
+
         val = hora_elegida_var.get()
         prev = _prev_hora[0]
         is_backspace = len(val) < len(prev)
         digitos = [c for c in val if c.isdigit()][:4]
+
+        pos_nueva = pos_antes
         if not digitos:
             nuevo = ""
+            pos_nueva = 0
         elif is_backspace:
             nuevo = val if all(c.isdigit() or c == ":" for c in val) else "".join(digitos)
-        elif len(digitos) == 2 and len(prev.replace(":", "")) < 2:
-            nuevo = "".join(digitos) + ":"
-        elif len(digitos) > 2:
+        elif len(digitos) <= 2:
+            nuevo = "".join(digitos)
+            if len(digitos) == 2:
+                nuevo = "".join(digitos) + ":"
+                if pos_antes == 2:
+                    pos_nueva = 3
+        else:
             h = min(23, int("".join(digitos[:2])))
             m_raw = "".join(digitos[2:])
             if len(m_raw) == 2:
                 m_raw = f"{min(59, int(m_raw)):02d}"
             nuevo = f"{h:02d}:{m_raw}"
-        else:
-            nuevo = "".join(digitos)
+            if pos_antes == 2:
+                pos_nueva = 3
 
         if nuevo != val:
             _en_formato_hora[0] = True
             hora_elegida_var.set(nuevo)
             _en_formato_hora[0] = False
+            if w_foc in (getattr(entry_hora_esp, "_entry", None), getattr(entry_hora_desde, "_entry", None)):
+                root.after_idle(lambda w=w_foc, p=pos_nueva, n=nuevo: (w.icursor(min(len(n), p)) if (hasattr(w, "winfo_exists") and w.winfo_exists()) else None))
+
         _prev_hora[0] = nuevo
         refrescar_plan_ui()
 
@@ -1626,23 +1674,11 @@ def iniciar_aplicacion_gui() -> None:
 
             # 1. TEXTO PARA EL BOTÓN PRINCIPAL (SUBIR A YOUTUBE)
             if es_editado:
-                c_edit = max(1, len(lista_videos_editados_locales))
-                if es_custom:
-                    txt_subir = f"IMPORTAR {c_edit} VIDEOS, PERSONALIZAR Y SUBIR" if c_edit > 1 else "IMPORTAR VIDEO, PERSONALIZAR Y SUBIR"
-                else:
-                    txt_subir = f"IMPORTAR {c_edit} VIDEOS DE CARPETA Y SUBIR CON IA" if c_edit > 1 else "IMPORTAR VIDEO DE CARPETA Y SUBIR CON IA"
+                txt_subir = "IMPORTAR Y SUBIR A YOUTUBE" if not es_custom else "PERSONALIZAR Y SUBIR A YOUTUBE"
             elif es_canales:
-                cant_c = MAPA_CANTIDAD_TOTAL.get(cantidad_total_var.get(), 2)
-                if es_custom:
-                    txt_subir = f"ELEGIR {cant_c} SHORTS, PERSONALIZAR Y SUBIR" if cant_c > 1 else "ELEGIR SHORT, PERSONALIZAR Y SUBIR"
-                else:
-                    txt_subir = f"CREAR Y SUBIR {cant_c} SHORTS EN 1 CLIC" if cant_c > 1 else "CREAR Y SUBIR SHORT EN 1 CLIC"
+                txt_subir = "CREAR Y SUBIR EN 1 CLIC" if not es_custom else "PERSONALIZAR Y SUBIR SHORTS"
             else:
-                c_links = max(1, len(obtener_links_ingresados()))
-                if es_custom:
-                    txt_subir = f"PERSONALIZAR Y SUBIR {c_links} SHORTS" if c_links > 1 else "PERSONALIZAR Y SUBIR SHORT DESDE LINK"
-                else:
-                    txt_subir = f"CREAR Y SUBIR {c_links} SHORTS CON IA" if c_links > 1 else "CREAR Y SUBIR SHORT DESDE LINK CON IA"
+                txt_subir = "CREAR Y SUBIR DESDE LINK" if not es_custom else "PERSONALIZAR Y SUBIR DESDE LINK"
 
             if btn_auto_1clic is not None:
                 btn_auto_1clic.configure(
@@ -1654,18 +1690,7 @@ def iniciar_aplicacion_gui() -> None:
 
             # 2. TEXTO PARA EL BOTÓN SECUNDARIO (GUARDAR EN CARPETA DIRECTAMENTE)
             if not es_editado:
-                if es_canales:
-                    cant_c = MAPA_CANTIDAD_TOTAL.get(cantidad_total_var.get(), 2)
-                    if es_custom:
-                        txt_guardar = f"PERSONALIZAR Y GUARDAR {cant_c}" if cant_c > 1 else "PERSONALIZAR Y GUARDAR"
-                    else:
-                        txt_guardar = f"CREAR Y GUARDAR {cant_c} EN CARPETA" if cant_c > 1 else "CREAR Y GUARDAR EN CARPETA"
-                else:
-                    c_links = max(1, len(obtener_links_ingresados()))
-                    if es_custom:
-                        txt_guardar = f"PERSONALIZAR Y GUARDAR {c_links}" if c_links > 1 else "PERSONALIZAR Y GUARDAR"
-                    else:
-                        txt_guardar = f"CREAR Y GUARDAR {c_links} EN CARPETA" if c_links > 1 else "EDITAR Y GUARDAR EN CARPETA"
+                txt_guardar = "CREAR Y GUARDAR EN CARPETA" if not es_custom else "PERSONALIZAR Y GUARDAR EN CARPETA"
 
                 if btn_guardar_carpeta is not None:
                     btn_guardar_carpeta.configure(
