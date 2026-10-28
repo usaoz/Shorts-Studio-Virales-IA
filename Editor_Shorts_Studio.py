@@ -4984,34 +4984,150 @@ def iniciar_aplicacion_gui() -> None:
                                 if accion == "descartar":
                                     raise InterruptedError("Video descartado por el usuario en revisión.")
                                 elif accion == "buscar_otro":
-                                    print("[*] Video descartado en revisión previa. Buscando siguiente video...")
-                                    descartar_video_actual = True
-                                    break
+                                    _actualizar_milestone_actual("activo", f"Reel {num_actual}: Buscando otro video...")
+                                    _set_subprogreso(0.04, f"{pref_lote}Buscando otro Short viral en los canales...", "#facc15")
+                                    root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}BUSCANDO OTRO SHORT..."))
+
+                                    nuevo_elegido = None
+                                    if es_modo_canales:
+                                        cid_actual = str(info_sel.get("cuenta_id") or "principal")
+                                        canales_para_este = list(canales_por_cuenta.get(cid_actual) or lista_canales)
+                                        if not canales_para_este:
+                                            canales_para_este = list(lista_canales)
+                                        if not ("Rotación" in orden_canales_var.get()):
+                                            random.shuffle(canales_para_este)
+
+                                        for c_cand in canales_para_este:
+                                            if evento_cancelar.is_set():
+                                                raise InterruptedError("Operación detenida por el usuario.")
+                                            c_lbl = etiqueta_corta_canal(c_cand)
+                                            _set_subprogreso(0.06, f"{pref_lote}Buscando en {c_lbl}...", "#facc15")
+                                            res_viral = buscar_short_viral_en_canal(c_cand, min_views=min_v, estricto_min_views=True)
+                                            if res_viral:
+                                                nuevo_elegido = res_viral
+                                                registrar_video_usado(res_viral[0])
+                                                ids_reservados_sesion.append(res_viral[0])
+                                                break
+                                    elif es_modo_editado:
+                                        subidos_o_guardados = {Path(s.get("ruta", "")).resolve() for s in shorts_guardados_disco}
+                                        for p_cand in lista_videos_editados_locales:
+                                            if p_cand.resolve() not in subidos_o_guardados and p_cand.resolve() != ruta_video_usar.resolve():
+                                                nuevo_elegido = (str(p_cand), p_cand.stem.replace("_", " ").title(), 0)
+                                                break
+                                    else:
+                                        for u_cand in links_a_procesar:
+                                            if u_cand != url_descargar:
+                                                nuevo_elegido = (u_cand, "Video Link", 0)
+                                                break
+
+                                    if not nuevo_elegido:
+                                        def _aviso_no_mas() -> None:
+                                            messagebox.showwarning(
+                                                "Sin Videos Disponibles",
+                                                "No se encontró otro Short viral con los filtros actuales en los canales.\n\n"
+                                                "Podés bajar el filtro de vistas mínimas o agregar más canales en Ajustes.",
+                                            )
+                                        root.after(0, _aviso_no_mas)
+                                        continue
+
+                                    u_nuevo, t_nuevo, v_nuevo = nuevo_elegido
+                                    url_descargar = u_nuevo
+                                    titulo_orig = t_nuevo
+                                    vistas_orig = v_nuevo
+                                    info_sel["url"] = u_nuevo
+                                    info_sel["titulo_orig"] = t_nuevo
+                                    info_sel["vistas"] = v_nuevo
+
+                                    posible_local_n = Path(url_descargar)
+                                    if posible_local_n.exists() and posible_local_n.is_file():
+                                        ruta_video_usar = posible_local_n
+                                    else:
+                                        _actualizar_milestone_actual("activo", f"Reel {num_actual}: Descargando...")
+                                        _set_subprogreso(0.10, f"{pref_lote}Descargando nuevo Short: '{titulo_orig[:36]}...'")
+                                        root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}DESCARGANDO NUEVO SHORT..."))
+                                        ruta_video_usar = descargar_video_youtube(url_descargar)
+                                        registrar_video_usado(url_descargar)
+                                        if ULTIMA_INFO_YTDLP.get("titulo"):
+                                            titulo_orig = ULTIMA_INFO_YTDLP["titulo"]
+
+                                    if es_modo_editado:
+                                        ruta_final = ruta_video_usar
+                                        ultimo_video_generado[0] = ruta_final
+                                    else:
+                                        _actualizar_milestone_actual("activo", f"Reel {num_actual}: Creando guión IA...")
+                                        _set_subprogreso(0.20, f"{pref_lote}Generando guión con IA...", PURPLE_MAIN)
+                                        root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}CREANDO GUIÓN CON IA..."))
+
+                                        def _cb_guion_otro(sub_frac: float, msg_ia: str) -> None:
+                                            frac_ia = 0.20 + max(0.0, min(1.0, sub_frac)) * 0.15
+                                            _set_subprogreso(frac_ia, f"{pref_lote}{msg_ia}", "#facc15")
+
+                                        generar_guion_con_gemini_flash(
+                                            ruta_video=ruta_video_usar,
+                                            api_key=api_k,
+                                            schedule_str=sched_actual or "auto",
+                                            modo_privacidad="privado" if modo_priv == "private" else modo_priv,
+                                            contexto_titulo_orig=titulo_orig,
+                                            modelo_preferido=pref_modelo_ia,
+                                            progreso_cb=_cb_guion_otro,
+                                        )
+
+                                        _actualizar_milestone_actual("activo", f"Reel {num_actual}: Editando 60 FPS...")
+                                        root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}RENDERIZANDO SHORT GPU..."))
+
+                                        def _cb_edit_otro(pct_edit: float, txt_edit: str) -> None:
+                                            f_val = pct_edit if pct_edit <= 1.0 else (pct_edit / 100.0)
+                                            frac_interna = 0.38 + max(0.0, min(1.0, f_val)) * 0.52
+                                            _set_subprogreso(frac_interna, f"{pref_lote}{txt_edit}", CYAN_ACCENT)
+
+                                        modo_render_elegido = "cpu" if "CPU" in modo_render_var.get() else "auto"
+                                        ruta_final = asyncio.run(
+                                            editar_video_con_guion(
+                                                ruta_video=ruta_video_usar,
+                                                ruta_guion=DEFAULT_GUION_TXT,
+                                                voz_override=voz_elegida,
+                                                modo_encuadre_override=encuadre_elegido,
+                                                progreso_cb=_cb_edit_otro,
+                                                cancelar_check=lambda: evento_cancelar.is_set(),
+                                                encoder_override=modo_render_elegido,
+                                            )
+                                        )
+                                        ultimo_video_generado[0] = ruta_final
+
+                                    continue
                                 elif accion == "reeditar":
                                     _actualizar_milestone_actual("activo", f"Reel {num_actual}: Re-editando con feedback...")
                                     _set_subprogreso(0.15, "Re-generando guion con tus correcciones...", PURPLE_MAIN)
-                                    root.after(0, lambda: btn_auto_1clic.configure(text="RE-GENERANDO GUION CON IA..."))
-                                    asyncio.run(
-                                        generar_guion_con_gemini_flash(
-                                            ruta_video=ruta_video_usar,
-                                            api_key=key_gemini,
-                                            schedule_str=sched_actual or "auto",
-                                            modo_privacidad=modo_priv,
-                                            contexto_titulo_orig=titulo_orig,
-                                            modelo_preferido=modelo_ia_elegido,
-                                            progreso_cb=lambda p, m: _set_subprogreso(0.15 + p * 0.15, m, PURPLE_MAIN),
-                                            contexto_feedback=feedback_usr,
-                                        )
+                                    root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}RE-GENERANDO GUIÓN CON IA..."))
+
+                                    def _cb_reedit_g(sub_frac: float, msg_ia: str) -> None:
+                                        _set_subprogreso(0.15 + max(0.0, min(1.0, sub_frac)) * 0.15, f"{pref_lote}{msg_ia}", PURPLE_MAIN)
+
+                                    generar_guion_con_gemini_flash(
+                                        ruta_video=ruta_video_usar,
+                                        api_key=api_k,
+                                        schedule_str=sched_actual or "auto",
+                                        modo_privacidad="privado" if modo_priv == "private" else modo_priv,
+                                        contexto_titulo_orig=titulo_orig,
+                                        modelo_preferido=pref_modelo_ia,
+                                        progreso_cb=_cb_reedit_g,
+                                        contexto_feedback=feedback_usr,
                                     )
                                     _set_subprogreso(0.35, "Re-renderizando video a 60 FPS...", CYAN_ACCENT)
-                                    root.after(0, lambda: btn_auto_1clic.configure(text="RE-RENDERIZANDO SHORT..."))
+                                    root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}RE-RENDERIZANDO SHORT GPU..."))
+
+                                    def _cb_reedit_e(pct_edit: float, txt_edit: str) -> None:
+                                        f_val = pct_edit if pct_edit <= 1.0 else (pct_edit / 100.0)
+                                        _set_subprogreso(0.35 + max(0.0, min(1.0, f_val)) * 0.55, f"{pref_lote}{txt_edit}", CYAN_ACCENT)
+
+                                    modo_render_elegido = "cpu" if "CPU" in modo_render_var.get() else "auto"
                                     ruta_final = asyncio.run(
                                         editar_video_con_guion(
                                             ruta_video=ruta_video_usar,
                                             ruta_guion=DEFAULT_GUION_TXT,
                                             voz_override=voz_elegida,
                                             modo_encuadre_override=encuadre_elegido,
-                                            progreso_cb=_cb_edicion,
+                                            progreso_cb=_cb_reedit_e,
                                             cancelar_check=lambda: evento_cancelar.is_set(),
                                             encoder_override=modo_render_elegido,
                                         )
@@ -5020,9 +5136,6 @@ def iniciar_aplicacion_gui() -> None:
                                     continue
                                 else:
                                     break
-
-                            if descartar_video_actual:
-                                continue
 
                         # Cuenta de YouTube asignada a este Reel en el lote
                         id_cuenta_usar = str(info_sel.get("cuenta_id") or estado_seleccion_cuentas.get("cuenta_id") or "principal")
@@ -5095,15 +5208,19 @@ def iniciar_aplicacion_gui() -> None:
                             else "100% — ¡Se creó y guardó el Reel en output_shorts!"
                         )
                         root.after(800, abrir_carpeta_salida)
+                        _actualizar_progreso_ui(100.0, txt_fin, GREEN_ACCENT, GREEN_ACCENT)
                     else:
-                        txt_fin = (
-                            f"100% — ¡Se subieron todos los Reels ({len(links_subidos)}/{cant_cola}) con éxito!"
-                            if cant_cola > 1
-                            else "100% — ¡Se subió el Reel a YouTube con éxito!"
-                        )
-                    _actualizar_progreso_ui(100.0, txt_fin, GREEN_ACCENT, GREEN_ACCENT)
+                        if len(links_subidos) > 0:
+                            txt_fin = (
+                                f"100% — ¡Se subieron todos los Reels ({len(links_subidos)}/{cant_cola}) con éxito!"
+                                if cant_cola > 1
+                                else "100% — ¡Se subió el Reel a YouTube con éxito!"
+                            )
+                            _actualizar_progreso_ui(100.0, txt_fin, GREEN_ACCENT, GREEN_ACCENT)
+                        else:
+                            txt_fin = "Proceso finalizado. No se subió ningún video."
+                            _actualizar_progreso_ui(0.0, txt_fin, TEXT_MUTED, PURPLE_MAIN)
                     root.after(2800, lambda: _mostrar_modo_progreso_activo(False) if not editando_lock.locked() else None)
-
                 root.after(0, _on_ok)
             except InterruptedError as exc_int:
                 def _on_cancelado() -> None:

@@ -1,6 +1,6 @@
-TITULO_SUPERIOR: Profesor Confunde a Maestra
-TITULO_YOUTUBE: ¡Estudiante confunde a su maestra con una alumna! #shorts
-DESCRIPCION_YOUTUBE: Un alumno entra al aula y confunde a la profesora con una colega o compañera. ¿Alguna vez te ha pasado algo tan vergonzoso en la escuela? #shorts #comedy #funny #viral #school
+TITULO_SUPERIOR: Broma de Pluma en la Escuela
+TITULO_YOUTUBE: ¡La broma escolar con pluma que salió mal! #shorts
+DESCRIPCION_YOUTUBE: Estos estudiantes hacen una broma tan absurda con una pluma que confunden por completo a sus profesores en clase. ¿Alguna vez hiciste una broma parecida en tu colegio? #shorts #comedy #funny #viral #school
 ESTADO_PUBLICACION: privado
 SCHEDULE: 2026-10-31 11:30
 PARA_NINOS: no
@@ -10,10 +10,11 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | whoosh | sorprendido:izquierda | izquierda | ninguno | ¡Este alumno entra despistado al aula y confunde a la profesora con una compañera!
-00:05 - 00:10 | zoom_in | error | ninguno | centro | ninguno | ¡El estudiante le habla como si fuera una colega mientras ella limpia la pizarra!
-00:10 - 00:15 | ningunos | riser_suction | risa:derecha | ninguna | ninguno | ¡Ella le sigue la broma con mucha paciencia mientras él intenta ayudar en clase!
-00:15 - 00:20 | zoom_in | good_idea | diablo:izquierda | derecha | centro:grande | ¡Ahora ella se sienta en el pupitre y él asume el rol principal organizando los teléfonos!
-00:20 - 00:25 | ninguno | click | ninguno | ninguna | ninguno | ¡La profesora aprovecha la confusión para confiscar los celulares de todos los compañeros!
-00:25 - 00:30 | zoom_out | cash_ting | fiesta:derecha | ninguna | ninguno | ¡Le devuelve los celulares a su cómplice sin que él note su verdadera identidad docente!
-00:30 - 00:34 | brillo_epico | cartoon_laugh | risa:izquierda | ninguna | ninguno | ¡Una broma maestra perfecta que salió a la perfección frente a toda la clase atónita!
+00:00 - 00:05 | zoom_impacto | click | sueno:izquierda | izquierda | ninguno | ¡Mira cómo este alumno dibuja con una pluma mientras su compañero duerme plácidamente en el pupitre!
+00:05 - 00:10 | zoom_in | whoosh | sorprendido:derecha | ninguna | ninguno | ¡De repente el bromista siente un impacto terrible al tocar su propio cuello con el bolígrafo mágico!
+00:10 - 00:14 | alerta_roja | riser_suction | diablo:izquierda | ninguna | ninguno | ¡Ambos estudiantes repiten gestos exagerados de dolor e incomodidad frente a la cámara totalmente desesperados!
+00:14 - 00:18 | temblor | punch | risa:derecha | ninguna | ninguno | ¡La situación se vuelve tan extraña que deciden ir corriendo a reportar este misterioso caso escolar!
+00:18 - 00:22 | zoom_in | crowd_shocked | sorprendido:izquierda | derecha | ninguno | ¡El profesor revisa el salón pero todo parece completamente normal y tranquilo para sorpresa de todos los presentes!
+00:22 - 00:26 | blanco_negro | error | enojo:derecha | ninguna | ninguno | ¡Para demostrar lo que pasó, el profesor imita los mismos gestos raros frente a la autoridad escolar!
+00:26 - 00:30 | flash | pop | ninguno | ninguna | centro:grande | ¡El director observa completamente confundido e incrédulo la divertida y extraña actuación de su propio maestro!
+00:30 - 00:33 | brillo_epico | cartoon_laugh | risa:izquierda | ninguna | ninguno | ¡Una broma escolar épica que termina en un momento súper gracioso e inesperado para todos!
