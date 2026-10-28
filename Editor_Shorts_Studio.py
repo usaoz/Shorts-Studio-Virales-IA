@@ -403,6 +403,10 @@ def iniciar_aplicacion_gui() -> None:
         "grupo_ids": [str(x) for x in (mem.get("grupo_cuentas_ids") or []) if str(x).strip()],
     }
     cache_avatares_ctk: Dict[str, ctk.CTkImage] = {}
+    row_botones_accion: Optional[ctk.CTkFrame] = None
+    btn_auto_1clic: Optional[ctk.CTkButton] = None
+    btn_guardar_carpeta: Optional[ctk.CTkButton] = None
+    solo_guardar_actual = [False]
 
     # Lista de diccionarios para personalizar cada Reel individualmente (hasta 12 Shorts)
     datos_custom_reels: List[Dict[str, str]] = []
@@ -1505,7 +1509,7 @@ def iniciar_aplicacion_gui() -> None:
         mf = modo_fuente_var.get()
         es_canales = "Canales" in mf
         es_editado = "Editado" in mf
-        solo_guardar = accion_final_var.get() == "Guardar en carpeta"
+        solo_guardar = (accion_final_var.get() == "Guardar en carpeta")
 
         privacidad_var.set("Privado")
 
@@ -1572,55 +1576,63 @@ def iniciar_aplicacion_gui() -> None:
     opt_intervalo.configure(command=refrescar_plan_ui)
 
     def refrescar_texto_boton_accion() -> None:
-        """Actualiza el texto y estilo del botón de acción según IA/Personalizado, Subir/Guardar y modo fuente."""
+        """Actualiza el texto y estilo de los botones de acción para todas las combinaciones de Fuente, Contenido y Subida/Guardado."""
         try:
             mf = modo_fuente_var.get()
             es_editado = "Editado" in mf
-            solo_guardar = accion_final_var.get() == "Guardar en carpeta"
+            es_canales = "Canales" in mf
+            es_link = not es_editado and not es_canales
+            es_custom = "Personalizado" in modo_contenido_var.get()
 
+            # 1. TEXTO PARA EL BOTÓN PRINCIPAL (SUBIR A YOUTUBE)
             if es_editado:
-                c_edit = len(lista_videos_editados_locales)
-                if c_edit > 1:
-                    txt_b = f"IMPORTAR {c_edit} VIDEOS DE CARPETA Y SUBIR"
+                c_edit = max(1, len(lista_videos_editados_locales))
+                if es_custom:
+                    txt_subir = f"IMPORTAR {c_edit} VIDEOS, PERSONALIZAR Y SUBIR" if c_edit > 1 else "IMPORTAR VIDEO, PERSONALIZAR Y SUBIR"
                 else:
-                    txt_b = "IMPORTAR VIDEO DE CARPETA Y SUBIR"
+                    txt_subir = f"IMPORTAR {c_edit} VIDEOS DE CARPETA Y SUBIR CON IA" if c_edit > 1 else "IMPORTAR VIDEO DE CARPETA Y SUBIR CON IA"
+            elif es_canales:
+                cant_c = MAPA_CANTIDAD_TOTAL.get(cantidad_total_var.get(), 2)
+                if es_custom:
+                    txt_subir = f"ELEGIR {cant_c} SHORTS, PERSONALIZAR Y SUBIR" if cant_c > 1 else "ELEGIR SHORT, PERSONALIZAR Y SUBIR"
+                else:
+                    txt_subir = f"CREAR Y SUBIR {cant_c} SHORTS EN 1 CLIC" if cant_c > 1 else "CREAR Y SUBIR SHORT EN 1 CLIC"
+            else:
+                c_links = max(1, len(obtener_links_ingresados()))
+                if es_custom:
+                    txt_subir = f"PERSONALIZAR Y SUBIR {c_links} SHORTS" if c_links > 1 else "PERSONALIZAR Y SUBIR SHORT DESDE LINK"
+                else:
+                    txt_subir = f"CREAR Y SUBIR {c_links} SHORTS CON IA" if c_links > 1 else "CREAR Y SUBIR SHORT DESDE LINK CON IA"
+
+            if btn_auto_1clic is not None:
                 btn_auto_1clic.configure(
-                    text=txt_b,
-                    fg_color=PURPLE_MAIN,
-                    hover_color=PURPLE_HOVER,
+                    text=txt_subir,
+                    fg_color=PURPLE_MAIN if not es_custom else "#0284c7",
+                    hover_color=PURPLE_HOVER if not es_custom else "#0369a1",
                     text_color="#ffffff",
                 )
-                return
 
-            if "Personalizado" in modo_contenido_var.get():
-                if solo_guardar:
-                    btn_auto_1clic.configure(
-                        text="ELEGIR SHORTS, PERSONALIZAR Y GUARDAR",
-                        fg_color="#0284c7",
-                        hover_color="#0369a1",
-                        text_color="#ffffff",
-                    )
+            # 2. TEXTO PARA EL BOTÓN SECUNDARIO (GUARDAR EN CARPETA DIRECTAMENTE)
+            if not es_editado:
+                if es_canales:
+                    cant_c = MAPA_CANTIDAD_TOTAL.get(cantidad_total_var.get(), 2)
+                    if es_custom:
+                        txt_guardar = f"PERSONALIZAR Y GUARDAR {cant_c}" if cant_c > 1 else "PERSONALIZAR Y GUARDAR"
+                    else:
+                        txt_guardar = f"CREAR Y GUARDAR {cant_c} EN CARPETA" if cant_c > 1 else "CREAR Y GUARDAR EN CARPETA"
                 else:
-                    btn_auto_1clic.configure(
-                        text="ELEGIR SHORTS Y ARMAR GUIÓN / TÍTULO",
-                        fg_color="#0284c7",
-                        hover_color="#0369a1",
-                        text_color="#ffffff",
-                    )
-            else:
-                if solo_guardar:
-                    btn_auto_1clic.configure(
-                        text="CREAR Y GUARDAR SHORTS EN CARPETA",
-                        fg_color=PURPLE_MAIN,
-                        hover_color=PURPLE_HOVER,
-                        text_color="#ffffff",
-                    )
-                else:
-                    btn_auto_1clic.configure(
-                        text="CREAR Y SUBIR SHORT EN 1 CLIC",
-                        fg_color=PURPLE_MAIN,
-                        hover_color=PURPLE_HOVER,
-                        text_color="#ffffff",
+                    c_links = max(1, len(obtener_links_ingresados()))
+                    if es_custom:
+                        txt_guardar = f"PERSONALIZAR Y GUARDAR {c_links}" if c_links > 1 else "PERSONALIZAR Y GUARDAR"
+                    else:
+                        txt_guardar = f"CREAR Y GUARDAR {c_links} EN CARPETA" if c_links > 1 else "EDITAR Y GUARDAR EN CARPETA"
+
+                if btn_guardar_carpeta is not None:
+                    btn_guardar_carpeta.configure(
+                        text=txt_guardar,
+                        fg_color="#182235",
+                        hover_color="#23324f",
+                        text_color="#38bdf8",
                     )
         except Exception:
             pass
@@ -1634,12 +1646,23 @@ def iniciar_aplicacion_gui() -> None:
         card_video_editado.pack_forget()
 
         mf = modo_fuente_var.get()
+        es_editado = "Editado" in mf
         if "Canales" in mf:
             card_canales.pack(fill="x")
         elif "Link" in mf:
             card_link.pack(fill="x")
         else:
             card_video_editado.pack(fill="x")
+
+        if btn_guardar_carpeta is not None and row_botones_accion is not None and btn_auto_1clic is not None:
+            if es_editado:
+                btn_guardar_carpeta.grid_remove()
+                row_botones_accion.grid_columnconfigure(1, weight=0)
+                btn_auto_1clic.grid_configure(padx=0)
+            else:
+                row_botones_accion.grid_columnconfigure(1, weight=3)
+                btn_auto_1clic.grid_configure(padx=(0, 8))
+                btn_guardar_carpeta.grid(row=0, column=1, sticky="nsew")
 
         refrescar_plan_ui()
         refrescar_texto_boton_accion()
@@ -2239,19 +2262,14 @@ def iniciar_aplicacion_gui() -> None:
 
         if c == 1:
             texto = "1 Short programado  ·  Ver cola ▾"
-            color_txt = "#ffffff"
-            color_bd = "#2e3852"
-            color_bg = "#111624"
         elif c > 1:
             texto = f"{c} Shorts programados  ·  Ver cola ▾"
-            color_txt = "#ffffff"
-            color_bd = "#2e3852"
-            color_bg = "#111624"
         else:
             texto = "Sin Shorts programados  ·  Ver cola de subidas ▾"
-            color_txt = "#ffffff"
-            color_bd = CARD_BORDER
-            color_bg = CARD_BG
+
+        color_txt = "#ffffff"
+        color_bd = "#2a3147"
+        color_bg = INPUT_BG
 
         try:
             btn_cola_programados.configure(
@@ -2271,14 +2289,12 @@ def iniciar_aplicacion_gui() -> None:
 
         if c_pubs > 0:
             texto = f"{c_pubs} Short{'s' if c_pubs != 1 else ''} reciente{'s' if c_pubs != 1 else ''}  ·  Ver métricas ▾"
-            color_txt = "#ffffff"
-            color_bd = "#382752"
-            color_bg = "#161124"
         else:
             texto = "Shorts Publicados  ·  Ver métricas ▾"
-            color_txt = "#ffffff"
-            color_bd = CARD_BORDER
-            color_bg = CARD_BG
+
+        color_txt = "#ffffff"
+        color_bd = "#2a3147"
+        color_bg = INPUT_BG
 
         try:
             btn_rendimiento_videos.configure(
@@ -3026,17 +3042,41 @@ def iniciar_aplicacion_gui() -> None:
     contenedor_accion_y_progreso = ctk.CTkFrame(root, fg_color="transparent")
     contenedor_accion_y_progreso.pack(fill="x", padx=28, pady=(2, 20))
 
+    solo_guardar_actual = [False]
+
+    row_botones_accion = ctk.CTkFrame(contenedor_accion_y_progreso, fg_color="transparent")
+    row_botones_accion.pack(fill="x")
+    row_botones_accion.grid_columnconfigure(0, weight=7)
+    row_botones_accion.grid_columnconfigure(1, weight=3)
+
     btn_auto_1clic = ctk.CTkButton(
-        contenedor_accion_y_progreso,
-        text="CREAR Y SUBIR SHORT AHORA",
-        corner_radius=26,
+        row_botones_accion,
+        text="CREAR Y SUBIR SHORT EN 1 CLIC",
+        corner_radius=24,
         height=58,
         fg_color=PURPLE_MAIN,
         hover_color=PURPLE_HOVER,
         text_color="#ffffff",
-        font=ctk.CTkFont(family="Segoe UI", size=17, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
+        command=lambda: ejecutar_flujo_1_clic(solo_guardar_override=False),
     )
-    btn_auto_1clic.pack(fill="x")
+    btn_auto_1clic.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+
+    btn_guardar_carpeta = ctk.CTkButton(
+        row_botones_accion,
+        text="GUARDAR EN CARPETA",
+        corner_radius=24,
+        height=58,
+        fg_color="#182235",
+        hover_color="#23324f",
+        border_width=1,
+        border_color="#334668",
+        text_color="#38bdf8",
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+        command=lambda: ejecutar_flujo_1_clic(solo_guardar_override=True),
+    )
+    btn_guardar_carpeta.grid(row=0, column=1, sticky="nsew")
+
     refrescar_texto_boton_accion()
 
     row_pildoras_inferiores = ctk.CTkFrame(contenedor_accion_y_progreso, fg_color="transparent")
@@ -3046,12 +3086,12 @@ def iniciar_aplicacion_gui() -> None:
         row_pildoras_inferiores,
         text="Consultando cola de Shorts...",
         command=lambda: abrir_ventana_shorts_programados(),
-        corner_radius=16,
+        corner_radius=14,
         height=38,
-        fg_color=CARD_BG,
-        hover_color="#1a2030",
+        fg_color=INPUT_BG,
+        hover_color="#1e2538",
         border_width=1,
-        border_color=CARD_BORDER,
+        border_color="#2a3147",
         text_color="#ffffff",
         font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
@@ -3062,12 +3102,12 @@ def iniciar_aplicacion_gui() -> None:
         row_pildoras_inferiores,
         text="Consultando métricas de Shorts...",
         command=lambda: abrir_ventana_overview_rendimiento(),
-        corner_radius=16,
+        corner_radius=14,
         height=38,
-        fg_color=CARD_BG,
-        hover_color="#1d162d",
+        fg_color=INPUT_BG,
+        hover_color="#1e2538",
         border_width=1,
-        border_color=CARD_BORDER,
+        border_color="#2a3147",
         text_color="#ffffff",
         font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
@@ -3086,10 +3126,10 @@ def iniciar_aplicacion_gui() -> None:
 
     def _mostrar_modo_progreso_activo(activo: bool) -> None:
         if activo:
-            btn_auto_1clic.pack_forget()
+            row_botones_accion.pack_forget()
             row_pildoras_inferiores.pack_forget()
             evento_cancelar.clear()
-            txt_frenar = "Frenar Proceso" if (accion_final_var.get() == "Guardar en carpeta") else "Frenar Subida"
+            txt_frenar = "Frenar Proceso" if solo_guardar_actual[0] else "Frenar Subida"
             btn_frenar_proceso.configure(state="normal", text=txt_frenar, fg_color="#3b151e")
             progress_card.pack(fill="x")
             row_pildoras_inferiores.pack(fill="x", pady=(10, 0))
@@ -3097,8 +3137,9 @@ def iniciar_aplicacion_gui() -> None:
             progress_card.pack_forget()
             row_pildoras_inferiores.pack_forget()
             btn_auto_1clic.configure(state="normal")
+            btn_guardar_carpeta.configure(state="normal")
             refrescar_texto_boton_accion()
-            btn_auto_1clic.pack(fill="x")
+            row_botones_accion.pack(fill="x")
             row_pildoras_inferiores.pack(fill="x", pady=(10, 0))
         autoajustar_tamano_ventana()
 
@@ -3404,7 +3445,7 @@ def iniciar_aplicacion_gui() -> None:
     ) -> None:
         win_c = ctk.CTkToplevel(root)
         win_c.title("Personalizar Reels Seleccionados")
-        win_c.geometry("700x535")
+        win_c.geometry("720x570")
         win_c.resizable(False, False)
         win_c.configure(fg_color=BG_DARK)
         win_c.transient(root)
@@ -3509,16 +3550,34 @@ def iniciar_aplicacion_gui() -> None:
         form_card = ctk.CTkFrame(win_c, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
         form_card.pack(fill="both", expand=True, padx=24, pady=(0, 10))
 
+        # Título Row con Switch IA
+        row_h_tit = ctk.CTkFrame(form_card, fg_color="transparent")
+        row_h_tit.pack(fill="x", padx=16, pady=(10, 2))
+
         ctk.CTkLabel(
-            form_card,
-            text="Título de YouTube Shorts (deja vacío para que lo arme la IA):",
+            row_h_tit,
+            text="Título de YouTube Shorts:",
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             text_color=TEXT_MAIN,
-        ).pack(anchor="w", padx=16, pady=(10, 2))
+        ).pack(side="left")
+
+        sw_ia_tit = ctk.CTkSwitch(
+            row_h_tit,
+            text="Crear con IA",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color="#c084fc",
+            progress_color=PURPLE_MAIN,
+            button_color="#ffffff",
+            button_hover_color="#e2e8f0",
+            height=18,
+            width=38,
+            command=lambda: _actualizar_estados_campos_ia(),
+        )
+        sw_ia_tit.pack(side="right")
 
         ent_m_tit = ctk.CTkEntry(
             form_card,
-            placeholder_text="Ej: ¡No vas a creer lo que hace con este control remoto! #shorts",
+            placeholder_text="Escribe un título viral o activa 'Crear con IA'...",
             corner_radius=12,
             height=34,
             fg_color=INPUT_BG,
@@ -3527,16 +3586,34 @@ def iniciar_aplicacion_gui() -> None:
         )
         ent_m_tit.pack(fill="x", padx=16, pady=(0, 8))
 
+        # Descripción Row con Switch IA
+        row_h_desc = ctk.CTkFrame(form_card, fg_color="transparent")
+        row_h_desc.pack(fill="x", padx=16, pady=(0, 2))
+
         ctk.CTkLabel(
-            form_card,
-            text="Descripción y Hashtags (deja vacío para que lo arme la IA):",
+            row_h_desc,
+            text="Descripción y Hashtags:",
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             text_color=TEXT_MAIN,
-        ).pack(anchor="w", padx=16, pady=(0, 2))
+        ).pack(side="left")
+
+        sw_ia_desc = ctk.CTkSwitch(
+            row_h_desc,
+            text="Crear con IA",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color="#c084fc",
+            progress_color=PURPLE_MAIN,
+            button_color="#ffffff",
+            button_hover_color="#e2e8f0",
+            height=18,
+            width=38,
+            command=lambda: _actualizar_estados_campos_ia(),
+        )
+        sw_ia_desc.pack(side="right")
 
         ent_m_desc = ctk.CTkEntry(
             form_card,
-            placeholder_text="Ej: Mirá hasta el final cómo reaccionan todos #shorts #viral #humor",
+            placeholder_text="Escribe descripción y hashtags o activa 'Crear con IA'...",
             corner_radius=12,
             height=34,
             fg_color=INPUT_BG,
@@ -3545,12 +3622,30 @@ def iniciar_aplicacion_gui() -> None:
         )
         ent_m_desc.pack(fill="x", padx=16, pady=(0, 8))
 
+        # Guión Row con Switch IA
+        row_h_guion = ctk.CTkFrame(form_card, fg_color="transparent")
+        row_h_guion.pack(fill="x", padx=16, pady=(0, 2))
+
         ctk.CTkLabel(
-            form_card,
-            text="Guión / Narración del Reel (escribe el texto a narrar o déjalo vacío para la IA):",
+            row_h_guion,
+            text="Guión / Narración del Reel:",
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             text_color=TEXT_MAIN,
-        ).pack(anchor="w", padx=16, pady=(0, 2))
+        ).pack(side="left")
+
+        sw_ia_guion = ctk.CTkSwitch(
+            row_h_guion,
+            text="Crear con IA",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color="#c084fc",
+            progress_color=PURPLE_MAIN,
+            button_color="#ffffff",
+            button_hover_color="#e2e8f0",
+            height=18,
+            width=38,
+            command=lambda: _actualizar_estados_campos_ia(),
+        )
+        sw_ia_guion.pack(side="right")
 
         txt_m_guion = ctk.CTkTextbox(
             form_card,
@@ -3564,11 +3659,30 @@ def iniciar_aplicacion_gui() -> None:
         )
         txt_m_guion.pack(fill="both", expand=True, padx=16, pady=(0, 12))
 
+        def _actualizar_estados_campos_ia() -> None:
+            if sw_ia_tit.get():
+                ent_m_tit.configure(state="disabled", fg_color="#101522")
+            else:
+                ent_m_tit.configure(state="normal", fg_color=INPUT_BG)
+
+            if sw_ia_desc.get():
+                ent_m_desc.configure(state="disabled", fg_color="#101522")
+            else:
+                ent_m_desc.configure(state="normal", fg_color=INPUT_BG)
+
+            if sw_ia_guion.get():
+                txt_m_guion.configure(state="disabled", fg_color="#101522")
+            else:
+                txt_m_guion.configure(state="normal", fg_color=INPUT_BG)
+
         def _guardar_actual_en_mem() -> None:
             i_c = estado_nav["idx"]
-            datos_custom_reels[i_c]["titulo"] = ent_m_tit.get().strip()
-            datos_custom_reels[i_c]["descripcion"] = ent_m_desc.get().strip()
-            datos_custom_reels[i_c]["guion"] = txt_m_guion.get("1.0", "end").strip()
+            datos_custom_reels[i_c]["usar_ia_tit"] = bool(sw_ia_tit.get())
+            datos_custom_reels[i_c]["usar_ia_desc"] = bool(sw_ia_desc.get())
+            datos_custom_reels[i_c]["usar_ia_guion"] = bool(sw_ia_guion.get())
+            datos_custom_reels[i_c]["titulo"] = ent_m_tit.get().strip() if not sw_ia_tit.get() else ""
+            datos_custom_reels[i_c]["descripcion"] = ent_m_desc.get().strip() if not sw_ia_desc.get() else ""
+            datos_custom_reels[i_c]["guion"] = txt_m_guion.get("1.0", "end").strip() if not sw_ia_guion.get() else ""
             _guardar_memoria()
 
         def _mostrar_reel_idx() -> None:
@@ -3586,15 +3700,41 @@ def iniciar_aplicacion_gui() -> None:
             ent_link_elegido.configure(state="readonly")
 
             d_c = datos_custom_reels[i_c]
+            ia_tit = d_c.get("usar_ia_tit", not bool(d_c.get("titulo")))
+            ia_desc = d_c.get("usar_ia_desc", not bool(d_c.get("descripcion")))
+            ia_guion = d_c.get("usar_ia_guion", not bool(d_c.get("guion")))
+
+            if ia_tit:
+                sw_ia_tit.select()
+            else:
+                sw_ia_tit.deselect()
+
+            if ia_desc:
+                sw_ia_desc.select()
+            else:
+                sw_ia_desc.deselect()
+
+            if ia_guion:
+                sw_ia_guion.select()
+            else:
+                sw_ia_guion.deselect()
+
+            ent_m_tit.configure(state="normal")
             ent_m_tit.delete(0, tk.END)
             if d_c.get("titulo"):
                 ent_m_tit.insert(0, d_c["titulo"])
+
+            ent_m_desc.configure(state="normal")
             ent_m_desc.delete(0, tk.END)
             if d_c.get("descripcion"):
                 ent_m_desc.insert(0, d_c["descripcion"])
+
+            txt_m_guion.configure(state="normal")
             txt_m_guion.delete("1.0", "end")
             if d_c.get("guion"):
                 txt_m_guion.insert("1.0", d_c["guion"])
+
+            _actualizar_estados_campos_ia()
 
             lbl_nav_r.configure(text=f"Reel {i_c + 1} de {total_v}")
             btn_p.configure(state="normal" if i_c > 0 else "disabled")
@@ -3845,7 +3985,7 @@ def iniciar_aplicacion_gui() -> None:
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         ).pack(side="right")
 
-    def ejecutar_flujo_1_clic() -> None:
+    def ejecutar_flujo_1_clic(solo_guardar_override: Optional[bool] = None) -> None:
         api_k = obtener_gemini_api_key()
         if not api_k:
             messagebox.showinfo(
@@ -3901,7 +4041,11 @@ def iniciar_aplicacion_gui() -> None:
         horarios_lote_plan = calcular_lista_horarios_actual()
         es_custom_activo = "Personalizado" in modo_contenido_var.get()
         pref_modelo_ia = MAPA_MODELOS_IA.get(modelo_ia_var.get(), "gemini-4-argon")
-        solo_guardar = accion_final_var.get() == "Guardar en carpeta"
+        if solo_guardar_override is not None:
+            solo_guardar = bool(solo_guardar_override)
+        else:
+            solo_guardar = (accion_final_var.get() == "Guardar en carpeta")
+        solo_guardar_actual[0] = solo_guardar
 
         modo_priv = "private"
         if "público" in privacidad_var.get().lower() or "publico" in privacidad_var.get().lower():
@@ -4088,7 +4232,11 @@ def iniciar_aplicacion_gui() -> None:
                 # ==================================================================
                 if es_custom_activo:
                     for i_limpiar in range(len(videos_seleccionados)):
-                        datos_custom_reels[i_limpiar] = {"titulo": "", "descripcion": "", "guion": ""}
+                        if i_limpiar not in datos_custom_reels:
+                            datos_custom_reels[i_limpiar] = {
+                                "titulo": "", "descripcion": "", "guion": "",
+                                "usar_ia_tit": True, "usar_ia_desc": True, "usar_ia_guion": True
+                            }
                     ev_modal = threading.Event()
                     res_modal = {"confirmado": False}
                     root.after(
@@ -4164,8 +4312,10 @@ def iniciar_aplicacion_gui() -> None:
                         _set_subprogreso(0.35, f"{pref_lote}Procesando video editado ({ruta_final.name})...", CYAN_ACCENT)
 
                         custom_data = datos_custom_reels[idx_lote] if idx_lote < len(datos_custom_reels) else {}
-                        c_tit = custom_data.get("titulo", "").strip() if es_custom_activo else ""
-                        c_desc = custom_data.get("descripcion", "").strip() if es_custom_activo else ""
+                        usar_ia_tit = custom_data.get("usar_ia_tit", True) if es_custom_activo else True
+                        usar_ia_desc = custom_data.get("usar_ia_desc", True) if es_custom_activo else True
+                        c_tit = custom_data.get("titulo", "").strip() if (es_custom_activo and not usar_ia_tit) else ""
+                        c_desc = custom_data.get("descripcion", "").strip() if (es_custom_activo and not usar_ia_desc) else ""
 
                         if es_custom_activo and c_tit:
                             d_final = c_desc or f"{c_tit} #Shorts"
@@ -4191,9 +4341,13 @@ def iniciar_aplicacion_gui() -> None:
                     else:
                         # Verificar si el usuario personalizó Título / Descripción / Guión para este Reel
                         custom_data = datos_custom_reels[idx_lote] if idx_lote < len(datos_custom_reels) else {}
-                        c_tit = custom_data.get("titulo", "").strip() if es_custom_activo else ""
-                        c_desc = custom_data.get("descripcion", "").strip() if es_custom_activo else ""
-                        c_guion = custom_data.get("guion", "").strip() if es_custom_activo else ""
+                        usar_ia_tit = custom_data.get("usar_ia_tit", True) if es_custom_activo else True
+                        usar_ia_desc = custom_data.get("usar_ia_desc", True) if es_custom_activo else True
+                        usar_ia_guion = custom_data.get("usar_ia_guion", True) if es_custom_activo else True
+
+                        c_tit = custom_data.get("titulo", "").strip() if (es_custom_activo and not usar_ia_tit) else ""
+                        c_desc = custom_data.get("descripcion", "").strip() if (es_custom_activo and not usar_ia_desc) else ""
+                        c_guion = custom_data.get("guion", "").strip() if (es_custom_activo and not usar_ia_guion) else ""
 
                         guion_ya_listo = False
                         if es_custom_activo and c_guion:
