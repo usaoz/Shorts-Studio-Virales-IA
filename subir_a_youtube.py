@@ -136,7 +136,36 @@ def _descargar_avatar_circular(url_avatar: str, destino_png: Path) -> bool:
         return False
 
 
-def listar_cuentas_vinculadas() -> List[Dict[str, str]]:
+_CACHE_SUBSCRIBERS_CANAL: Dict[str, int] = {}
+
+
+def obtener_subscribers_canal(cuenta_id: str = "principal") -> int:
+    """Retorna la cantidad de suscriptores actuales del canal (de caché o índice)."""
+    return int(_CACHE_SUBSCRIBERS_CANAL.get(str(cuenta_id), 0))
+
+
+def obtener_todos_subscribers() -> Dict[str, int]:
+    """Retorna mapa {cuenta_id: suscriptores} de todos los canales vinculados."""
+    return dict(_CACHE_SUBSCRIBERS_CANAL)
+
+
+def _guardar_suscriptores_en_indice(cid: str, sub_count: int) -> None:
+    try:
+        idx_p = CUENTAS_DIR / "indice_cuentas.json"
+        if idx_p.exists() and sub_count > 0:
+            raw_c = json.loads(idx_p.read_text(encoding="utf-8"))
+            cambio = False
+            for entry in raw_c:
+                if str(entry.get("id")) == str(cid) and entry.get("subscribers") != sub_count:
+                    entry["subscribers"] = sub_count
+                    cambio = True
+            if cambio:
+                idx_p.write_text(json.dumps(raw_c, indent=2, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def listar_cuentas_vinculadas() -> List[Dict[str, Any]]:
     """
     Lista todas las cuentas/canales de YouTube vinculados.
     Si existe el `token_youtube.json` clásico y aún no está en `cuentas_youtube/indice_cuentas.json`,
@@ -239,6 +268,16 @@ def listar_cuentas_vinculadas() -> List[Dict[str, str]]:
             idx_file.write_text(json.dumps(cuentas, indent=2, ensure_ascii=False), encoding="utf-8")
         except Exception:
             pass
+
+    for c in cuentas:
+        cid_s = str(c.get("id") or "")
+        try:
+            subs_val = int(c.get("subscribers") or 0)
+        except Exception:
+            subs_val = 0
+        c["subscribers"] = subs_val
+        if subs_val > 0:
+            _CACHE_SUBSCRIBERS_CANAL[cid_s] = subs_val
 
     return cuentas
 
@@ -814,10 +853,15 @@ def obtener_shorts_programados() -> List[Dict[str, Any]]:
         cname = str(c.get("nombre") or cid)
         try:
             yt = obtener_servicio_youtube(cuenta_id=cid)
-            ch_resp = yt.channels().list(mine=True, part="contentDetails,snippet").execute()
+            ch_resp = yt.channels().list(mine=True, part="contentDetails,snippet,statistics").execute()
             items_ch = ch_resp.get("items", [])
             if not items_ch:
                 continue
+            sub_count = int(items_ch[0].get("statistics", {}).get("subscriberCount") or 0)
+            if sub_count > 0:
+                _CACHE_SUBSCRIBERS_CANAL[cid] = sub_count
+                _guardar_suscriptores_en_indice(cid, sub_count)
+
             uploads_id = items_ch[0]["contentDetails"]["relatedPlaylists"]["uploads"]
             pl_resp = yt.playlistItems().list(
                 playlistId=uploads_id,
@@ -856,6 +900,7 @@ def obtener_shorts_programados() -> List[Dict[str, Any]]:
                         "titulo": tit,
                         "cuenta_id": cid,
                         "cuenta_nombre": cname,
+                        "subscribers": sub_count,
                         "dt_utc": dt_utc,
                         "dt_local": dt_local,
                         "fecha_dia": dt_local.strftime("%Y-%m-%d"),
@@ -897,10 +942,15 @@ def obtener_metricas_ultimos_videos(limite_por_cuenta: int = 15, total_max: int 
         cname = str(c.get("nombre") or cid)
         try:
             yt = obtener_servicio_youtube(cuenta_id=cid)
-            ch_resp = yt.channels().list(mine=True, part="contentDetails,snippet").execute()
+            ch_resp = yt.channels().list(mine=True, part="contentDetails,snippet,statistics").execute()
             items_ch = ch_resp.get("items", [])
             if not items_ch:
                 continue
+            sub_count = int(items_ch[0].get("statistics", {}).get("subscriberCount") or 0)
+            if sub_count > 0:
+                _CACHE_SUBSCRIBERS_CANAL[cid] = sub_count
+                _guardar_suscriptores_en_indice(cid, sub_count)
+
             uploads_id = items_ch[0]["contentDetails"]["relatedPlaylists"]["uploads"]
             pl_resp = yt.playlistItems().list(
                 playlistId=uploads_id,
@@ -946,8 +996,9 @@ def obtener_metricas_ultimos_videos(limite_por_cuenta: int = 15, total_max: int 
                 likes = int(stats.get("likeCount", 0))
                 comentarios = int(stats.get("commentCount", 0))
 
-                # Ratio de engagement: interacciones totales (likes + comentarios) sobre vistas
-                engagement_pct = round(((likes + comentarios) / vistas) * 100, 2) if vistas > 0 else 0.0
+                # Ratios de engagement:
+                ratio_likes = round((likes / vistas) * 100, 1) if vistas > 0 else 0.0
+                ratio_interaccion = round(((likes + comentarios) / vistas) * 100, 1) if vistas > 0 else 0.0
 
                 vid_id = str(it.get("id") or "")
                 tit = str(snip.get("title") or "Short sin título")
@@ -957,10 +1008,13 @@ def obtener_metricas_ultimos_videos(limite_por_cuenta: int = 15, total_max: int 
                     "titulo": tit,
                     "cuenta_id": cid,
                     "cuenta_nombre": cname,
+                    "subscribers": sub_count,
                     "vistas": vistas,
                     "likes": likes,
                     "comentarios": comentarios,
-                    "engagement_pct": engagement_pct,
+                    "engagement_pct": ratio_interaccion,
+                    "ratio_likes": ratio_likes,
+                    "ratio_interaccion": ratio_interaccion,
                     "dt_utc": dt_pub_utc,
                     "dt_local": dt_pub_local,
                     "fecha_dia": dt_pub_local.strftime("%Y-%m-%d"),
