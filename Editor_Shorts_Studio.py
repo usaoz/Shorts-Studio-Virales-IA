@@ -339,7 +339,7 @@ def iniciar_aplicacion_gui() -> None:
                     "encuadre": str(leido.get("encuadre", def_data["encuadre"])),
                     "modo_fuente": mf_val,
                     "modo_contenido": "Personalizado" if "Personalizado" in str(leido.get("modo_contenido", "IA Automática")) else "IA Automática",
-                    "accion_final": "Guardar en carpeta" if "Guardar" in str(leido.get("accion_final", "Subir automáticamente")) else "Subir automáticamente",
+                    "accion_final": "Subir automáticamente",
                     "modelo_ia": (str(leido.get("modelo_ia")) if str(leido.get("modelo_ia")) in MAPA_MODELOS_IA else def_data["modelo_ia"]),
                     "orden_canales": str(leido.get("orden_canales", "Rotación (En fila)")),
                     "min_views_millones": str(leido.get("min_views_millones", "1.0M+ vistas")),
@@ -1195,9 +1195,11 @@ def iniciar_aplicacion_gui() -> None:
         corner_radius=12,
         height=30,
         width=110,
-        fg_color=INPUT_BG,
-        button_color="#252d42",
-        button_hover_color="#333e5a",
+        fg_color=PURPLE_MAIN,
+        button_color=PURPLE_HOVER,
+        button_hover_color="#5b21b6",
+        text_color="#ffffff",
+        dropdown_hover_color=PURPLE_MAIN,
         font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
     opt_cantidad_total.pack(side="left", padx=(0, 8))
@@ -1491,7 +1493,7 @@ def iniciar_aplicacion_gui() -> None:
         else:
             cant_t = len(lista_videos_editados_locales) if lista_videos_editados_locales else 1
         por_d = MAPA_POR_DIA.get(shorts_por_dia_var.get(), 2)
-        if not programar_var.get() or accion_final_var.get() == "Guardar en carpeta":
+        if not programar_var.get():
             return [None] * cant_t
         interv = MAPA_INTERVALO_HS.get(intervalo_horas_var.get(), 8)
         slots = calcular_horarios_inteligentes(
@@ -1509,24 +1511,15 @@ def iniciar_aplicacion_gui() -> None:
         mf = modo_fuente_var.get()
         es_canales = "Canales" in mf
         es_editado = "Editado" in mf
-        solo_guardar = (accion_final_var.get() == "Guardar en carpeta")
 
         privacidad_var.set("Privado")
 
         if es_canales:
             opt_cantidad_total.configure(state="normal")
-            opt_por_dia.configure(state="normal" if not solo_guardar else "disabled")
+            opt_por_dia.configure(state="normal")
         else:
             opt_cantidad_total.configure(state="disabled")
             opt_por_dia.configure(state="disabled")
-
-        if solo_guardar and not es_editado:
-            lbl_preview_horarios.configure(
-                text="Modo Guardar en Carpeta activo — Se generarán y guardarán los Reels en output_shorts sin subir a YouTube.",
-                text_color="#67e8f9",
-            )
-            autoajustar_tamano_ventana()
-            return
 
         est_act = modo_horario_var.get()
         frame_sub_cada_x_hs.pack_forget()
@@ -4027,7 +4020,7 @@ def iniciar_aplicacion_gui() -> None:
         if solo_guardar_override is not None:
             solo_guardar = bool(solo_guardar_override)
         else:
-            solo_guardar = (accion_final_var.get() == "Guardar en carpeta")
+            solo_guardar = False
         solo_guardar_actual[0] = solo_guardar
 
         modo_priv = "private"
