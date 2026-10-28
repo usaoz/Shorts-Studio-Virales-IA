@@ -253,6 +253,7 @@ def generar_guion_con_gemini_flash(
     modelo_preferido: str = "gemini-3.5-flash-lite",
     progreso_cb: Optional[object] = None,
     contexto_feedback: str = "",
+    auto_auditoria_retrospectiva: bool = False,
 ) -> str:
     """
     Sistema de Triple Pasada (Ensemble Refinement) con IA:
@@ -331,7 +332,11 @@ def generar_guion_con_gemini_flash(
         f"- Recuerda usar FLECHA como máximo en 2 bloques clave de todo el guion y CIRCULO como máximo en 1 bloque.\n"
     )
 
-    def _consultar_ia_robusta(texto_prompt: str, timeout_max: float = 40.0) -> str:
+    def _consultar_ia_robusta(
+        texto_prompt: str,
+        timeout_max: float = 40.0,
+        priorizar_mejor_ia: bool = False,
+    ) -> str:
         partes_v: List[object] = []
         if video_bytes:
             partes_v.append(types.Part.from_bytes(data=video_bytes, mime_type="video/mp4"))
@@ -343,16 +348,27 @@ def generar_guion_con_gemini_flash(
             texto_prompt,
         ]
 
-        candidatos_base: List[Tuple[str, List[object], float]] = [
-            (modelo_preferido, partes_v, timeout_max),
-            ("gemini-3.5-flash-lite", partes_v, timeout_max),
-            ("gemini-flash-lite-latest", partes_v, timeout_max),
-            ("gemini-3.6-flash", partes_v, timeout_max),
-            ("gemini-3.8-flash", partes_v, timeout_max),
-            ("gemini-3.5-flash-lite", partes_m, min(30.0, timeout_max)),
-            ("gemini-flash-lite-latest", partes_m, min(30.0, timeout_max)),
-            ("gemini-3.6-flash", partes_m, min(30.0, timeout_max)),
-        ]
+        if priorizar_mejor_ia:
+            # Para la Auto-Auditoría Crítica y Re-edición: priorizar siempre la mejor IA de razonamiento
+            candidatos_base: List[Tuple[str, List[object], float]] = [
+                ("gemini-3.8-flash", partes_v, timeout_max),
+                ("gemini-3.6-flash", partes_v, timeout_max),
+                ("gemini-3.5-flash-lite", partes_v, timeout_max),
+                ("gemini-3.8-flash", partes_m, min(30.0, timeout_max)),
+                ("gemini-3.6-flash", partes_m, min(30.0, timeout_max)),
+                ("gemini-3.5-flash-lite", partes_m, min(30.0, timeout_max)),
+            ]
+        else:
+            candidatos_base: List[Tuple[str, List[object], float]] = [
+                (modelo_preferido, partes_v, timeout_max),
+                ("gemini-3.5-flash-lite", partes_v, timeout_max),
+                ("gemini-flash-lite-latest", partes_v, timeout_max),
+                ("gemini-3.6-flash", partes_v, timeout_max),
+                ("gemini-3.8-flash", partes_v, timeout_max),
+                ("gemini-3.5-flash-lite", partes_m, min(30.0, timeout_max)),
+                ("gemini-flash-lite-latest", partes_m, min(30.0, timeout_max)),
+                ("gemini-3.6-flash", partes_m, min(30.0, timeout_max)),
+            ]
         plan_intentos: List[Tuple[str, List[object], float]] = []
         vistos: Set[Tuple[str, int]] = set()
         for m, c, t in candidatos_base:
@@ -489,6 +505,65 @@ def generar_guion_con_gemini_flash(
 
     if not texto_respuesta or "[GUION]" not in texto_respuesta:
         texto_respuesta = guion_final or fb_raw or ""
+
+    # --- PASADA 4: AUTO-AUDITORÍA Y RE-EDICIÓN EN RETROSPECTIVA (Hasta 3 Rondas con la Mejor IA) ---
+    if auto_auditoria_retrospectiva and texto_respuesta and "[GUION]" in texto_respuesta:
+        max_rondas_auditoria = 3
+        guion_actual_auditar = texto_respuesta
+
+        for ronda in range(1, max_rondas_auditoria + 1):
+            if callable(progreso_cb):
+                try:
+                    p_val = 0.86 + (ronda / max_rondas_auditoria) * 0.12
+                    progreso_cb(p_val, f"IA Auto-Auditoría (Ronda {ronda}/{max_rondas_auditoria}): Verificando coherencia y desenlace...")
+                except Exception:
+                    pass
+            print(f"[*] IA Auto-Auditoría (Ronda {ronda}/{max_rondas_auditoria}): Evaluando video completo, flechas y desenlace en retrospectiva con la mejor IA...")
+
+            prompt_auditoria = (
+                PROMPT_COMPACTO_INTERNO + instruccion_extra_base +
+                f"\n\nACTÚA COMO EL AUDITOR JEFE DE CALIDAD, COHERENCIA VISUAL Y RETROSPECTIVA DE YOUTUBE SHORTS.\n"
+                f"Estás auditando el guion para este video (Ronda de Control {ronda} de {max_rondas_auditoria}):\n\n"
+                f"--- [GUION ACTUAL A AUDITAR] ---\n{guion_actual_auditar}\n\n"
+                f"TU MISIÓN DE AUDITORÍA CRÍTICA Y AUTO-RE-EDICIÓN:\n"
+                f"1. FIDELIDAD VISUAL SEGUNDO A SEGUNDO: Compara cada bloque (de 00:00 a 00:{dur_redondeada:02d}) contra lo que REALMENTE pasa en pantalla en el video. ¿La narración describe la acción real o se confundió con los objetos o inventó algo falso? Si se confundió, corrígelo con total precisión.\n"
+                f"2. COHERENCIA DEL FINAL EN RETROSPECTIVA: Analiza cómo termina el video al finalizar su duración. ¿El remate final condice con el desenlace real del video? Si el final fue un fracaso, una broma revelada o una sorpresa, asegúrate de que la frase final coincida con el resultado real.\n"
+                f"3. CALIBRACIÓN DE FLECHAS Y EFECTOS: Revisa si las etiquetas [FLECHA:...] o [CIRCULO:...] están bien puestas en el momento justo del impacto o si apuntan a la nada o en momentos aburridos. Si están mal puestas, ajústalas a 'ninguna' o colócalas en el segundo exacto donde ocurre la acción clave (máximo 2 flechas y 1 círculo en todo el video).\n"
+                f"4. CADENCIA RÁPIDA: Mantén entre 15 y 17 palabras por cada bloque de 5s para que la voz fluya con dinamismo y energía.\n\n"
+                f"REGLA DE DECISIÓN OBLIGATORIA:\n"
+                f"- Si el guion ya es 100% coherente, exacto con el video y las flechas están bien: responde en la primera línea 'ESTADO_AUDITORIA: APROBADO' y nada más.\n"
+                f"- Si detectas cualquier incoherencia, objeto confundido, flecha mal puesta o final discordante: escribe en la primera línea 'ESTADO_AUDITORIA: REQUIERE_AJUSTES', explica brevemente en 'MOTIVO_AJUSTE: ...', y entrega INMEDIATAMENTE a continuación el GUION RE-EDITADO Y CORREGIDO completo con la plantilla obligatoria."
+            )
+
+            try:
+                res_aud_raw = _consultar_ia_robusta(
+                    prompt_auditoria,
+                    timeout_max=42.0,
+                    priorizar_mejor_ia=True,
+                )
+                res_aud = _limpiar_bloque(res_aud_raw)
+
+                if "ESTADO_AUDITORIA: APROBADO" in res_aud or res_aud.startswith("APROBADO"):
+                    print(f"[+] ¡Auto-auditoría superada con éxito en Ronda {ronda}! El guion es 100% coherente con el video.")
+                    break
+
+                if "[GUION]" in res_aud:
+                    idx_inicio = res_aud.find("TITULO_SUPERIOR:")
+                    if idx_inicio == -1:
+                        idx_inicio = res_aud.find("[GUION]")
+                    guion_corregido = res_aud[idx_inicio:].strip() if idx_inicio != -1 else res_aud
+                    if len(guion_corregido) > 150:
+                        guion_actual_auditar = guion_corregido
+                        texto_respuesta = guion_corregido
+                        print(f"[+] [Ronda {ronda}] Inconsistencia detectada y corregida. Guion re-editado por la mejor IA.")
+                        if ronda == max_rondas_auditoria:
+                            print(f"[+] Se completó el máximo de {max_rondas_auditoria} rondas de re-edición y ajuste.")
+                else:
+                    print(f"[*] Ronda {ronda}: No se requirieron cambios estructurales adicionales.")
+                    break
+            except Exception as e_aud:
+                print(f"[!] Aviso en ronda {ronda} de auto-auditoría ({e_aud}), finalizando auditoría.")
+                break
 
     DEFAULT_GUION_TXT.write_text(texto_respuesta + "\n", encoding="utf-8")
     print(f"[+] ¡Guión final perfeccionado y guardado en {DEFAULT_GUION_TXT.name}!")
