@@ -252,6 +252,7 @@ def generar_guion_con_gemini_flash(
     contexto_titulo_orig: str = "",
     modelo_preferido: str = "gemini-3.5-flash-lite",
     progreso_cb: Optional[object] = None,
+    contexto_feedback: str = "",
 ) -> str:
     """
     Sistema de Triple Pasada (Ensemble Refinement) con IA:
@@ -308,8 +309,18 @@ def generar_guion_con_gemini_flash(
             + "- DIRECTIVA DE FIDELIDAD TOTAL: Usa este título y descripción para conocer exactamente qué sucede, quiénes son y qué objetos o acciones reales aparecen. No inventes elementos contrarios a la descripción ni confundas juguetes/objetos.\n"
         )
 
+    bloque_feedback = ""
+    if contexto_feedback and contexto_feedback.strip():
+        bloque_feedback = (
+            f"\nCORRECCIONES Y FEEDBACK EXPLÍCITO DEL USUARIO (MÁXIMA PRIORIDAD):\n"
+            f"- El usuario revisó una versión anterior y pide expresamente corregir:\n"
+            f"  \"{contexto_feedback.strip()}\"\n"
+            f"- DIRECTIVA OBLIGATORIA: Aplica estas indicaciones de forma prioritaria en la interpretación y en el guion.\n"
+        )
+
     instruccion_extra_base = (
         f"{bloque_contexto_real}\n"
+        f"{bloque_feedback}\n"
         f"DATOS EXACTOS DEL VIDEO ANALIZADO:\n"
         f"- Duración total exacta del video: {dur_redondeada} segundos (de 00:00 a 00:{dur_redondeada:02d}).\n"
         f"- Divide los bloques de 00:00 hasta 00:{dur_redondeada:02d} en tramos de 5 segundos (EXACTAMENTE entre 15 y 17 palabras por bloque de 5s, o ~3.2 palabras/segundo, con ritmo rápido y enérgico).\n"

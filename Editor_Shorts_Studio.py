@@ -299,6 +299,7 @@ def iniciar_aplicacion_gui() -> None:
             "encuadre": list(encuadre_map.keys())[0],
             "modo_fuente": "Canales Seleccionados",
             "modo_contenido": "IA Automática",
+            "modo_subida": "Subida Automática",
             "accion_final": "Subir automáticamente",
             "modelo_ia": list(MAPA_MODELOS_IA.keys())[0],
             "orden_canales": "Rotación (En fila)",
@@ -340,6 +341,7 @@ def iniciar_aplicacion_gui() -> None:
                     "encuadre": str(leido.get("encuadre", def_data["encuadre"])),
                     "modo_fuente": mf_val,
                     "modo_contenido": "Personalizado" if "Personalizado" in str(leido.get("modo_contenido", "IA Automática")) else "IA Automática",
+                    "modo_subida": "Revisión Previa" if "Revisión" in str(leido.get("modo_subida", "")) or "Revision" in str(leido.get("modo_subida", "")) else "Subida Automática",
                     "accion_final": "Subir automáticamente",
                     "modelo_ia": (str(leido.get("modelo_ia")) if str(leido.get("modelo_ia")) in MAPA_MODELOS_IA else def_data["modelo_ia"]),
                     "orden_canales": str(leido.get("orden_canales", "Rotación (En fila)")),
@@ -378,6 +380,7 @@ def iniciar_aplicacion_gui() -> None:
                 lista_videos_editados_locales.append(_p)
     modo_fuente_var = tk.StringVar(value=str(mem["modo_fuente"]))
     modo_contenido_var = tk.StringVar(value=str(mem["modo_contenido"]))
+    modo_subida_var = tk.StringVar(value=str(mem.get("modo_subida", "Subida Automática")))
     accion_final_var = tk.StringVar(value=str(mem.get("accion_final", "Subir automáticamente")))
     modelo_ia_var = tk.StringVar(value=str(mem["modelo_ia"]))
     modo_render_var = tk.StringVar(value=str(mem.get("modo_render", "Automático (GPU)")))
@@ -495,6 +498,7 @@ def iniciar_aplicacion_gui() -> None:
                         "encuadre": encuadre_var.get(),
                         "modo_fuente": modo_fuente_var.get(),
                         "modo_contenido": modo_contenido_var.get(),
+                        "modo_subida": modo_subida_var.get(),
                         "accion_final": accion_final_var.get(),
                         "modelo_ia": modelo_ia_var.get(),
                         "orden_canales": orden_canales_var.get(),
@@ -1744,7 +1748,7 @@ def iniciar_aplicacion_gui() -> None:
     def abrir_ventana_ajustes() -> None:
         win = ctk.CTkToplevel(root)
         win.title("Ajustes y Herramientas")
-        win.geometry("600x760")
+        win.geometry("600x820")
         win.resizable(False, False)
         win.configure(fg_color=BG_DARK)
         win.transient(root)
@@ -1792,6 +1796,24 @@ def iniciar_aplicacion_gui() -> None:
             values=["IA Automática", "Personalizado"],
             variable=modo_contenido_var,
             command=actualizar_modo_vista,
+            corner_radius=14,
+            height=32,
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            selected_color=PURPLE_MAIN,
+        ).pack(fill="x", padx=18, pady=(0, 8))
+
+        ctk.CTkLabel(
+            card_modo,
+            text="Modo de Publicación",
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+            text_color=TEXT_MAIN,
+        ).pack(anchor="w", padx=18, pady=(2, 4))
+
+        ctk.CTkSegmentedButton(
+            card_modo,
+            values=["Subida Automática", "Revisión Previa"],
+            variable=modo_subida_var,
+            command=_guardar_memoria,
             corner_radius=14,
             height=32,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
@@ -3887,6 +3909,422 @@ def iniciar_aplicacion_gui() -> None:
 
         _mostrar_reel_idx()
 
+    def abrir_dialogo_revision_short(
+        ruta_video: Path,
+        titulo: str,
+        ruta_guion: Path,
+        on_decision: Callable[[str, str], None],
+    ) -> None:
+        win_r = ctk.CTkToplevel(root)
+        win_r.title("Shorts Studio · Revisión Previa")
+        win_r.geometry("860x650")
+        win_r.resizable(False, False)
+        win_r.configure(fg_color=BG_DARK)
+        win_r.transient(root)
+        aplicar_icono_ventana(win_r)
+        win_r.grab_set()
+
+        player = None
+        reproduciendo = True
+        duracion_total = 1.0
+        arrastrando_slider = False
+        cancelado_reproductor = False
+
+        def _limpiar() -> None:
+            nonlocal cancelado_reproductor
+            cancelado_reproductor = True
+            if player is not None:
+                try:
+                    player.close_player()
+                except Exception:
+                    pass
+
+        def _al_cerrar_x() -> None:
+            _limpiar()
+            win_r.destroy()
+            on_decision("descartar", "")
+
+        win_r.protocol("WM_DELETE_WINDOW", _al_cerrar_x)
+
+        def _responder(acc: str) -> None:
+            fb = txt_feedback.get("1.0", "end").strip()
+            _limpiar()
+            win_r.destroy()
+            on_decision(acc, fb)
+
+        panel_principal = ctk.CTkFrame(win_r, fg_color="transparent")
+        panel_principal.pack(fill="both", expand=True, padx=18, pady=16)
+        panel_principal.grid_columnconfigure(0, weight=0)
+        panel_principal.grid_columnconfigure(1, weight=1)
+        panel_principal.grid_rowconfigure(0, weight=1)
+
+        # Columna Izquierda: Reproductor Vertical 9:16
+        col_izq = ctk.CTkFrame(
+            panel_principal,
+            fg_color=CARD_BG,
+            corner_radius=14,
+            border_width=1,
+            border_color=CARD_BORDER,
+            width=300,
+        )
+        col_izq.grid(row=0, column=0, sticky="nsew", padx=(0, 14))
+
+        canvas_video = tk.Canvas(
+            col_izq,
+            width=270,
+            height=480,
+            bg="#000000",
+            highlightthickness=0,
+        )
+        canvas_video.pack(padx=14, pady=(12, 6))
+
+        slider_seek = ctk.CTkSlider(
+            col_izq,
+            from_=0.0,
+            to=1.0,
+            height=14,
+            progress_color=PURPLE_MAIN,
+            button_color=CYAN_ACCENT,
+            button_hover_color="#38bdf8",
+        )
+        slider_seek.set(0.0)
+        slider_seek.pack(fill="x", padx=14, pady=(0, 4))
+
+        def _fmt_tiempo(s: float) -> str:
+            s_int = max(0, int(s))
+            m = s_int // 60
+            sec = s_int % 60
+            return f"{m:02d}:{sec:02d}"
+
+        def _seek_press(event: Any) -> None:
+            nonlocal arrastrando_slider
+            arrastrando_slider = True
+
+        def _seek_release(event: Any) -> None:
+            nonlocal arrastrando_slider
+            arrastrando_slider = False
+            if player is not None and duracion_total > 0:
+                try:
+                    player.seek(slider_seek.get() * duracion_total, relative=False)
+                except Exception:
+                    pass
+
+        def _on_slider_change(val: float) -> None:
+            if arrastrando_slider and duracion_total > 0 and player is not None:
+                try:
+                    target_pts = float(val) * duracion_total
+                    player.seek(target_pts, relative=False)
+                    lbl_tiempo.configure(text=f"{_fmt_tiempo(target_pts)} / {_fmt_tiempo(duracion_total)}")
+                except Exception:
+                    pass
+
+        slider_seek.bind("<Button-1>", _seek_press)
+        slider_seek.bind("<ButtonRelease-1>", _seek_release)
+        slider_seek.configure(command=_on_slider_change)
+
+        row_ctrl = ctk.CTkFrame(col_izq, fg_color="transparent")
+        row_ctrl.pack(fill="x", padx=14, pady=(0, 10))
+
+        btn_play = ctk.CTkButton(
+            row_ctrl,
+            text="⏸",
+            width=36,
+            height=30,
+            corner_radius=8,
+            fg_color=INPUT_BG,
+            hover_color="#2a3147",
+            font=ctk.CTkFont(size=13, weight="bold"),
+        )
+        lbl_tiempo = ctk.CTkLabel(
+            row_ctrl,
+            text="00:00 / 00:00",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color=TEXT_MUTED,
+        )
+        btn_play.pack(side="left", padx=(0, 6))
+        lbl_tiempo.pack(side="left")
+
+        slider_vol = ctk.CTkSlider(
+            row_ctrl,
+            from_=0.0,
+            to=1.0,
+            width=60,
+            height=12,
+            number_of_steps=20,
+            progress_color=CYAN_ACCENT,
+            button_color=CYAN_ACCENT,
+        )
+        slider_vol.set(1.0)
+        lbl_vol = ctk.CTkLabel(row_ctrl, text="🔊", font=ctk.CTkFont(size=12))
+        slider_vol.pack(side="right")
+        lbl_vol.pack(side="right", padx=(0, 3))
+
+        def _on_vol_change(val: float) -> None:
+            if player is not None:
+                try:
+                    player.set_volume(float(val))
+                    v = float(val)
+                    lbl_vol.configure(text="🔇" if v == 0 else ("🔉" if v < 0.5 else "🔊"))
+                except Exception:
+                    pass
+
+        slider_vol.configure(command=_on_vol_change)
+
+        def _toggle_play() -> None:
+            nonlocal reproduciendo
+            if player is not None:
+                try:
+                    reproduciendo = not reproduciendo
+                    player.set_pause(not reproduciendo)
+                    btn_play.configure(text="▶" if not reproduciendo else "⏸")
+                except Exception:
+                    pass
+
+        btn_play.configure(command=_toggle_play)
+
+        # Columna Derecha: Controles, Decisiones e Información
+        col_der = ctk.CTkFrame(panel_principal, fg_color="transparent")
+        col_der.grid(row=0, column=1, sticky="nsew")
+
+        top_der = ctk.CTkFrame(col_der, fg_color="transparent")
+        top_der.pack(fill="x", pady=(0, 6))
+
+        badge = ctk.CTkFrame(
+            top_der,
+            fg_color="#1e1b4b",
+            corner_radius=10,
+            border_width=1,
+            border_color=PURPLE_MAIN,
+        )
+        badge.pack(anchor="w", pady=(0, 4))
+        ctk.CTkLabel(
+            badge,
+            text="MODO REVISIÓN PREVIA",
+            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+            text_color="#c084fc",
+        ).pack(padx=10, pady=2)
+
+        ctk.CTkLabel(
+            top_der,
+            text="Tu Short está listo para publicar",
+            font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
+            text_color=TEXT_MAIN,
+        ).pack(anchor="w")
+
+        tit_corto = titulo[:58] + ("..." if len(titulo) > 58 else "")
+        ctk.CTkLabel(
+            top_der,
+            text=f"Título: {tit_corto}",
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color=TEXT_MUTED,
+        ).pack(anchor="w", pady=(2, 0))
+
+        # Tarjeta 1: Re-editar con indicaciones
+        card_reeditar = ctk.CTkFrame(
+            col_der,
+            fg_color=CARD_BG,
+            corner_radius=12,
+            border_width=1,
+            border_color=CARD_BORDER,
+        )
+        card_reeditar.pack(fill="x", pady=(0, 8))
+
+        ctk.CTkLabel(
+            card_reeditar,
+            text="Re-editar Guion con tus Indicaciones",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text_color=TEXT_MAIN,
+        ).pack(anchor="w", padx=12, pady=(8, 2))
+
+        ctk.CTkLabel(
+            card_reeditar,
+            text="Agregá contexto, corregí si entendió mal o pedí otro tono narrativo:",
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color=TEXT_MUTED,
+        ).pack(anchor="w", padx=12, pady=(0, 4))
+
+        txt_feedback = ctk.CTkTextbox(
+            card_reeditar,
+            height=58,
+            corner_radius=8,
+            fg_color=INPUT_BG,
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color=TEXT_MAIN,
+        )
+        txt_feedback.pack(fill="x", padx=12, pady=(0, 8))
+
+        btn_reeditar = ctk.CTkButton(
+            card_reeditar,
+            text="Re-editar Short con IA",
+            command=lambda: _responder("reeditar"),
+            height=34,
+            corner_radius=10,
+            fg_color=PURPLE_MAIN,
+            hover_color=PURPLE_HOVER,
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            text_color="#ffffff",
+        )
+        btn_reeditar.pack(fill="x", padx=12, pady=(0, 10))
+
+        # Tarjeta 2: Decisiones de Publicación (Subir, Buscar Otro, Descartar)
+        card_acciones = ctk.CTkFrame(
+            col_der,
+            fg_color=CARD_BG,
+            corner_radius=12,
+            border_width=1,
+            border_color=CARD_BORDER,
+        )
+        card_acciones.pack(fill="x", pady=(0, 8))
+
+        ctk.CTkLabel(
+            card_acciones,
+            text="Decisión de Publicación",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text_color=TEXT_MAIN,
+        ).pack(anchor="w", padx=12, pady=(8, 4))
+
+        btn_subir = ctk.CTkButton(
+            card_acciones,
+            text="Subir a YouTube",
+            command=lambda: _responder("subir"),
+            height=38,
+            corner_radius=10,
+            fg_color=GREEN_ACCENT,
+            hover_color="#059669",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text_color="#ffffff",
+        )
+        btn_subir.pack(fill="x", padx=12, pady=(0, 6))
+
+        row_sec = ctk.CTkFrame(card_acciones, fg_color="transparent")
+        row_sec.pack(fill="x", padx=12, pady=(0, 10))
+        row_sec.grid_columnconfigure((0, 1), weight=1, uniform="sec_btn")
+
+        btn_otro = ctk.CTkButton(
+            row_sec,
+            text="Buscar Otro Video",
+            command=lambda: _responder("buscar_otro"),
+            height=32,
+            corner_radius=10,
+            fg_color="#0284c7",
+            hover_color="#0369a1",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color="#ffffff",
+        )
+        btn_otro.grid(row=0, column=0, padx=(0, 4), sticky="ew")
+
+        btn_cancelar = ctk.CTkButton(
+            row_sec,
+            text="Cancelar Proceso",
+            command=lambda: _responder("descartar"),
+            height=32,
+            corner_radius=10,
+            fg_color="#334155",
+            hover_color="#dc2626",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color="#ffffff",
+        )
+        btn_cancelar.grid(row=0, column=1, padx=(4, 0), sticky="ew")
+
+        # Tarjeta 3: Guion Generado
+        card_guion = ctk.CTkFrame(
+            col_der,
+            fg_color=CARD_BG,
+            corner_radius=12,
+            border_width=1,
+            border_color=CARD_BORDER,
+        )
+        card_guion.pack(fill="both", expand=True)
+
+        ctk.CTkLabel(
+            card_guion,
+            text="Guion y Narración generada por la IA:",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color=TEXT_MUTED,
+        ).pack(anchor="w", padx=12, pady=(6, 2))
+
+        txt_guion_box = ctk.CTkTextbox(
+            card_guion,
+            corner_radius=8,
+            fg_color=INPUT_BG,
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color=TEXT_MAIN,
+        )
+        txt_guion_box.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+        if ruta_guion.exists():
+            try:
+                txt_guion_box.insert("1.0", ruta_guion.read_text(encoding="utf-8", errors="replace"))
+            except Exception:
+                pass
+        txt_guion_box.configure(state="disabled")
+
+        # Inicialización del reproductor ffpyplayer
+        try:
+            from ffpyplayer.player import MediaPlayer
+            from PIL import Image, ImageTk
+
+            player = MediaPlayer(str(ruta_video), ff_opts={"autoexit": False})
+            player.set_size(270, 480)
+        except Exception as e_init:
+            player = None
+            canvas_video.create_text(
+                135,
+                240,
+                text=f"No se pudo inicializar\nel reproductor interno:\n{e_init}",
+                fill="#ef4444",
+                font=("Segoe UI", 10),
+                justify="center",
+            )
+
+        def _loop_reproductor() -> None:
+            nonlocal duracion_total
+            if cancelado_reproductor:
+                return
+
+            if player is not None:
+                if duracion_total <= 1.0:
+                    try:
+                        meta = player.get_metadata()
+                        if meta and meta.get("duration"):
+                            duracion_total = float(meta["duration"])
+                    except Exception:
+                        pass
+
+                frame, val = player.get_frame()
+                if val == "eof":
+                    try:
+                        player.seek(0.0, relative=False)
+                    except Exception:
+                        pass
+                    if not arrastrando_slider:
+                        slider_seek.set(0.0)
+                        lbl_tiempo.configure(text=f"00:00 / {_fmt_tiempo(duracion_total)}")
+                    delay_ms = 30
+                elif frame is not None:
+                    img, pts = frame
+                    w, h = img.get_size()
+                    try:
+                        pil_img = Image.frombytes("RGB", (w, h), bytes(img.to_bytearray()[0]))
+                        photo = ImageTk.PhotoImage(pil_img)
+                        canvas_video.create_image(0, 0, image=photo, anchor="nw")
+                        canvas_video.image = photo
+                    except Exception:
+                        pass
+
+                    if not arrastrando_slider and duracion_total > 0:
+                        progreso = max(0.0, min(1.0, pts / duracion_total))
+                        slider_seek.set(progreso)
+                        lbl_tiempo.configure(text=f"{_fmt_tiempo(pts)} / {_fmt_tiempo(duracion_total)}")
+
+                    delay_ms = int(val * 1000) if isinstance(val, (int, float)) and val > 0 else 16
+                else:
+                    delay_ms = int(val * 1000) if isinstance(val, (int, float)) and val > 0 else 20
+
+                delay_ms = max(5, min(50, delay_ms))
+                win_r.after(delay_ms, _loop_reproductor)
+
+        if player is not None:
+            win_r.after(10, _loop_reproductor)
     def abrir_dialogo_frenado(datos_frenado: Dict[str, Any]) -> None:
         subidos = datos_frenado.get("subidos", [])
         editados = datos_frenado.get("editados", [])
@@ -4513,6 +4951,79 @@ def iniciar_aplicacion_gui() -> None:
                             GREEN_ACCENT,
                         )
                     else:
+                        # Si está activo el Modo Revisión Previa, esperar la decisión del usuario
+                        if "Revisión" in modo_subida_var.get() or "Revision" in modo_subida_var.get():
+                            _actualizar_milestone_actual("activo", f"Reel {num_actual}: Esperando tu revisión...")
+                            root.after(0, lambda: btn_auto_1clic.configure(text="ESPERANDO TU REVISIÓN DEL SHORT..."))
+
+                            descartar_video_actual = False
+                            while True:
+                                ev_decision = threading.Event()
+                                datos_dec: Dict[str, str] = {}
+
+                                def _mostrar_rev(
+                                    rf=ruta_final,
+                                    tit=(c_tit if (es_custom_activo and c_tit) else titulo_orig) or ruta_final.stem,
+                                ):
+                                    abrir_dialogo_revision_short(
+                                        ruta_video=rf,
+                                        titulo=tit,
+                                        ruta_guion=DEFAULT_GUION_TXT,
+                                        on_decision=lambda acc, fb: (
+                                            datos_dec.update({"accion": acc, "feedback": fb}),
+                                            ev_decision.set(),
+                                        ),
+                                    )
+
+                                root.after(0, _mostrar_rev)
+                                ev_decision.wait()
+
+                                accion = datos_dec.get("accion", "subir")
+                                feedback_usr = datos_dec.get("feedback", "")
+
+                                if accion == "descartar":
+                                    raise InterruptedError("Video descartado por el usuario en revisión.")
+                                elif accion == "buscar_otro":
+                                    print("[*] Video descartado en revisión previa. Buscando siguiente video...")
+                                    descartar_video_actual = True
+                                    break
+                                elif accion == "reeditar":
+                                    _actualizar_milestone_actual("activo", f"Reel {num_actual}: Re-editando con feedback...")
+                                    _set_subprogreso(0.15, "Re-generando guion con tus correcciones...", PURPLE_MAIN)
+                                    root.after(0, lambda: btn_auto_1clic.configure(text="RE-GENERANDO GUION CON IA..."))
+                                    asyncio.run(
+                                        generar_guion_con_gemini_flash(
+                                            ruta_video=ruta_video_usar,
+                                            api_key=key_gemini,
+                                            schedule_str=sched_actual or "auto",
+                                            modo_privacidad=modo_priv,
+                                            contexto_titulo_orig=titulo_orig,
+                                            modelo_preferido=modelo_ia_elegido,
+                                            progreso_cb=lambda p, m: _set_subprogreso(0.15 + p * 0.15, m, PURPLE_MAIN),
+                                            contexto_feedback=feedback_usr,
+                                        )
+                                    )
+                                    _set_subprogreso(0.35, "Re-renderizando video a 60 FPS...", CYAN_ACCENT)
+                                    root.after(0, lambda: btn_auto_1clic.configure(text="RE-RENDERIZANDO SHORT..."))
+                                    ruta_final = asyncio.run(
+                                        editar_video_con_guion(
+                                            ruta_video=ruta_video_usar,
+                                            ruta_guion=DEFAULT_GUION_TXT,
+                                            voz_override=voz_elegida,
+                                            modo_encuadre_override=encuadre_elegido,
+                                            progreso_cb=_cb_edicion,
+                                            cancelar_check=lambda: evento_cancelar.is_set(),
+                                            encoder_override=modo_render_elegido,
+                                        )
+                                    )
+                                    ultimo_video_generado[0] = ruta_final
+                                    continue
+                                else:
+                                    break
+
+                            if descartar_video_actual:
+                                continue
+
                         # Cuenta de YouTube asignada a este Reel en el lote
                         id_cuenta_usar = str(info_sel.get("cuenta_id") or estado_seleccion_cuentas.get("cuenta_id") or "principal")
                         nombre_cuenta_subida = str(info_sel.get("cuenta_nombre") or id_cuenta_usar)
