@@ -1219,7 +1219,6 @@ def iniciar_aplicacion_gui() -> None:
         frame_manual_horas,
         variable=hora_elegida_var,
         values=LISTA_HORAS_SCROLL,
-        command=refrescar_plan_ui,
         state="readonly",
         corner_radius=14,
         height=34,
@@ -1238,7 +1237,6 @@ def iniciar_aplicacion_gui() -> None:
         frame_manual_horas,
         variable=intervalo_horas_var,
         values=list(MAPA_INTERVALO_HS.keys()),
-        command=refrescar_plan_ui,
         corner_radius=14,
         height=34,
         width=102,
@@ -1268,7 +1266,6 @@ def iniciar_aplicacion_gui() -> None:
         row_plan2,
         values=["Horarios Pico", "Cada X hs"],
         variable=modo_horario_var,
-        command=lambda _: refrescar_plan_ui(),
         corner_radius=14,
         height=34,
         fg_color=INPUT_BG,
@@ -3899,4 +3896,16 @@ if __name__ == "__main__":
             raise
         except Exception:
             pass
-        iniciar_aplicacion_gui()
+        try:
+            iniciar_aplicacion_gui()
+        except Exception:
+            import traceback
+            import tkinter.messagebox as mb
+            err = traceback.format_exc()
+            with open("error_inicio.log", "w", encoding="utf-8") as ef:
+                ef.write(err)
+            try:
+                mb.showerror("Error al Iniciar", "No se pudo iniciar la aplicación:\n\n" + err)
+            except Exception:
+                pass
+            raise
