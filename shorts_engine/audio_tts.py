@@ -493,10 +493,10 @@ async def generar_voz_y_timestamps_segmento(
                 # de corrido (sin huecos de silencio al final) y nunca lo exceda.
                 # Ritmo dinámico, rápido y enérgico para YouTube Shorts:
                 # Base de 1.12x para que nunca hable lento. Si el texto necesita más espacio se acelera hasta 1.28x.
-                factor_atempo = 1.12
+                factor_atempo = 1.18
                 if dur_objetivo_seg and dur_objetivo_seg > 0.5 and dur_cruda > 0.15:
                     dur_ideal_voz = max(0.35, dur_objetivo_seg - 0.06)
-                    factor_atempo = float(np.clip(dur_cruda / dur_ideal_voz, 1.12, 1.28))
+                    factor_atempo = float(np.clip(dur_cruda / dur_ideal_voz, 1.18, 1.35))
 
                 if abs(factor_atempo - 1.0) > 0.012 and palabras_raw:
                     for p_w in palabras_raw:
@@ -635,15 +635,20 @@ class GestorAudioSFX:
         sfx_lista: List[str],
         tiene_emoji_o_flecha: bool,
         ruta_salida_wav: Path,
+        permitir_cola_voz: bool = False,
     ) -> None:
         n_total = int(round(duracion_total_seg * self.sr))
-        mezcla = np.zeros(n_total, dtype=np.float32)
 
         with wave.open(str(ruta_voz_wav), "r") as wf:
             voz_pcm = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16).astype(np.float32) / 32768.0
-            n_copy = min(n_total, len(voz_pcm))
-            voz_fuerte = np.tanh(voz_pcm[:n_copy] * VOLUMEN_VOZ_NARRADOR)
-            mezcla[:n_copy] += voz_fuerte
+
+        # Si es el último segmento, NUNCA cortar abruptamente la voz: permitir que termine la frase completa
+        n_samples_salida = max(n_total, len(voz_pcm)) if permitir_cola_voz else n_total
+        mezcla = np.zeros(n_samples_salida, dtype=np.float32)
+
+        n_copy = min(n_samples_salida, len(voz_pcm))
+        voz_fuerte = np.tanh(voz_pcm[:n_copy] * VOLUMEN_VOZ_NARRADOR)
+        mezcla[:n_copy] += voz_fuerte
 
         # Superponer los SFX solicitados (con ligero escalonamiento si hay más de uno)
         for idx_s, nombre_sfx in enumerate(sfx_lista):
@@ -651,9 +656,9 @@ class GestorAudioSFX:
             if sfx_pcm is None or len(sfx_pcm) == 0:
                 continue
             offset_samples = int(round(idx_s * 0.14 * self.sr))
-            if offset_samples >= n_total:
+            if offset_samples >= n_samples_salida:
                 continue
-            n_disp = min(n_total - offset_samples, len(sfx_pcm))
+            n_disp = min(n_samples_salida - offset_samples, len(sfx_pcm))
             # Limitar duración máxima de SFX muy largos para no ensuciar toda la frase
             max_samples_sfx = int(round(2.4 * self.sr))
             n_usar = min(n_disp, max_samples_sfx)
@@ -669,7 +674,7 @@ class GestorAudioSFX:
             pop_pcm = self.obtener_pcm("pop")
             if pop_pcm is not None:
                 off_pop = int(round(0.06 * self.sr))
-                n_pop = min(max(0, n_total - off_pop), len(pop_pcm))
+                n_pop = min(max(0, n_samples_salida - off_pop), len(pop_pcm))
                 if n_pop > 0:
                     mezcla[off_pop : off_pop + n_pop] += pop_pcm[:n_pop] * 0.18
 

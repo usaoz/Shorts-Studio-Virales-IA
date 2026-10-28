@@ -646,6 +646,86 @@ def obtener_info_video(ruta_video: Path) -> Tuple[float, int, int, float]:
     return max(0.5, dur), w, h, float(fps)
 
 
+def asegurar_formato_short(
+    ruta_video: Path,
+    progreso_cb: Optional[Callable[[float, str], None]] = None,
+) -> Path:
+    """
+    Garantiza que el video cumpla con los requisitos estrictos de YouTube Shorts:
+    1. Formato vertical (ancho <= alto, idealmente 1080x1920 con fondo desenfocado si es horizontal).
+    2. Duracion estrictamente menor o igual a 59.9 segundos (si excede 60s, YouTube lo publica como Video normal).
+    Si el video ya cumple ambos requisitos, se devuelve la ruta intacta sin re-procesar.
+    """
+    if not ruta_video.exists():
+        return ruta_video
+
+    dur, w, h, fps = obtener_info_video(ruta_video)
+    es_horizontal = (w > h)
+    es_largo = (dur > 59.9)
+
+    if not es_horizontal and not es_largo:
+        return ruta_video
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    salida_short = OUTPUT_DIR / f"{ruta_video.stem}_short.mp4"
+
+    if salida_short.exists() and salida_short.stat().st_size > 1024:
+        dur_s, w_s, h_s, _ = obtener_info_video(salida_short)
+        if w_s <= h_s and dur_s <= 59.9:
+            return salida_short
+
+    msg = "Adaptando video a formato vertical YouTube Shorts (1080x1920 60 FPS)..."
+    if progreso_cb:
+        progreso_cb(0.1, msg)
+    print(f"[*] {msg}")
+
+    cmd = ["ffmpeg", "-y", "-i", str(ruta_video)]
+    if es_largo:
+        cmd.extend(["-t", "59.9"])
+
+    if es_horizontal:
+        filtro = (
+            "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=25:5[bg];"
+            "[0:v]scale=1080:-2:force_original_aspect_ratio=decrease[fg];"
+            "[bg][fg]overlay=(W-w)/2:(H-h)/2[v]"
+        )
+        cmd.extend([
+            "-filter_complex", filtro,
+            "-map", "[v]",
+            "-map", "0:a?",
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-crf", "18",
+            "-r", "60",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac",
+            "-b:a", "192k",
+        ])
+    else:
+        cmd.extend(["-c:v", "copy", "-c:a", "copy"])
+
+    cmd.append(str(salida_short))
+
+    try:
+        res = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+            creationflags=WIN_NO_WINDOW,
+            startupinfo=WIN_STARTUPINFO,
+        )
+        if res.returncode == 0 and salida_short.exists() and salida_short.stat().st_size > 1024:
+            print(f"[✓] Video adaptado con exito a YouTube Shorts: {salida_short.name}")
+            return salida_short
+        else:
+            print(f"[!] Aviso al adaptar short con ffmpeg: {res.stderr[:200] if res.stderr else 'error desconocido'}")
+    except Exception as e_adapt:
+        print(f"[!] Error ejecutando adaptacion de short: {e_adapt}")
+
+    return ruta_video
+
+
 def _asignar_tiempos_reales_segmentos(
     segmentos: List[SegmentoVideoGuion],
     dur_video_origen: float,
@@ -709,7 +789,15 @@ def _asignar_tiempos_reales_segmentos(
             else:
                 limites_seg.append((acum / suma_p) * dur_exacta_total)
 
-    # Convertir los límites de tiempo a índices de fotograma exactos a 60 FPS
+    # Evitar que el ultimo segmento quede huerfano con duracion insignificante (<3.4s)
+    if n_segs > 1 and len(limites_seg) >= 2:
+        dur_ultimo = limites_seg[-1] - limites_seg[-2]
+        if dur_ultimo < 3.4:
+            faltante = 3.4 - dur_ultimo
+            min_prev = limites_seg[-3] + 2.0 if len(limites_seg) >= 3 else 1.0
+            limites_seg[-2] = max(min_prev, limites_seg[-2] - faltante)
+
+    # Convertir los limites de tiempo a indices de fotograma exactos a 60 FPS
     limites_frames: List[int] = [0]
     for idx_s in range(1, n_segs):
         f_ideal = int(round(limites_seg[idx_s] * FPS))
@@ -1115,13 +1203,66 @@ async def editar_video_con_guion(
             sfx_lista=seg.sfx_lista,
             tiene_emoji_o_flecha=tiene_overlay_pop,
             ruta_salida_wav=ruta_mix_wav,
+            permitir_cola_voz=(idx == len(config.segmentos) - 1),
         )
         archivos_audio_seg.append(ruta_mix_wav)
         datos_segmentos.append([seg, total_frames_seg, dur_seg_exacta, palabras_sub, rms_env])
 
-    # 2.5 El video se reproduce íntegro al 100% hasta el último fotograma real sin cortes ni freeze frame difuminado
-    dur_outro_seg = 0.0
-    total_frames_outro = 0
+    # 2.5 Generar Outro automatico con llamada visual al Like (campana ding, flecha animada y texto neon)
+    extra_remate = 0.0
+    if archivos_audio_seg:
+        try:
+            with wave.open(str(archivos_audio_seg[-1]), "r") as wf_last:
+                dur_real_last = wf_last.getnframes() / float(wf_last.getframerate())
+                dur_teorica_last = datos_segmentos[-1][2]
+                if dur_real_last > dur_teorica_last:
+                    extra_remate = min(1.2, dur_real_last - dur_teorica_last)
+        except Exception:
+            pass
+
+    dur_outro_seg = round(0.85 + extra_remate, 2)
+    total_frames_outro = int(round(FPS * dur_outro_seg))
+
+    print(f"[*] Configurando Outro final de {dur_outro_seg}s con sonido de campana (ding) y texto luminoso...")
+
+    # Subtitulos sincronizados para el Outro: ¡DEJA TU LIKE!
+    palabras_sub_outro = [
+        PalabraSubtitulo(texto="¡DEJA", inicio_seg=0.00, fin_seg=0.25),
+        PalabraSubtitulo(texto="TU", inicio_seg=0.25, fin_seg=0.50),
+        PalabraSubtitulo(texto="LIKE!", inicio_seg=0.50, fin_seg=dur_outro_seg, forzar_destaque=True),
+    ]
+
+    # Generar pista de audio para el Outro con sonido de campana (ding)
+    ruta_mix_outro_wav = TEMP_DIR / "seg_outro_mix.wav"
+    sr_audio = gestor_sfx.sr
+    n_samples_outro = int(round(sr_audio * dur_outro_seg))
+    mezcla_outro = np.zeros(n_samples_outro, dtype=np.float32)
+
+    ding_pcm = gestor_sfx.obtener_pcm("ding")
+    if ding_pcm is not None and len(ding_pcm) > 0:
+        n_copiar = min(n_samples_outro, len(ding_pcm))
+        mezcla_outro[:n_copiar] = ding_pcm[:n_copiar] * 0.85
+    else:
+        pop_pcm = gestor_sfx.obtener_pcm("pop")
+        if pop_pcm is not None and len(pop_pcm) > 0:
+            n_copiar = min(n_samples_outro, len(pop_pcm))
+            mezcla_outro[:n_copiar] = pop_pcm[:n_copiar] * 0.85
+
+    fade_samples = min(int(sr_audio * 0.06), n_samples_outro // 4)
+    if fade_samples > 0:
+        mezcla_outro[-fade_samples:] *= np.linspace(1.0, 0.0, fade_samples, dtype=np.float32)
+
+    mezcla_outro = np.clip(mezcla_outro, -0.98, 0.98)
+    pcm_outro_bytes = (mezcla_outro * 32767).astype(np.int16).tobytes()
+
+    with wave.open(str(ruta_mix_outro_wav), "w") as wf_out:
+        wf_out.setnchannels(1)
+        wf_out.setsampwidth(2)
+        wf_out.setframerate(sr_audio)
+        wf_out.writeframes(pcm_outro_bytes)
+
+    archivos_audio_seg.append(ruta_mix_outro_wav)
+    rms_env_outro = calcular_envolvente_rms(ruta_mix_outro_wav, FPS)
 
     _notificar_prog(0.38, "Masterizando pista de audio final con música de fondo...")
 

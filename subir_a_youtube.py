@@ -614,18 +614,32 @@ def subir_video(
     if not ruta_video.exists():
         raise FileNotFoundError(f"No existe el archivo de video: {ruta_video}")
 
+    # Garantizar que el video sea estrictamente vertical 9:16 y <=59.9s para que YouTube lo clasifique como Short
+    try:
+        from shorts_engine.video_render import asegurar_formato_short
+        ruta_video = asegurar_formato_short(ruta_video)
+    except Exception as e_short_fmt:
+        print(f"[!] Aviso al asegurar formato short: {e_short_fmt}")
+
     # Si faltan metadatos, extraerlos automáticamente de guion_video.txt
     meta = extraer_metadatos_guion(ruta_guion)
 
     nombre_limpio = ruta_video.stem.replace("_", " ").strip()
 
-    titulo_final = titulo or meta.get("titulo_youtube") or f"¡{nombre_limpio}! #shorts"
+    titulo_final = (titulo or meta.get("titulo_youtube") or f"¡{nombre_limpio}! #shorts").strip()
+    if "#shorts" not in titulo_final.lower():
+        if len(titulo_final) <= 91:
+            titulo_final = f"{titulo_final} #shorts"
+        else:
+            titulo_final = f"{titulo_final[:91].strip()} #shorts"
 
-    descripcion_final = descripcion or meta.get("descripcion_youtube") or (
+    descripcion_final = (descripcion or meta.get("descripcion_youtube") or (
         f"¡Mira lo que ocurrió en este video! ¿Qué hubieras hecho tú? Déjamelo en los comentarios:\n\n"
         f"Suscríbete para más momentos virales diarios.\n\n"
         f"#shorts #viral #humor #comedia #shortsfeed"
-    )
+    )).strip()
+    if "#shorts" not in descripcion_final.lower():
+        descripcion_final = f"{descripcion_final}\n\n#shorts"
 
     tags_final = tags or meta.get("tags") or ["shorts", "humor", "viral", "comedia", "bromas"]
 

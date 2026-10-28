@@ -1,8 +1,8 @@
-TITULO_SUPERIOR: Arte de Sandia y Arroz
-TITULO_YOUTUBE: ¡Increíbles esculturas de comida que su padre ignora por completo! #shorts
-DESCRIPCION_YOUTUBE: Esta talentosa niña crea impresionantes esculturas con sandía y arroz que sorprenden a todos. ¿Crees que su padre debería valorar más su gran esfuerzo artístico? #shorts #arte #comida #manualidades #viral
+TITULO_SUPERIOR: El Padre Con Expectativas De Oro
+TITULO_YOUTUBE: ¡Las expectativas de este padre con su bebé! 🏎️😂 #shorts
+DESCRIPCION_YOUTUBE: Este padre imaginaba un futuro brillante para su hijo, pero la realidad fue totalmente distinta. ¿Cuál de todas las divertidas expectativas te pareció la más graciosa? #shorts #comedia #bebes #humor #padres
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-28 20:30
+SCHEDULE: 2026-10-29 13:00
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
@@ -10,7 +10,10 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | auto | ninguno | ¡Esta talentosa niña convierte una simple sandía en un tierno perrito con sus propias manos!
-00:05 - 00:10 | zoom_in | cartoon_laugh | risa:izquierda | ninguna | ninguno | ¡Muy orgullosa le muestra su obra maestra a su padre para ver su gran reacción con él!
-00:10 - 00:15 | flash | party_horn | fiesta:derecha | ninguna | centro:grande | ¡Pero su padre simplemente se come la escultura de sandía sin dudar un solo instante!
-00:15 - 00:22 | temblor | error | enojo:izquierda | ninguna | ninguno | ¡Ella continúa creando increíbles tortugas y figuras de arroz que dejan a todos sin palabras mientras su padre prefiere ignorarla!
+00:00 - 00:05 | zoom_impacto | whoosh | sorprendido:derecha | centro | ninguno | ¡Este padre observa totalmente concentrado a su pequeño bebé mientras juega muy tranquilo con sus carritos!
+00:05 - 00:10 | zoom_in | cartoon_laugh | risa:izquierda | ninguna | centro:grande | ¡Imagina que su hijo será un veloz piloto y corre emocionado a ver un superdeportivo real!
+00:10 - 00:15 | flash | cash_ting | risa:derecha | ninguna | ninguno | ¡Pero sorpresa total, sale del lujoso concesionario cargando únicamente un diminuto auto de juguete pequeño!
+00:15 - 00:20 | temblor | error | risa:izquierda | ninguna | ninguno | ¡Para recuperar la inversión, el papá se sienta desesperado sobre el pequeño coche y comienza a manejar!
+00:20 - 00:25 | zoom_out | crowd_shocked | sorprendido:derecha | ninguna | ninguno | ¡Al día siguiente el bebé sujeta un control remoto con fuerza y su padre cree ver superfuerza!
+00:25 - 00:30 | alerta_roja | punch | diablo:izquierda | ninguna | ninguno | ¡Convencido de que su hijo será un poderoso levantador de pesas, lo lleva directo al gimnasio!
+00:30 - 00:36 | brillo_epico | xp_Error | sorprendido:derecha | ninguna | ninguno | ¡Pero el niño arruina el entrenamiento y usa la pesada mancuerna exactamente igual que un carrito!

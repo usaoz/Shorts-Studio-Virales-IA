@@ -319,12 +319,18 @@ def generar_guion_con_gemini_flash(
             f"- DIRECTIVA OBLIGATORIA: Aplica estas indicaciones de forma prioritaria en la interpretación y en el guion.\n"
         )
 
+    n_bloques_optimo = max(1, round(dur_redondeada / 5.0))
+    limites_sugeridos = [int(round(i * (dur_redondeada / n_bloques_optimo))) for i in range(n_bloques_optimo + 1)]
+    ejemplo_tramos = " | ".join(f"00:{limites_sugeridos[i]:02d} - 00:{limites_sugeridos[i+1]:02d}" for i in range(n_bloques_optimo))
+
     instruccion_extra_base = (
         f"{bloque_contexto_real}\n"
         f"{bloque_feedback}\n"
         f"DATOS EXACTOS DEL VIDEO ANALIZADO:\n"
         f"- Duración total exacta del video: {dur_redondeada} segundos (de 00:00 a 00:{dur_redondeada:02d}).\n"
-        f"- Divide los bloques de 00:00 hasta 00:{dur_redondeada:02d} en tramos de 5 segundos (EXACTAMENTE entre 15 y 17 palabras por bloque de 5s, o ~3.2 palabras/segundo, con ritmo rápido y enérgico).\n"
+        f"- Divide la narración en exactamente {n_bloques_optimo} bloques equilibrados (cada uno de ~{dur_redondeada/n_bloques_optimo:.1f} segundos, MÍNIMO 4.0s por bloque, NUNCA bloques cortos al final):\n"
+        f"  Tramos sugeridos: {ejemplo_tramos}\n"
+        f"- En cada bloque usa entre 2.8 y 3.2 palabras por segundo según la duración del tramo (ej. en 5s usa 14-16 palabras; en 6s usa 17-19 palabras).\n"
         f"- En ESTADO_PUBLICACION escribe: {modo_privacidad}\n"
         f"- En SCHEDULE escribe: {schedule_str.strip() if schedule_str.strip() else 'no'}\n"
         f"- En PARA_NINOS escribe: no\n"

@@ -348,7 +348,9 @@ def iniciar_aplicacion_gui() -> None:
                     "min_views_millones": str(leido.get("min_views_millones", "1.0M+ vistas")),
                     "cantidad_total": str(leido.get("cantidad_total", "2 Shorts")),
                     "shorts_por_dia": str(leido.get("shorts_por_dia", "2 / día")),
-                    "modo_horario": ("Horarios Pico" if "Pico" in str(leido.get("modo_horario", "Horarios Pico")) else "Cada X hs"),
+                    "modo_horario": ("Horario Específico" if ("Específ" in str(leido.get("modo_horario", "")) or "especif" in str(leido.get("modo_horario", "")).lower()) else ("Cada X hs" if "Cada" in str(leido.get("modo_horario", "")) else "Horarios Pico")),
+                    "hora_esp": str(leido.get("hora_esp", leido.get("hora", "13:00")) or "13:00"),
+                    "hora_desde": str(leido.get("hora_desde", "13:00") or "13:00"),
                     "intervalo_horas": str(re.sub(r"\D", "", str(leido.get("intervalo_horas", "8"))) or "8"),
                     "cuenta_destino": str(leido.get("cuenta_destino", "Canal Principal")),
                     "modo_cuentas": str(leido.get("modo_cuentas", "una")),
@@ -369,6 +371,8 @@ def iniciar_aplicacion_gui() -> None:
     programar_var = tk.BooleanVar(value=bool(mem["activar_schedule"]))
     fecha_elegida_var = tk.StringVar(value=str(mem["fecha"]))
     hora_elegida_var = tk.StringVar(value=str(mem["hora"]))
+    hora_esp_var = tk.StringVar(value=str(mem.get("hora_esp", mem["hora"]) or "13:00"))
+    hora_desde_var = tk.StringVar(value=str(mem.get("hora_desde", "13:00") or "13:00"))
     privacidad_var = tk.StringVar(value=str(mem["privacidad"]))
     voz_var = tk.StringVar(value=str(mem["voz"]))
     encuadre_var = tk.StringVar(value=str(mem["encuadre"]))
@@ -492,7 +496,9 @@ def iniciar_aplicacion_gui() -> None:
                         "activar_schedule": True,
                         "videos_editados_guardados": [str(p) for p in lista_videos_editados_locales],
                         "fecha": fecha_elegida_var.get(),
-                        "hora": hora_elegida_var.get(),
+                        "hora": (hora_esp_var.get() if "Específ" in modo_horario_var.get() else hora_desde_var.get()),
+                        "hora_esp": hora_esp_var.get(),
+                        "hora_desde": hora_desde_var.get(),
                         "privacidad": privacidad_var.get(),
                         "voz": voz_var.get(),
                         "encuadre": encuadre_var.get(),
@@ -1240,7 +1246,7 @@ def iniciar_aplicacion_gui() -> None:
 
     entry_hora_desde = ctk.CTkEntry(
         frame_sub_cada_x_hs,
-        textvariable=hora_elegida_var,
+        textvariable=hora_desde_var,
         placeholder_text="13:00",
         corner_radius=10,
         height=30,
@@ -1297,7 +1303,7 @@ def iniciar_aplicacion_gui() -> None:
 
     entry_hora_esp = ctk.CTkEntry(
         frame_sub_horario_especifico,
-        textvariable=hora_elegida_var,
+        textvariable=hora_esp_var,
         placeholder_text="07:52",
         corner_radius=10,
         height=30,
@@ -1508,20 +1514,28 @@ def iniciar_aplicacion_gui() -> None:
             return [None] * cant_t
         raw_int = re.sub(r"\D", "", intervalo_horas_var.get())
         interv = max(1, min(24, int(raw_int))) if raw_int else 8
-        h_cand = hora_elegida_var.get().strip()
+        est_act = modo_horario_var.get()
+        if "Específ" in est_act or "especif" in est_act.lower():
+            h_cand = hora_esp_var.get().strip()
+        elif "Cada" in est_act:
+            h_cand = hora_desde_var.get().strip()
+        else:
+            h_cand = "13:00"
         if ":" not in h_cand or len(h_cand) < 4:
             h_cand = "13:00"
         slots = calcular_horarios_inteligentes(
             cantidad_total=cant_t,
             por_dia=por_d,
             fecha_base_iso=fecha_elegida_var.get().strip(),
-            modo_horario=modo_horario_var.get(),
+            modo_horario=est_act,
             hora_inicio=h_cand,
             intervalo_hs=interv,
         )
         return [s for s in slots]
 
     def refrescar_plan_ui(*_args: object) -> None:
+        if _args and isinstance(_args[0], str) and _args[0] in ("Horarios Pico", "Cada X hs", "Horario Específico"):
+            modo_horario_var.set(_args[0])
         _guardar_memoria()
         mf = modo_fuente_var.get()
         es_canales = "Canales" in mf
@@ -1576,9 +1590,6 @@ def iniciar_aplicacion_gui() -> None:
     opt_cantidad_total.configure(command=refrescar_plan_ui)
     opt_por_dia.configure(command=refrescar_plan_ui)
 
-    _en_formato_hora = [False]
-    _prev_hora = [hora_elegida_var.get()]
-
     def _filtrar_tecla_no_digito(event: tk.Event) -> Optional[str]:
         if event.keysym in ("BackSpace", "Delete", "Left", "Right", "Tab", "Home", "End", "Return"):
             return None
@@ -1595,52 +1606,59 @@ def iniciar_aplicacion_gui() -> None:
     except Exception:
         pass
 
-    def _on_hora_escribir(*_args: object) -> None:
-        if _en_formato_hora[0]:
-            return
-        w_foc = root.focus_get()
-        pos_antes = 0
-        if w_foc in (getattr(entry_hora_esp, "_entry", None), getattr(entry_hora_desde, "_entry", None)):
-            try:
-                pos_antes = w_foc.index(tk.INSERT)
-            except Exception:
-                pos_antes = len(hora_elegida_var.get())
+    def _crear_formateador_hora(var_hora: tk.StringVar, entry_ref: Any) -> Callable[..., None]:
+        en_formato = [False]
+        prev_h = [var_hora.get()]
 
-        val = hora_elegida_var.get()
-        prev = _prev_hora[0]
-        is_backspace = len(val) < len(prev)
-        digitos = [c for c in val if c.isdigit()][:4]
+        def _on_escribir(*_args: object) -> None:
+            if en_formato[0]:
+                return
+            w_foc = root.focus_get()
+            pos_antes = 0
+            ent_inner = getattr(entry_ref, "_entry", None)
+            if w_foc == ent_inner:
+                try:
+                    pos_antes = w_foc.index(tk.INSERT)
+                except Exception:
+                    pos_antes = len(var_hora.get())
 
-        pos_nueva = pos_antes
-        if not digitos:
-            nuevo = ""
-            pos_nueva = 0
-        elif is_backspace:
-            nuevo = val if all(c.isdigit() or c == ":" for c in val) else "".join(digitos)
-        elif len(digitos) <= 2:
-            nuevo = "".join(digitos)
-            if len(digitos) == 2:
-                nuevo = "".join(digitos) + ":"
+            val = var_hora.get()
+            prev = prev_h[0]
+            is_backspace = len(val) < len(prev)
+            digitos = [c for c in val if c.isdigit()][:4]
+
+            pos_nueva = pos_antes
+            if not digitos:
+                nuevo = ""
+                pos_nueva = 0
+            elif is_backspace:
+                nuevo = val if all(c.isdigit() or c == ":" for c in val) else "".join(digitos)
+            elif len(digitos) <= 2:
+                nuevo = "".join(digitos)
+                if len(digitos) == 2:
+                    nuevo = "".join(digitos) + ":"
+                    if pos_antes == 2:
+                        pos_nueva = 3
+            else:
+                h = min(23, int("".join(digitos[:2])))
+                m_raw = "".join(digitos[2:])
+                if len(m_raw) == 2:
+                    m_raw = f"{min(59, int(m_raw)):02d}"
+                nuevo = f"{h:02d}:{m_raw}"
                 if pos_antes == 2:
                     pos_nueva = 3
-        else:
-            h = min(23, int("".join(digitos[:2])))
-            m_raw = "".join(digitos[2:])
-            if len(m_raw) == 2:
-                m_raw = f"{min(59, int(m_raw)):02d}"
-            nuevo = f"{h:02d}:{m_raw}"
-            if pos_antes == 2:
-                pos_nueva = 3
 
-        if nuevo != val:
-            _en_formato_hora[0] = True
-            hora_elegida_var.set(nuevo)
-            _en_formato_hora[0] = False
-            if w_foc in (getattr(entry_hora_esp, "_entry", None), getattr(entry_hora_desde, "_entry", None)):
-                root.after_idle(lambda w=w_foc, p=pos_nueva, n=nuevo: (w.icursor(min(len(n), p)) if (hasattr(w, "winfo_exists") and w.winfo_exists()) else None))
+            if nuevo != val:
+                en_formato[0] = True
+                var_hora.set(nuevo)
+                en_formato[0] = False
+                if w_foc == ent_inner:
+                    root.after_idle(lambda w=w_foc, p=pos_nueva, n=nuevo: (w.icursor(min(len(n), p)) if (hasattr(w, "winfo_exists") and w.winfo_exists()) else None))
 
-        _prev_hora[0] = nuevo
-        refrescar_plan_ui()
+            prev_h[0] = nuevo
+            refrescar_plan_ui()
+
+        return _on_escribir
 
     _en_formato_interv = [False]
 
@@ -1656,7 +1674,8 @@ def iniciar_aplicacion_gui() -> None:
             _en_formato_interv[0] = False
         refrescar_plan_ui()
 
-    hora_elegida_var.trace_add("write", _on_hora_escribir)
+    hora_esp_var.trace_add("write", _crear_formateador_hora(hora_esp_var, entry_hora_esp))
+    hora_desde_var.trace_add("write", _crear_formateador_hora(hora_desde_var, entry_hora_desde))
     intervalo_horas_var.trace_add("write", _on_intervalo_escribir)
 
     def refrescar_texto_boton_accion() -> None:
@@ -3237,24 +3256,8 @@ def iniciar_aplicacion_gui() -> None:
     frame_milestones = ctk.CTkFrame(progress_card, fg_color="transparent")
     frame_milestones.pack(fill="x", padx=18, pady=(0, 6))
 
-    lbl_tiempo_estimado = ctk.CTkLabel(
-        progress_card,
-        text="Tiempo estimado: ~1 a 2 minutos por cada Reel (descarga + guion IA + render 60 FPS + subida)",
-        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-        text_color=CYAN_ACCENT,
-    )
-    lbl_tiempo_estimado.pack(anchor="w", padx=20, pady=(0, 8))
-
     row_frenar_proceso = ctk.CTkFrame(progress_card, fg_color="transparent")
-    row_frenar_proceso.pack(fill="x", padx=18, pady=(0, 12))
-
-    lbl_frenar_hint = ctk.CTkLabel(
-        row_frenar_proceso,
-        text="¿Deseas frenar o diste un clic accidental? Puedes detener la operación aquí:",
-        font=ctk.CTkFont(family="Segoe UI", size=11),
-        text_color=TEXT_MUTED,
-    )
-    lbl_frenar_hint.pack(side="left", padx=(2, 0))
+    row_frenar_proceso.pack(fill="x", padx=18, pady=(4, 12))
 
     evento_cancelar = threading.Event()
 
@@ -3300,12 +3303,6 @@ def iniciar_aplicacion_gui() -> None:
         for w in frame_milestones.winfo_children():
             w.destroy()
         if len(estados_reels) <= 1:
-            ctk.CTkLabel(
-                frame_milestones,
-                text="Modo 1 Reel · La barra avanza en tiempo real desde la descarga hasta quedar subido al 100%",
-                font=ctk.CTkFont(family="Segoe UI", size=11),
-                text_color=TEXT_DIM,
-            ).pack(anchor="w", padx=4)
             return
         for item_m in estados_reels:
             est_tipo = item_m.get("tipo", "pendiente")
@@ -4827,8 +4824,8 @@ def iniciar_aplicacion_gui() -> None:
                             titulo_orig = ULTIMA_INFO_YTDLP["titulo"]
 
                     if es_modo_editado:
-                        # Modo Subir Video Editado: el video ya está terminado en el disco, no se renderiza de nuevo
-                        ruta_final = ruta_video_usar
+                        # Modo Subir Video Editado: asegurar formato vertical 9:16 y <=59.9s para YouTube Shorts
+                        ruta_final = asegurar_formato_short(ruta_video_usar)
                         ultimo_video_generado[0] = ruta_final
                         _actualizar_milestone_actual("activo", f"Reel {num_actual}: Video Listo")
                         _set_subprogreso(0.35, f"{pref_lote}Procesando video editado ({ruta_final.name})...", CYAN_ACCENT)
@@ -4840,8 +4837,11 @@ def iniciar_aplicacion_gui() -> None:
                         c_desc = custom_data.get("descripcion", "").strip() if (es_custom_activo and not usar_ia_desc) else ""
 
                         if es_custom_activo and c_tit:
-                            d_final = c_desc or f"{c_tit} #Shorts"
-                            DEFAULT_GUION_TXT.write_text(f"TITULO_SUPERIOR: {c_tit}\nDESCRIPCION_YOUTUBE: {d_final}\n\n[GUION]\n", encoding="utf-8")
+                            tit_yt = f"{c_tit} #shorts" if "#shorts" not in c_tit.lower() else c_tit
+                            d_final = c_desc or f"{c_tit} #shorts"
+                            if "#shorts" not in d_final.lower():
+                                d_final = f"{d_final}\n\n#shorts"
+                            DEFAULT_GUION_TXT.write_text(f"TITULO_SUPERIOR: {c_tit}\nTITULO_YOUTUBE: {tit_yt}\nDESCRIPCION_YOUTUBE: {d_final}\nSCHEDULE: {sched_str}\n\n[GUION]\n", encoding="utf-8")
                             _set_subprogreso(0.65, f"{pref_lote}Título personalizado asignado...", CYAN_ACCENT)
                         else:
                             _actualizar_milestone_actual("activo", f"Reel {num_actual}: Título con IA...")
@@ -4858,7 +4858,8 @@ def iniciar_aplicacion_gui() -> None:
                                 )
                             except Exception as e_ia:
                                 print(f"[!] Aviso al generar título IA: {e_ia}. Usando nombre de archivo.")
-                                DEFAULT_GUION_TXT.write_text(f"TITULO_SUPERIOR: {titulo_orig or ruta_final.stem}\n\n[GUION]\n", encoding="utf-8")
+                                tit_fall = titulo_orig or ruta_final.stem
+                                DEFAULT_GUION_TXT.write_text(f"TITULO_SUPERIOR: {tit_fall}\nTITULO_YOUTUBE: {tit_fall} #shorts\nSCHEDULE: {sched_str}\n\n[GUION]\n", encoding="utf-8")
                             _set_subprogreso(0.65, f"{pref_lote}Título listo...", CYAN_ACCENT)
                     else:
                         # Verificar si el usuario personalizó Título / Descripción / Guión para este Reel
@@ -4952,7 +4953,7 @@ def iniciar_aplicacion_gui() -> None:
                         raise InterruptedError("Operación detenida por el usuario tras guardar la edición.")
 
                     if solo_guardar:
-                        _actualizar_milestone_actual("subido", f"Reel {num_actual}: ¡Guardado!")
+                        _actualizar_milestone_actual("subido", f"Reel {num_actual}: ✓ Guardado")
                         _set_subprogreso(
                             1.0,
                             f"{pref_lote}Reel guardado en output_shorts ({ruta_final.name})",
@@ -5185,7 +5186,7 @@ def iniciar_aplicacion_gui() -> None:
                         url_short = f"https://youtube.com/shorts/{vid_id}"
                         links_subidos.append(url_short)
 
-                        _actualizar_milestone_actual("subido", f"Reel {num_actual}: ¡Subido!")
+                        _actualizar_milestone_actual("subido", f"Reel {num_actual}: ✓ Subido")
                         _set_subprogreso(
                             1.0,
                             f"{pref_lote}Reel {num_actual} subido con éxito ({sched_actual or modo_priv.upper()})",
