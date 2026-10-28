@@ -1660,7 +1660,8 @@ def iniciar_aplicacion_gui() -> None:
                 row_botones_accion.grid_columnconfigure(1, weight=0)
                 btn_auto_1clic.grid_configure(padx=0)
             else:
-                row_botones_accion.grid_columnconfigure(1, weight=3)
+                row_botones_accion.grid_columnconfigure(0, weight=8)
+                row_botones_accion.grid_columnconfigure(1, weight=2)
                 btn_auto_1clic.grid_configure(padx=(0, 8))
                 btn_guardar_carpeta.grid(row=0, column=1, sticky="nsew")
 
@@ -1674,7 +1675,7 @@ def iniciar_aplicacion_gui() -> None:
     def abrir_ventana_ajustes() -> None:
         win = ctk.CTkToplevel(root)
         win.title("Ajustes y Herramientas")
-        win.geometry("600x770")
+        win.geometry("600x700")
         win.resizable(False, False)
         win.configure(fg_color=BG_DARK)
         win.transient(root)
@@ -1721,24 +1722,6 @@ def iniciar_aplicacion_gui() -> None:
             card_modo,
             values=["IA Automática", "Personalizado"],
             variable=modo_contenido_var,
-            command=actualizar_modo_vista,
-            corner_radius=14,
-            height=32,
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-            selected_color=PURPLE_MAIN,
-        ).pack(fill="x", padx=18, pady=(0, 8))
-
-        ctk.CTkLabel(
-            card_modo,
-            text="Acción Final al Terminar de Crear Shorts",
-            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-            text_color=TEXT_MAIN,
-        ).pack(anchor="w", padx=18, pady=(2, 4))
-
-        ctk.CTkSegmentedButton(
-            card_modo,
-            values=["Subir automáticamente", "Guardar en carpeta"],
-            variable=accion_final_var,
             command=actualizar_modo_vista,
             corner_radius=14,
             height=32,
@@ -3046,8 +3029,8 @@ def iniciar_aplicacion_gui() -> None:
 
     row_botones_accion = ctk.CTkFrame(contenedor_accion_y_progreso, fg_color="transparent")
     row_botones_accion.pack(fill="x")
-    row_botones_accion.grid_columnconfigure(0, weight=7)
-    row_botones_accion.grid_columnconfigure(1, weight=3)
+    row_botones_accion.grid_columnconfigure(0, weight=8)
+    row_botones_accion.grid_columnconfigure(1, weight=2)
 
     btn_auto_1clic = ctk.CTkButton(
         row_botones_accion,
@@ -3791,7 +3774,7 @@ def iniciar_aplicacion_gui() -> None:
 
         txt_confirmar = (
             "COMENZAR EDICIÓN Y GUARDAR AHORA"
-            if (accion_final_var.get() == "Guardar en carpeta")
+            if solo_guardar_actual[0]
             else "COMENZAR EDICIÓN Y SUBIDA AHORA"
         )
         ctk.CTkButton(
