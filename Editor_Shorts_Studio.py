@@ -35,6 +35,13 @@ import re
 import shutil
 import subprocess
 import sys
+
+WIN_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+WIN_STARTUPINFO = None
+if sys.platform == "win32":
+    WIN_STARTUPINFO = subprocess.STARTUPINFO()
+    WIN_STARTUPINFO.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    WIN_STARTUPINFO.wShowWindow = subprocess.SW_HIDE
 import unicodedata
 import urllib.request
 import wave
@@ -1333,6 +1340,8 @@ def masterizar_voz_estudio_ffmpeg(
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         check=False,
+        creationflags=WIN_NO_WINDOW,
+        startupinfo=WIN_STARTUPINFO,
     )
     if res.returncode != 0 or not ruta_wav_salida.exists():
         subprocess.run(
@@ -1340,6 +1349,8 @@ def masterizar_voz_estudio_ffmpeg(
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=False,
+            creationflags=WIN_NO_WINDOW,
+            startupinfo=WIN_STARTUPINFO,
         )
 
 
@@ -1482,6 +1493,8 @@ async def generar_voz_y_timestamps_segmento(
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                         check=False,
+                        creationflags=WIN_NO_WINDOW,
+                        startupinfo=WIN_STARTUPINFO,
                     )
                 if tmp_wav.exists() and tmp_wav.stat().st_size > 0:
                     with wave.open(str(tmp_wav), "r") as wf_c:
@@ -2516,6 +2529,8 @@ class GestorAudioSFX:
                     ],
                     capture_output=True,
                     check=False,
+                    creationflags=WIN_NO_WINDOW,
+                    startupinfo=WIN_STARTUPINFO,
                 )
                 if res.returncode != 0 or len(res.stdout) < 100:
                     continue
@@ -2631,6 +2646,8 @@ def obtener_info_video(ruta_video: Path) -> Tuple[float, int, int, float]:
             capture_output=True,
             text=True,
             check=False,
+            creationflags=WIN_NO_WINDOW,
+            startupinfo=WIN_STARTUPINFO,
         )
         dur = float(res.stdout.strip())
     except Exception:
@@ -2778,7 +2795,13 @@ def extraer_frames_segmento_video(
     frames_raw: List[np.ndarray] = []
     bytes_por_frame = WIDTH * HEIGHT * 3
     try:
-        proc = subprocess.Popen(cmd_ff, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        proc = subprocess.Popen(
+            cmd_ff,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            creationflags=WIN_NO_WINDOW,
+            startupinfo=WIN_STARTUPINFO,
+        )
         if proc.stdout:
             while True:
                 buf = proc.stdout.read(bytes_por_frame)
@@ -2877,7 +2900,13 @@ def detectar_encoder_video() -> Tuple[str, List[str]]:
                 *args,
                 "-f", "null", "-"
             ]
-            res = subprocess.run(cmd_test, capture_output=True, check=False)
+            res = subprocess.run(
+                cmd_test,
+                capture_output=True,
+                check=False,
+                creationflags=WIN_NO_WINDOW,
+                startupinfo=WIN_STARTUPINFO,
+            )
             if res.returncode == 0:
                 _ENCODER_SELECCIONADO = (nombre, args)
                 return _ENCODER_SELECCIONADO
@@ -3101,6 +3130,8 @@ async def editar_video_con_guion(
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=False,
+            creationflags=WIN_NO_WINDOW,
+            startupinfo=WIN_STARTUPINFO,
         )
         if res_mix.returncode != 0 or not ruta_audio_final.exists():
             ruta_audio_final = ruta_voz_maestra
@@ -3147,7 +3178,14 @@ async def editar_video_con_guion(
     TEMP_DIR.mkdir(parents=True, exist_ok=True)
     ruta_err_ffmpeg = TEMP_DIR / "ffmpeg_render_error.log"
     f_err = open(ruta_err_ffmpeg, "w", encoding="utf-8", errors="replace")
-    proceso_ffmpeg = subprocess.Popen(cmd_ffmpeg, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=f_err)
+    proceso_ffmpeg = subprocess.Popen(
+        cmd_ffmpeg,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=f_err,
+        creationflags=WIN_NO_WINDOW,
+        startupinfo=WIN_STARTUPINFO,
+    )
 
     # Nota: `config.titulo_superior` se usa únicamente para darle nombre al archivo MP4 exportado
     # y NO se renderiza encima del video.
@@ -3421,6 +3459,8 @@ def descargar_video_youtube(url: str) -> Path:
         text=True,
         encoding="utf-8",
         errors="replace",
+        creationflags=WIN_NO_WINDOW,
+        startupinfo=WIN_STARTUPINFO,
     )
     if proc.stdout:
         for linea in proc.stdout:
@@ -3637,6 +3677,8 @@ def generar_video_compacto_ia(ruta_video: Path) -> Tuple[Optional[bytes], float]
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         check=False,
+        creationflags=WIN_NO_WINDOW,
+        startupinfo=WIN_STARTUPINFO,
     )
     if res.returncode == 0 and ruta_low.exists() and 1000 < ruta_low.stat().st_size < 6_000_000:
         return ruta_low.read_bytes(), dur_seg
@@ -4059,6 +4101,8 @@ def buscar_short_viral_en_canal(
             encoding="utf-8",
             errors="replace",
             timeout=28,
+            creationflags=WIN_NO_WINDOW,
+            startupinfo=WIN_STARTUPINFO,
         )
     except Exception as e:
         print(f"[!] Error al escanear canal {url_shorts}: {e}")
