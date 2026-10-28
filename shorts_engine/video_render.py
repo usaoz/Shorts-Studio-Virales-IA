@@ -1325,51 +1325,77 @@ async def editar_video_con_guion(
 
                 # Calcular trayectorias rastreadas por visión artificial para FLECHA y CIRCULO
                 mismo_objetivo = bool(
-                    seg.track_flecha_activo
-                    and seg.track_circulo_activo
-                    and seg.callout_flecha
-                    and seg.callout_circulo
-                    and (seg.callout_flecha.strip() == seg.callout_circulo.strip())
+                    seg.flecha and seg.circulo and (_quitar_acentos(seg.flecha) == _quitar_acentos(seg.circulo))
                 )
 
-                pos_flecha_lista: List[Optional[Tuple[int, int]]] = [None] * total_frames_seg
-                pos_circulo_lista: List[Optional[Tuple[int, int]]] = [None] * total_frames_seg
+                trayectoria_flecha: Optional[List[Tuple[float, float]]] = None
+                trayectoria_circulo: Optional[List[Tuple[float, float]]] = None
 
-                if seg.track_circulo_activo and seg.callout_circulo:
-                    pos_circulo_lista = rastrear_objetivo_en_segmento(frames_seg_rgb, seg.callout_circulo)
-
-                if seg.track_flecha_activo and seg.callout_flecha:
-                    if mismo_objetivo and pos_circulo_lista:
-                        pos_flecha_lista = list(pos_circulo_lista)
+                if seg.circulo:
+                    trayectoria_circulo = RastreadorObjetivosVideo.calcular_trayectoria(frames_seg_rgb, seg.circulo)
+                if seg.flecha:
+                    if mismo_objetivo and trayectoria_circulo is not None:
+                        trayectoria_flecha = trayectoria_circulo
                     else:
-                        pos_flecha_lista = rastrear_objetivo_en_segmento(frames_seg_rgb, seg.callout_flecha)
+                        trayectoria_flecha = RastreadorObjetivosVideo.calcular_trayectoria(frames_seg_rgb, seg.flecha)
+
+                print(
+                    f"    -> Renderizando segmento {idx_seg + 1}/{len(datos_segmentos)} "
+                    f"({total_frames_seg} frames | video {t_vid_ini:.1f}s..{t_vid_fin:.1f}s)..."
+                )
 
                 for f_idx in range(total_frames_seg):
                     t_seg = f_idx / float(FPS)
-                    frame_pil = frames_seg_rgb[f_idx] if f_idx < len(frames_seg_rgb) else frames_seg_rgb[-1]
-                    lienzo = frame_pil.copy()
+                    rms_val = float(rms_env[f_idx]) if f_idx < len(rms_env) else 0.0
+                    frame_rgb = frames_seg_rgb[f_idx]
 
-                    p_flecha = pos_flecha_lista[f_idx] if f_idx < len(pos_flecha_lista) else None
-                    p_circulo = pos_circulo_lista[f_idx] if f_idx < len(pos_circulo_lista) else None
+                    pt_c_vid = trayectoria_circulo[f_idx] if trayectoria_circulo else (WIDTH / 2.0, HEIGHT * 0.44)
+                    pt_f_vid = trayectoria_flecha[f_idx] if trayectoria_flecha else pt_c_vid
+                    foco_camara = pt_c_vid if trayectoria_circulo else (pt_f_vid if trayectoria_flecha else (WIDTH / 2.0, HEIGHT * 0.46))
 
-                    gestor_assets.dibujar_efectos_en_frame(
-                        lienzo=lienzo,
+                    lienzo, pts_pantalla = gestor_assets.aplicar_efecto_camara_y_transformar_puntos(
+                        frame_rgb=frame_rgb,
+                        efecto=seg.efecto_visual,
                         t_seg=t_seg,
                         dur_seg=dur_seg_exacta,
-                        pos_flecha_track=p_flecha,
-                        pos_circulo_track=p_circulo,
-                        tiene_circulo=seg.tiene_circulo,
-                        tiene_flecha=seg.tiene_flecha,
-                        tiene_emoji=seg.tiene_emoji,
-                        emoji_nombre=seg.emoji_nombre,
-                        tiene_foto=seg.tiene_foto,
-                        foto_nombre=seg.foto_nombre,
-                        callout_flecha=seg.callout_flecha,
-                        callout_circulo=seg.callout_circulo,
+                        foco_video=foco_camara,
+                        puntos_rastreados=[pt_c_vid, pt_f_vid],
+                    )
+                    pt_c_screen, pt_f_screen = pts_pantalla[0], pts_pantalla[1]
+
+                    # 1) Círculo Rojo siguiendo al objetivo
+                    radio_circulo = gestor_assets.dibujar_circulo_rojo(
+                        lienzo=lienzo,
+                        activo=bool(seg.circulo),
+                        target_xy=pt_c_screen,
+                        tamano_mod=seg.tamano_circulo,
+                        t_seg=t_seg,
+                        dur_seg=dur_seg_exacta,
                     )
 
-                    # Subtítulos neón dinámicos con zoom y colores clave
-                    rms_val = float(rms_env[f_idx]) if f_idx < len(rms_env) else 0.0
+                    # 2) Flecha Roja siguiendo al objetivo (si comparte objetivo con el círculo, apunta a su borde)
+                    radio_para_flecha = radio_circulo if mismo_objetivo else 0.0
+                    gestor_assets.dibujar_flecha_roja(
+                        lienzo=lienzo,
+                        activo=bool(seg.flecha),
+                        target_xy=pt_f_screen,
+                        radio_circulo_activo=radio_para_flecha,
+                        t_seg=t_seg,
+                        dur_seg=dur_seg_exacta,
+                    )
+
+                    # 3) Emoji animado (evitando superponerse con el objetivo rastreado)
+                    target_ref_emoji = pt_c_screen if seg.circulo else (pt_f_screen if seg.flecha else None)
+                    gestor_assets.dibujar_emoji(
+                        lienzo=lienzo,
+                        nombre_emoji=seg.emoji,
+                        posicion_solicitada=seg.posicion_emoji,
+                        target_principal_xy=target_ref_emoji,
+                        t_seg=t_seg,
+                        dur_seg=dur_seg_exacta,
+                    )
+
+                    # 4) Subtítulos dinámicos ultra llamativos con resplandor neón y pulso reactivo a la voz
                     renderizar_subtitulos_luminosos(
                         lienzo=lienzo,
                         palabras=palabras_sub,

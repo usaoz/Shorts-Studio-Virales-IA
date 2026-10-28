@@ -1,6 +1,6 @@
-TITULO_SUPERIOR: Empleada Desconecta Camara Troleo Fallido
-TITULO_YOUTUBE: ¡Atrapó a su empleada apagando la cámara! 😱 #shorts
-DESCRIPCION_YOUTUBE: La empleada intentó apagar la cámara de seguridad sin saber que su jefe la estaba viendo en vivo. ¿Qué habrías hecho en el lugar del jefe? #shorts #humor #fail #viral
+TITULO_SUPERIOR: Pareja Pelea Divertida En Carro
+TITULO_YOUTUBE: ¡Cuando intentas dominar el auto y sale mal! 😂 #shorts
+DESCRIPCION_YOUTUBE: Esta divertida pareja tiene una discusión inesperada en el coche cuando ella decide poner sus pies en el tablero. ¿Qué harías tú en esa situación? #shorts #humor #fail #viral
 ESTADO_PUBLICACION: privado
 SCHEDULE: 2026-10-29 19:00
 PARA_NINOS: no
@@ -10,8 +10,7 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | ¡Esta empleada descubre que su jefe puso una cámara para vigilarla! ¡Así que decide desconectar el cable de inmediato!
-00:05 - 00:10 | zoom_in | whoosh | risa:izquierda | ninguna | ninguno | ¡Pensó que nadie la descubriría jamás mientras comía su fruta! ¡Pero de repente recibe la llamada furiosa de su jefe!
-00:10 - 00:15 | alerta_roja | riser_suction | enojo:derecha | ninguna | centro:grande | ¡El dueño le reclama por apagar la cámara en secreto! ¡Y ella inventa descaradamente que se cortó la luz eléctrica!
-00:15 - 00:20 | temblor | xp_Error | diablo:izquierda | abajo | ninguno | ¡El jefe la amenaza con descontarle el sueldo entero! ¡Asustada corre a conectar todo diciendo que la luz ya volvió!
-00:20 - 00:24 | brillo_epico | cartoon_laugh | fiesta:derecha | ninguna | ninguno | ¡El dueño le dice que no puede engañarlo a él porque es el maestro de la trampa!
+00:00 - 00:05 | zoom_impacto | whoosh | sorprendido:derecha | 35,25 | ninguno | ¡Esta chica pone sus pies sobre el tablero del auto y se niega rotundamente a bajarlos entre risas desafiantes!
+00:05 - 00:10 | temblor | punch+cartoon_laugh | risa:izquierda | ninguna | 50,70 | ¡El conductor frena de golpe y la chica termina cayéndose estrepitosamente al piso del auto sin poder levantarse sola!
+00:10 - 00:15 | alerta_roja | riser_suction | enojo:izquierda | ninguna | ninguno | ¡Al salir del carro ella se molesta muchísimo e intenta llamar a su suegra para denunciar la travesura!
+00:15 - 00:21 | brillo_epico | awww | fiesta:derecha | ninguna | ninguno | ¡Pero él la atrapa rápidamente, la recuesta sobre el césped suavemente y terminan este divertido momento llenos de mucho amor y ternura!
