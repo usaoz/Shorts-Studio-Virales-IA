@@ -277,9 +277,9 @@ def generar_guion_con_gemini_flash(
     # - `gemini-3.6-flash` es el modelo más potente con cuota gratuita activa (`Free Tier`) para Video+Mosaico.
     # - `gemini-4-argon` solo tiene cuota > 0 si la cuenta tiene facturación (Tier 1) activa en Google AI Studio.
     plan_intentos: List[Tuple[str, List[object], float]] = [
+        (modelo_preferido, partes_con_video, 20.0),
         ("gemini-3.6-flash", partes_con_video, 16.0),
-        ("gemini-3-flash-preview", partes_con_video, 15.0),
-        (modelo_preferido, partes_con_video, 12.0),
+        ("gemini-3.8-flash", partes_con_video, 16.0),
         ("gemini-3.5-flash-lite", partes_con_video, 16.0),
         ("gemini-3.6-flash", partes_solo_mosaico, 14.0),
         ("gemini-3.5-flash-lite", partes_solo_mosaico, 15.0),

@@ -282,10 +282,10 @@ def iniciar_aplicacion_gui() -> None:
     }
 
     MAPA_MODELOS_IA = {
-        "Gemini 3.6 Flash (Máxima Inteligencia Gratis · Video Completo)": "gemini-3.6-flash",
-        "Argon 4 (gemini-4-argon · Requiere Tier 1 en AI Studio)": "gemini-4-argon",
-        "Gemini 3.8 Flash (Rápido y Preciso)": "gemini-3.8-flash",
-        "Gemini 3.5 Flash Lite (Ultra Rápido)": "gemini-3.5-flash-lite",
+        "Gemini 3.6 Flash · Recomendado (gratis, rápido, ideal para video)": "gemini-3.6-flash",
+        "Gemini 3.8 Flash · Razonamiento extra (más lento, más tokens)": "gemini-3.8-flash",
+        "Argon 4 · Máxima calidad (requiere facturación en AI Studio)": "gemini-4-argon",
+        "Gemini 3.5 Flash Lite · Ultra rápido (menor detalle)": "gemini-3.5-flash-lite",
     }
 
     def _cargar_memoria() -> Dict[str, object]:
@@ -340,7 +340,7 @@ def iniciar_aplicacion_gui() -> None:
                     "modo_fuente": mf_val,
                     "modo_contenido": "Personalizado" if "Personalizado" in str(leido.get("modo_contenido", "IA Automática")) else "IA Automática",
                     "accion_final": "Guardar en carpeta" if "Guardar" in str(leido.get("accion_final", "Subir automáticamente")) else "Subir automáticamente",
-                    "modelo_ia": str(leido.get("modelo_ia", def_data["modelo_ia"])),
+                    "modelo_ia": (str(leido.get("modelo_ia")) if str(leido.get("modelo_ia")) in MAPA_MODELOS_IA else def_data["modelo_ia"]),
                     "orden_canales": str(leido.get("orden_canales", "Rotación (En fila)")),
                     "min_views_millones": str(leido.get("min_views_millones", "1.0M+ vistas")),
                     "cantidad_total": str(leido.get("cantidad_total", "2 Shorts")),
@@ -4023,7 +4023,7 @@ def iniciar_aplicacion_gui() -> None:
             cant_cola = len(links_a_procesar)
         horarios_lote_plan = calcular_lista_horarios_actual()
         es_custom_activo = "Personalizado" in modo_contenido_var.get()
-        pref_modelo_ia = MAPA_MODELOS_IA.get(modelo_ia_var.get(), "gemini-4-argon")
+        pref_modelo_ia = MAPA_MODELOS_IA.get(modelo_ia_var.get(), "gemini-3.6-flash")
         if solo_guardar_override is not None:
             solo_guardar = bool(solo_guardar_override)
         else:
