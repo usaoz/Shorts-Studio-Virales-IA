@@ -610,20 +610,14 @@ def obtener_info_video(ruta_video: Path) -> Tuple[float, int, int, float]:
     """
     if not ruta_video.exists():
         raise FileNotFoundError(f"No se encontró el archivo de video: {ruta_video}")
-    cap = cv2.VideoCapture(str(ruta_video))
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    n_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
-    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 1080)
-    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 1920)
-    cap.release()
-
-    dur = 0.0
+    w, h, fps, dur = 1080, 1920, 30.0, 0.0
     try:
         res = subprocess.run(
             [
                 "ffprobe", "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
+                "-select_streams", "v:0",
+                "-show_entries", "stream=width,height,r_frame_rate,duration:format=duration",
+                "-of", "json",
                 str(ruta_video),
             ],
             capture_output=True,
@@ -632,12 +626,33 @@ def obtener_info_video(ruta_video: Path) -> Tuple[float, int, int, float]:
             creationflags=WIN_NO_WINDOW,
             startupinfo=WIN_STARTUPINFO,
         )
-        dur = float(res.stdout.strip())
+        if res.returncode == 0 and res.stdout:
+            d = json.loads(res.stdout)
+            st = d.get("streams", [{}])[0]
+            fmt = d.get("format", {})
+            w = int(st.get("width") or 1080)
+            h = int(st.get("height") or 1920)
+            fps_str = str(st.get("r_frame_rate") or "30/1")
+            fps = eval(fps_str) if "/" in fps_str else float(fps_str)
+            dur = float(st.get("duration") or fmt.get("duration") or 0.0)
     except Exception:
-        dur = 0.0
+        pass
 
-    if dur <= 0.1 and n_frames > 0 and fps > 0:
-        dur = float(n_frames) / float(fps)
+    if dur <= 0.1 or fps <= 0:
+        try:
+            cap = cv2.VideoCapture(str(ruta_video), cv2.CAP_FFMPEG)
+            if not cap.isOpened():
+                cap = cv2.VideoCapture(str(ruta_video))
+            fps = fps or cap.get(cv2.CAP_PROP_FPS) or 30.0
+            n_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+            w = w or int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 1080)
+            h = h or int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 1920)
+            cap.release()
+            if dur <= 0.1 and n_frames > 0 and fps > 0:
+                dur = float(n_frames) / float(fps)
+        except (Exception, SystemError, BaseException):
+            pass
+
     if dur <= 0.1:
         dur = 15.0
     return max(0.5, dur), w, h, float(fps)
@@ -798,23 +813,31 @@ def extraer_frames_segmento_video(
 
     # Fallback con OpenCV si FFmpeg no devolvió frames
     if not frames_raw:
-        cap = cv2.VideoCapture(str(ruta_video))
-        fps_orig = cap.get(cv2.CAP_PROP_FPS) or 30.0
-        cap.set(cv2.CAP_PROP_POS_MSEC, max(0.0, t_ini) * 1000.0)
-        max_leer = max(2, int(round(dur_clip * fps_orig)))
-        for _ in range(max_leer):
-            ret, frame_bgr = cap.read()
-            if not ret:
-                break
-            frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-            h, w, _ = frame_rgb.shape
-            scale = max(WIDTH / float(w), HEIGHT / float(h))
-            nw, nh = int(round(w * scale)), int(round(h * scale))
-            resized = cv2.resize(frame_rgb, (nw, nh), interpolation=cv2.INTER_LANCZOS4)
-            x0 = (nw - WIDTH) // 2
-            y0 = (nh - HEIGHT) // 2
-            frames_raw.append(resized[y0 : y0 + HEIGHT, x0 : x0 + WIDTH].copy())
-        cap.release()
+        try:
+            cap = cv2.VideoCapture(str(ruta_video), cv2.CAP_FFMPEG)
+            if not cap.isOpened():
+                cap = cv2.VideoCapture(str(ruta_video))
+            fps_orig = cap.get(cv2.CAP_PROP_FPS) or 30.0
+            cap.set(cv2.CAP_PROP_POS_MSEC, max(0.0, t_ini) * 1000.0)
+            max_leer = max(2, int(round(dur_clip * fps_orig)))
+            for _ in range(max_leer):
+                try:
+                    ret, frame_bgr = cap.read()
+                except (Exception, SystemError, BaseException):
+                    break
+                if not ret or frame_bgr is None:
+                    break
+                frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+                h, w, _ = frame_rgb.shape
+                scale = max(WIDTH / float(w), HEIGHT / float(h))
+                nw, nh = int(round(w * scale)), int(round(h * scale))
+                resized = cv2.resize(frame_rgb, (nw, nh), interpolation=cv2.INTER_LANCZOS4)
+                x0 = (nw - WIDTH) // 2
+                y0 = (nh - HEIGHT) // 2
+                frames_raw.append(resized[y0 : y0 + HEIGHT, x0 : x0 + WIDTH].copy())
+            cap.release()
+        except (Exception, SystemError, BaseException):
+            pass
 
     if not frames_raw:
         if t_ini > 0.1:

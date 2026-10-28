@@ -1,8 +1,8 @@
-TITULO_SUPERIOR: Reto Galletas Locas Hermanas
-TITULO_YOUTUBE: ¡Increíble reto de galletas entre hermanas! #shorts
-DESCRIPCION_YOUTUBE: Mira cómo estas dos hermanas compiten en un reto divertido para ver quién se come todo más rápido. ¿Quién ganará esta alocada prueba? #shorts #humor #retos #viral
+TITULO_SUPERIOR: Troleo Epico en Tienda de Abarrotes
+TITULO_YOUTUBE: ¡Le aplican la broma perfecta al dependiente de la tienda! #shorts
+DESCRIPCION_YOUTUBE: Un cliente travieso intenta engañar al tendero en esta divertida broma. ¡Mira cómo termina este épico enredo! #shorts #humor #broma #viral
 ESTADO_PUBLICACION: privado
-SCHEDULE: auto
+SCHEDULE: 2026-10-29 19:00
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
@@ -10,8 +10,17 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | 28,45 | ninguno | ¡Mira cómo la hermana mayor le dice que mire a la pared para robarse todas las deliciosas galletas!
-00:05 - 00:10 | zoom_in | whoosh+ding | risa:izquierda | ninguna | ninguno | ¡La pequeña se voltea y descubre que solo le dejaron una solitaria galleta en el plato brillante!
-00:10 - 00:15 | alerta_roja | riser_suction | diablo:derecha | ninguna | 50,38 | ¡Ahora arranca el desafío definitivo donde quien termine primero todas las galletas se lleva un gran premio!
-00:15 - 00:20 | zoom_out | whoosh | sorprendido:izquierda | ninguna | ninguno | ¡La hermana mayor se come solo una uva y le entrega rápidamente el plato entero a su pequeña compañera!
-00:20 - 00:25 | brillo_epico | cash_ting+party_horn | fiesta:derecha | ninguna | ninguno | ¡La pequeña celebra feliz porque logró comer primero y reclama su merecido regalo de limpieza!
+00:00 - 00:05 | zoom_impacto | whoosh | sorprendido:derecha | izquierda | ninguno | ¡Mira cómo este joven intenta abrir un frasco con jugo en la tienda! ¡El tendero le enseña un truco súper rápido!
+00:05 - 00:10 | zoom_in | pop | risa:izquierda | ninguna | ninguno | ¡El tendero le da dos golpes abajo y el frasco se abre al instante frente a todos! ¡Increíble truco!
+00:10 - 00:15 | alerta_roja | error | enojo:derecha | ninguna | ninguno | ¡Ahora el tendero le cobra doscientos pesos por abrirlo, pero el cliente dice que él jamás pidió eso!
+00:15 - 00:20 | zoom_out | click | sorprendido:izquierda | ninguna | ninguno | ¡El joven acepta pagar y revisa la tapa roja buscando algún mensaje oculto con mucha curiosidad hoy!
+00:20 - 00:25 | flash | cash_ting | fiesta:derecha | ninguna | ninguno | ¡Aparece un texto oculto en la tapa y el joven grita emocionado porque ganó un premio increíble gratis!
+00:25 - 00:30 | zoom_in | whoosh | risa:izquierda | ninguna | ninguno | ¡El tendero se burla diciendo que la empresa solo pone eso por diversión y no significa nada real!
+00:30 - 00:35 | temblor | xp_Error | enojo:derecha | ninguna | ninguno | ¡El cliente graba todo con su celular y amenaza con llevar el video directamente a la policía local!
+00:35 - 00:40 | brillo_epico | party_horn | fiesta:izquierda | ninguna | ninguno | ¡El tendero se asusta por el video y le entrega un montón de botellas gratis para evitar más problemas!
+00:40 - 00:45 | zoom_in | cash_ting | sorprendido:derecha | ninguna | ninguno | ¡El tendero lanza otra oferta loca donde si pagas cien pesos te regresa quinientos en efectivo ahora mismo!
+00:45 - 00:50 | flash | error | risa:izquierda | ninguna | ninguno | ¡El cliente paga los cien pesos pero el tendero le entrega una foto con una mano abierta de broma!
+00:50 - 00:55 | zoom_out | punch | enojo:derecha | ninguna | ninguno | ¡El joven se da cuenta de que cayó en la trampa y ahora busca la forma de vengarse!
+00:55 - 01:00 | zoom_in | whoosh | sorprendido:izquierda | ninguna | ninguno | ¡Pregunta el precio de toda la mercancía de la tienda y el tendero dice ochocientos pesos exactos!
+01:00 - 01:05 | alerta_roja | good_idea | diablo:derecha | ninguna | ninguno | ¡El joven paga los ochocientos pesos y rápidamente se lleva a la hermosa hija del tendero de la mano!
+01:05 - 01:10 | flash | crowd_shocked | lloros:izquierda | ninguna | ninguno | ¡El tendero se queda completamente solo gritando desesperado mientras ve cómo se llevan a su adorada hija!

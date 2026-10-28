@@ -42,38 +42,67 @@ def generar_mosaico_video(ruta_video: Path, cols: int = 4, rows: int = 2) -> Tup
     impresas en cada cuadro. Ahorra más del 80% de tokens visuales y permite análisis instantáneo.
     """
     import io
-    cap = cv2.VideoCapture(str(ruta_video))
-    if not cap.isOpened():
-        raise RuntimeError(f"No se pudo abrir el video para crear el mosaico: {ruta_video}")
-
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
-    dur_seg, _, _, _ = obtener_info_video(ruta_video)
-    if dur_seg <= 0 and total_frames > 0:
-        dur_seg = total_frames / fps
-
+    dur_seg, w_src, h_src, fps_src = obtener_info_video(ruta_video)
     num_tiles = cols * rows
     tile_w, tile_h = 270, 480
     mosaico = Image.new("RGB", (cols * tile_w, rows * tile_h), (15, 17, 23))
 
+    cap = None
+    try:
+        cap = cv2.VideoCapture(str(ruta_video), cv2.CAP_FFMPEG)
+        if not cap.isOpened():
+            cap = cv2.VideoCapture(str(ruta_video))
+    except (Exception, SystemError, BaseException):
+        cap = None
+
     for i in range(num_tiles):
         t_sec = min(max(0.15, (i + 0.5) * (dur_seg / num_tiles)), max(0.2, dur_seg - 0.15))
-        cap.set(cv2.CAP_PROP_POS_MSEC, t_sec * 1000.0)
-        ok, frame_bgr = cap.read()
-        if not ok or frame_bgr is None:
-            continue
-        frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-        img_tile = Image.fromarray(frame_rgb).resize((tile_w, tile_h), Image.Resampling.LANCZOS)
-        draw = ImageDraw.Draw(img_tile)
+        img_tile = None
 
-        # Banda superior oscura con timestamp exacto y guía de zonas
+        if cap is not None and cap.isOpened():
+            try:
+                cap.set(cv2.CAP_PROP_POS_MSEC, t_sec * 1000.0)
+                ok, frame_bgr = cap.read()
+                if ok and frame_bgr is not None:
+                    frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+                    img_tile = Image.fromarray(frame_rgb).resize((tile_w, tile_h), Image.Resampling.LANCZOS)
+            except (Exception, SystemError, BaseException):
+                img_tile = None
+
+        if img_tile is None:
+            try:
+                cmd_ff = [
+                    "ffmpeg", "-v", "error",
+                    "-ss", f"{max(0.0, t_sec):.3f}",
+                    "-i", str(ruta_video),
+                    "-frames:v", "1",
+                    "-vf", f"scale={tile_w}:{tile_h}:force_original_aspect_ratio=increase:flags=lanczos,crop={tile_w}:{tile_h}",
+                    "-f", "image2pipe",
+                    "-vcodec", "png",
+                    "-",
+                ]
+                proc_ff = subprocess.run(
+                    cmd_ff,
+                    capture_output=True,
+                    check=False,
+                    creationflags=WIN_NO_WINDOW,
+                    startupinfo=WIN_STARTUPINFO,
+                )
+                if proc_ff.returncode == 0 and proc_ff.stdout:
+                    img_tile = Image.open(io.BytesIO(proc_ff.stdout)).convert("RGB")
+            except Exception:
+                img_tile = None
+
+        if img_tile is None:
+            img_tile = Image.new("RGB", (tile_w, tile_h), (15, 17, 23))
+
+        draw = ImageDraw.Draw(img_tile)
         draw.rectangle([0, 0, tile_w, 34], fill=(0, 0, 0))
         mm = int(t_sec) // 60
         ss = int(t_sec) % 60
         etiqueta = f"#{i + 1} | {mm:02d}:{ss:02d} ({t_sec:.1f}s)"
         draw.text((8, 6), etiqueta, fill=(250, 204, 21))
 
-        # Líneas sutiles divisorias IZQ / CENTRO / DER abajo
         draw.rectangle([0, tile_h - 22, tile_w, tile_h], fill=(0, 0, 0))
         draw.text((10, tile_h - 19), "IZQ        |        CENTRO        |        DER", fill=(180, 190, 210))
 
@@ -81,7 +110,11 @@ def generar_mosaico_video(ruta_video: Path, cols: int = 4, rows: int = 2) -> Tup
         r = i // cols
         mosaico.paste(img_tile, (c * tile_w, r * tile_h))
 
-    cap.release()
+    if cap is not None:
+        try:
+            cap.release()
+        except Exception:
+            pass
 
     TEMP_DIR.mkdir(parents=True, exist_ok=True)
     ruta_mosaico = TEMP_DIR / "mosaico_analisis.jpg"
