@@ -4285,9 +4285,21 @@ def iniciar_aplicacion_gui() -> None:
 
     root = ctk.CTk()
     root.title("Shorts Studio")
-    root.geometry("860x830")
-    root.minsize(800, 720)
+    root.minsize(840, 460)
     root.configure(fg_color="#0b0d13")
+
+    def autoajustar_tamano_ventana() -> None:
+        """
+        Amolda dinámicamente la altura de la ventana para que calce exactamente
+        con el contenido actual (sin dejar espacios vacíos abajo).
+        """
+        try:
+            root.update_idletasks()
+            req_h = root.winfo_reqheight() + 8
+            cur_w = max(860, root.winfo_width())
+            root.geometry(f"{cur_w}x{req_h}")
+        except Exception:
+            pass
 
     _ico_app = BASE_DIR / "icono_shorts_studio.ico"
     if not _ico_app.exists():
@@ -4691,14 +4703,14 @@ def iniciar_aplicacion_gui() -> None:
     ctk.CTkLabel(
         title_box,
         text="Shorts Studio",
-        font=ctk.CTkFont(family="Segoe UI", size=23, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=25, weight="bold"),
         text_color=TEXT_MAIN,
     ).pack(anchor="w")
 
     ctk.CTkLabel(
         title_box,
         text="Piloto automático de Shorts virales con IA",
-        font=ctk.CTkFont(family="Segoe UI", size=12),
+        font=ctk.CTkFont(family="Segoe UI", size=13),
         text_color=TEXT_MUTED,
     ).pack(anchor="w")
 
@@ -4750,7 +4762,7 @@ def iniciar_aplicacion_gui() -> None:
     lbl_cuota_info = ctk.CTkLabel(
         quota_top,
         text="6/6 Shorts hoy",
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         text_color=GREEN_ACCENT,
     )
     lbl_cuota_info.pack(side="left", padx=(0, 8), pady=2)
@@ -4759,13 +4771,13 @@ def iniciar_aplicacion_gui() -> None:
         quota_top,
         text="+",
         command=lambda: agregar_api_json_gui(root),
-        width=26,
-        height=26,
-        corner_radius=13,
+        width=28,
+        height=28,
+        corner_radius=14,
         fg_color=PURPLE_MAIN,
         hover_color=PURPLE_HOVER,
         text_color="#ffffff",
-        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
     )
     btn_add_api_top.pack(side="left", padx=(0, 2), pady=2)
 
@@ -4806,7 +4818,7 @@ def iniciar_aplicacion_gui() -> None:
     lbl_titulo_canales = ctk.CTkLabel(
         top_canales,
         text="📺  Canales Fuente de Shorts Virales",
-        font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
         text_color=TEXT_MAIN,
     )
     lbl_titulo_canales.pack(side="left")
@@ -4814,7 +4826,7 @@ def iniciar_aplicacion_gui() -> None:
     lbl_modo_orden = ctk.CTkLabel(
         top_canales,
         text="",
-        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         text_color=CYAN_ACCENT,
     )
     lbl_modo_orden.pack(side="right")
@@ -4831,7 +4843,7 @@ def iniciar_aplicacion_gui() -> None:
         border_width=1,
         border_color="#2a3147",
         text_color="#ffffff",
-        font=ctk.CTkFont(family="Consolas", size=12),
+        font=ctk.CTkFont(family="Consolas", size=13),
     )
     entry_nuevo_canal.pack(side="left", fill="x", expand=True, padx=(0, 8))
 
@@ -4852,9 +4864,10 @@ def iniciar_aplicacion_gui() -> None:
             ctk.CTkLabel(
                 chips_container,
                 text="Aún no agregaste canales. Pega el link de un canal arriba y toca '+ Agregar'.",
-                font=ctk.CTkFont(family="Segoe UI", size=11),
+                font=ctk.CTkFont(family="Segoe UI", size=12),
                 text_color=TEXT_MUTED,
             ).pack(padx=12, pady=12)
+            autoajustar_tamano_ventana()
             return
 
         row_frame = None
@@ -4878,7 +4891,7 @@ def iniciar_aplicacion_gui() -> None:
             ctk.CTkLabel(
                 chip,
                 text=f"{pref_turno}{idx_c + 1}. {etiqueta_corta_canal(c_url)}",
-                font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+                font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
                 text_color="#ffffff" if es_turno else TEXT_MAIN,
             ).pack(side="left", padx=(12, 6), pady=4)
 
@@ -4898,8 +4911,9 @@ def iniciar_aplicacion_gui() -> None:
                 hover_color="#dc2626",
                 text_color=TEXT_MUTED,
                 command=_quitar_c,
-                font=ctk.CTkFont(size=11, weight="bold"),
+                font=ctk.CTkFont(size=12, weight="bold"),
             ).pack(side="right", padx=(0, 6), pady=4)
+        autoajustar_tamano_ventana()
 
     def agregar_canal_gui() -> None:
         raw = entry_nuevo_canal.get().strip()
@@ -4929,7 +4943,7 @@ def iniciar_aplicacion_gui() -> None:
         width=85,
         fg_color="#1e2538",
         hover_color="#2b3550",
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     ).pack(side="left", padx=(0, 6))
 
     ctk.CTkButton(
@@ -4938,10 +4952,10 @@ def iniciar_aplicacion_gui() -> None:
         command=agregar_canal_gui,
         corner_radius=16,
         height=38,
-        width=130,
+        width=135,
         fg_color=PURPLE_MAIN,
         hover_color=PURPLE_HOVER,
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     ).pack(side="right")
 
     # --- TARJETA MODO B: LINK DE VIDEO (INDIVIDUAL O MÚLTIPLES LINKS) ---
@@ -4953,14 +4967,14 @@ def iniciar_aplicacion_gui() -> None:
     ctk.CTkLabel(
         top_link_row,
         text="🔗  Links de Videos de YouTube",
-        font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
         text_color=TEXT_MAIN,
     ).pack(side="left")
 
     lbl_contador_links = ctk.CTkLabel(
         top_link_row,
         text="1 Video",
-        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         text_color=CYAN_ACCENT,
         fg_color="#0e2a3a",
         corner_radius=10,
@@ -5005,6 +5019,7 @@ def iniciar_aplicacion_gui() -> None:
             refrescar_plan_ui()
         except (NameError, Exception):
             pass
+        autoajustar_tamano_ventana()
 
     def _agregar_fila_link(valor_inicial: str = "") -> None:
         if len(lista_filas_links) >= 12:
@@ -5025,7 +5040,7 @@ def iniciar_aplicacion_gui() -> None:
             border_width=1,
             border_color="#2a3147",
             text_color="#ffffff",
-            font=ctk.CTkFont(family="Consolas", size=13),
+            font=ctk.CTkFont(family="Consolas", size=14),
         )
         ent.pack(side="left", fill="x", expand=True, padx=(0, 8))
         if valor_inicial:
@@ -5056,7 +5071,7 @@ def iniciar_aplicacion_gui() -> None:
             fg_color="#1e2538",
             hover_color="#2b3550",
             text_color=TEXT_MAIN,
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         )
         btn_peg.pack(side="left", padx=(0, 4))
 
@@ -5070,7 +5085,7 @@ def iniciar_aplicacion_gui() -> None:
             fg_color=PURPLE_MAIN,
             hover_color=PURPLE_HOVER,
             text_color="#ffffff",
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=ctk.CTkFont(size=15, weight="bold"),
         )
         btn_add.pack(side="left")
 
@@ -5101,7 +5116,7 @@ def iniciar_aplicacion_gui() -> None:
             fg_color="#261b23",
             hover_color="#dc2626",
             text_color="#f87171",
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=ctk.CTkFont(size=15, weight="bold"),
         )
         fila_record["btn_del"] = btn_del
 
@@ -5125,7 +5140,7 @@ def iniciar_aplicacion_gui() -> None:
     ctk.CTkLabel(
         pub_header,
         text="📅  Plan de Subida y Programación Inteligente",
-        font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
         text_color=TEXT_MAIN,
     ).pack(side="left")
 
@@ -5139,7 +5154,7 @@ def iniciar_aplicacion_gui() -> None:
         fg_color=INPUT_BG,
         selected_color=PURPLE_MAIN,
         selected_hover_color=PURPLE_HOVER,
-        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
     seg_estrategia.pack(side="right")
 
@@ -5150,7 +5165,7 @@ def iniciar_aplicacion_gui() -> None:
     box_cant = ctk.CTkFrame(row_plan1, fg_color="transparent")
     box_cant.pack(side="left", padx=(0, 10))
     ctk.CTkLabel(
-        box_cant, text="📦 Cantidad Total", font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"), text_color=TEXT_MUTED
+        box_cant, text="📦 Cantidad Total", font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"), text_color=TEXT_MUTED
     ).pack(anchor="w", pady=(0, 2))
     opt_cantidad_total = ctk.CTkOptionMenu(
         box_cant,
@@ -5162,14 +5177,14 @@ def iniciar_aplicacion_gui() -> None:
         fg_color=INPUT_BG,
         button_color="#252d42",
         button_hover_color="#333e5a",
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
     opt_cantidad_total.pack()
 
     box_pordia = ctk.CTkFrame(row_plan1, fg_color="transparent")
     box_pordia.pack(side="left", padx=(0, 14))
     ctk.CTkLabel(
-        box_pordia, text="📆 Shorts por Día", font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"), text_color=TEXT_MUTED
+        box_pordia, text="📆 Shorts por Día", font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"), text_color=TEXT_MUTED
     ).pack(anchor="w", pady=(0, 2))
     opt_por_dia = ctk.CTkOptionMenu(
         box_pordia,
@@ -5181,14 +5196,14 @@ def iniciar_aplicacion_gui() -> None:
         fg_color=INPUT_BG,
         button_color="#252d42",
         button_hover_color="#333e5a",
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
     opt_por_dia.pack()
 
     box_priv = ctk.CTkFrame(row_plan1, fg_color="transparent")
     box_priv.pack(side="left", padx=(0, 12))
     ctk.CTkLabel(
-        box_priv, text="🔒 Visibilidad Base", font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"), text_color=TEXT_MUTED
+        box_priv, text="🔒 Visibilidad Base", font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"), text_color=TEXT_MUTED
     ).pack(anchor="w", pady=(0, 2))
     seg_priv = ctk.CTkSegmentedButton(
         box_priv,
@@ -5201,7 +5216,7 @@ def iniciar_aplicacion_gui() -> None:
         selected_hover_color=PURPLE_HOVER,
         unselected_color=INPUT_BG,
         unselected_hover_color="#1a2030",
-        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
     seg_priv.pack()
 
@@ -5349,7 +5364,7 @@ def iniciar_aplicacion_gui() -> None:
         variable=programar_var,
         progress_color=PURPLE_MAIN,
         button_color="#ffffff",
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
     sw_prog.pack(side="right", pady=(14, 0))
 
@@ -5368,7 +5383,7 @@ def iniciar_aplicacion_gui() -> None:
         border_width=1,
         border_color="#2e3852",
         text_color=CYAN_ACCENT,
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
     btn_calendario.pack(side="left", padx=(0, 8))
 
@@ -5378,7 +5393,7 @@ def iniciar_aplicacion_gui() -> None:
     lbl_desde = ctk.CTkLabel(
         frame_manual_horas,
         text="Desde:",
-        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         text_color=TEXT_MUTED,
     )
     lbl_desde.pack(side="left", padx=(2, 4))
@@ -5398,7 +5413,7 @@ def iniciar_aplicacion_gui() -> None:
         button_hover_color="#333e5a",
         dropdown_fg_color="#141824",
         dropdown_hover_color=PURPLE_MAIN,
-        font=ctk.CTkFont(family="Consolas", size=12, weight="bold"),
+        font=ctk.CTkFont(family="Consolas", size=13, weight="bold"),
     )
     combo_hora.pack(side="left", padx=(0, 6))
 
@@ -5412,7 +5427,7 @@ def iniciar_aplicacion_gui() -> None:
         fg_color=INPUT_BG,
         button_color="#252d42",
         button_hover_color="#333e5a",
-        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
     opt_intervalo.pack(side="left", padx=(0, 6))
 
@@ -5423,7 +5438,7 @@ def iniciar_aplicacion_gui() -> None:
     lbl_preview_horarios = ctk.CTkLabel(
         preview_box,
         text="",
-        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         text_color="#a7f3d0",
         wraplength=540,
         justify="left",
@@ -5469,6 +5484,7 @@ def iniciar_aplicacion_gui() -> None:
                 text="💾 Modo Guardar en Carpeta activo — Se generarán y guardarán los Reels en output_shorts sin subir a YouTube.",
                 text_color="#67e8f9",
             )
+            autoajustar_tamano_ventana()
             return
         else:
             sw_prog.configure(state="normal")
@@ -5485,6 +5501,7 @@ def iniciar_aplicacion_gui() -> None:
                 text="⚡ Subida inmediata sin programación (se publicarán ahora mismo)",
                 text_color="#facc15",
             )
+            autoajustar_tamano_ventana()
             return
 
         slots = calcular_lista_horarios_actual()
@@ -5510,6 +5527,7 @@ def iniciar_aplicacion_gui() -> None:
             wraplength=540,
             justify="left",
         )
+        autoajustar_tamano_ventana()
 
     seg_estrategia.configure(command=refrescar_plan_ui)
     opt_cantidad_total.configure(command=refrescar_plan_ui)
@@ -5567,6 +5585,7 @@ def iniciar_aplicacion_gui() -> None:
             card_link.pack(fill="x")
         refrescar_plan_ui()
         refrescar_texto_boton_accion()
+        autoajustar_tamano_ventana()
 
     # ==========================================================================
     # VENTANA DE AJUSTES (CON TOGGLE DE MODO, CONTENIDO IA/MANUAL Y MODELO ARGON 4)
@@ -5574,7 +5593,7 @@ def iniciar_aplicacion_gui() -> None:
     def abrir_ventana_ajustes() -> None:
         win = ctk.CTkToplevel(root)
         win.title("Ajustes y Herramientas")
-        win.geometry("580x695")
+        win.geometry("600x730")
         win.resizable(False, False)
         win.configure(fg_color=BG_DARK)
         win.transient(root)
@@ -5584,7 +5603,7 @@ def iniciar_aplicacion_gui() -> None:
         ctk.CTkLabel(
             win,
             text="⚙️  Ajustes del Estudio",
-            font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=20, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(anchor="w", padx=24, pady=(16, 8))
 
@@ -5595,7 +5614,7 @@ def iniciar_aplicacion_gui() -> None:
         ctk.CTkLabel(
             card_modo,
             text="🔀 Modo de Obtención de Videos",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(anchor="w", padx=18, pady=(10, 4))
 
@@ -5606,13 +5625,14 @@ def iniciar_aplicacion_gui() -> None:
             command=actualizar_modo_vista,
             corner_radius=14,
             height=32,
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
             selected_color=PURPLE_MAIN,
         ).pack(fill="x", padx=18, pady=(0, 8))
 
         ctk.CTkLabel(
             card_modo,
             text="✍️ Modo de Título, Descripción y Guión",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(anchor="w", padx=18, pady=(2, 4))
 
@@ -5623,13 +5643,14 @@ def iniciar_aplicacion_gui() -> None:
             command=actualizar_modo_vista,
             corner_radius=14,
             height=32,
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
             selected_color=PURPLE_MAIN,
         ).pack(fill="x", padx=18, pady=(0, 8))
 
         ctk.CTkLabel(
             card_modo,
             text="🎯 Acción Final al Terminar de Crear Shorts",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(anchor="w", padx=18, pady=(2, 4))
 
@@ -5640,6 +5661,7 @@ def iniciar_aplicacion_gui() -> None:
             command=actualizar_modo_vista,
             corner_radius=14,
             height=32,
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
             selected_color=PURPLE_MAIN,
         ).pack(fill="x", padx=18, pady=(0, 10))
 
@@ -5661,6 +5683,7 @@ def iniciar_aplicacion_gui() -> None:
             command=lambda _: (_guardar_memoria(), renderizar_chips_canales()),
             corner_radius=14,
             height=32,
+            font=ctk.CTkFont(family="Segoe UI", size=12),
             fg_color="#1e2436",
             button_color="#2d354d",
         ).pack(fill="x")
@@ -5680,6 +5703,7 @@ def iniciar_aplicacion_gui() -> None:
             command=lambda _: (_guardar_memoria(), renderizar_chips_canales()),
             corner_radius=14,
             height=32,
+            font=ctk.CTkFont(family="Segoe UI", size=12),
             fg_color="#1e2436",
             button_color="#2d354d",
         ).pack(fill="x")
@@ -5691,7 +5715,7 @@ def iniciar_aplicacion_gui() -> None:
         ctk.CTkLabel(
             card_cfg,
             text="🧠 Modelo de IA para Guiones (Argon 4 / Gemini)",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(anchor="w", padx=18, pady=(10, 4))
 
@@ -5702,6 +5726,7 @@ def iniciar_aplicacion_gui() -> None:
             command=_guardar_memoria,
             corner_radius=14,
             height=32,
+            font=ctk.CTkFont(family="Segoe UI", size=12),
             fg_color="#1e2436",
             button_color="#2d354d",
         ).pack(fill="x", padx=18, pady=(0, 8))
@@ -5709,7 +5734,7 @@ def iniciar_aplicacion_gui() -> None:
         ctk.CTkLabel(
             card_cfg,
             text="🎙️ Voz del Narrador IA",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(anchor="w", padx=18, pady=(2, 4))
 
@@ -5720,6 +5745,7 @@ def iniciar_aplicacion_gui() -> None:
             command=_guardar_memoria,
             corner_radius=14,
             height=32,
+            font=ctk.CTkFont(family="Segoe UI", size=12),
             fg_color="#1e2436",
             button_color="#2d354d",
         ).pack(fill="x", padx=18, pady=(0, 8))
@@ -5727,7 +5753,7 @@ def iniciar_aplicacion_gui() -> None:
         ctk.CTkLabel(
             card_cfg,
             text="📐 Formato de Encuadre Vertical (9:16)",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(anchor="w", padx=18, pady=(0, 4))
 
@@ -5738,6 +5764,7 @@ def iniciar_aplicacion_gui() -> None:
             command=_guardar_memoria,
             corner_radius=14,
             height=32,
+            font=ctk.CTkFont(family="Segoe UI", size=12),
             fg_color="#1e2436",
             button_color="#2d354d",
         ).pack(fill="x", padx=18, pady=(0, 12))
@@ -5752,7 +5779,7 @@ def iniciar_aplicacion_gui() -> None:
         ctk.CTkLabel(
             top_api,
             text="🔑 Clave API de Gemini Flash (Gratis)",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(side="left")
 
@@ -5766,7 +5793,7 @@ def iniciar_aplicacion_gui() -> None:
             fg_color="#1e293b",
             hover_color="#334155",
             text_color=CYAN_ACCENT,
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         ).pack(side="right")
 
         key_var = tk.StringVar(value=obtener_gemini_api_key())
@@ -5780,7 +5807,7 @@ def iniciar_aplicacion_gui() -> None:
             height=34,
             fg_color=INPUT_BG,
             border_color="#2e364f",
-            font=ctk.CTkFont(family="Consolas", size=12),
+            font=ctk.CTkFont(family="Consolas", size=13),
         )
         ent_k.pack(side="left", fill="x", expand=True, padx=(0, 8))
 
@@ -5800,7 +5827,7 @@ def iniciar_aplicacion_gui() -> None:
             fg_color=GREEN_ACCENT,
             hover_color="#059669",
             text_color="#052e16",
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         ).pack(side="right")
 
         # 4. Carpeta Output
@@ -5818,7 +5845,7 @@ def iniciar_aplicacion_gui() -> None:
             height=36,
             fg_color="#1e2436",
             hover_color="#2d354d",
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         ).pack(fill="x", padx=4)
 
     def finalizar_app_completamente() -> None:
@@ -5862,7 +5889,7 @@ def iniciar_aplicacion_gui() -> None:
     def abrir_selector_cuentas_popup() -> None:
         pop = ctk.CTkToplevel(root)
         pop.title("Elegir Cuenta o Grupo de Subida")
-        pop.geometry("460x530")
+        pop.geometry("490x560")
         pop.resizable(False, False)
         pop.configure(fg_color=BG_DARK)
         pop.transient(root)
@@ -5871,14 +5898,14 @@ def iniciar_aplicacion_gui() -> None:
         ctk.CTkLabel(
             pop,
             text="📺  Elegir Cuenta de Subida",
-            font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=20, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(anchor="w", padx=22, pady=(16, 2))
 
         ctk.CTkLabel(
             pop,
             text="Cada cuenta recuerda sus propios Canales Fuente guardados.",
-            font=ctk.CTkFont(family="Segoe UI", size=11),
+            font=ctk.CTkFont(family="Segoe UI", size=12),
             text_color=TEXT_MUTED,
         ).pack(anchor="w", padx=22, pady=(0, 10))
 
@@ -5930,17 +5957,17 @@ def iniciar_aplicacion_gui() -> None:
                 ctk.CTkLabel(
                     lista_scroll,
                     text=f"🔄 Se subirán los Shorts rotando entre TODAS tus cuentas ({len(cuentas_disp)}).\nCada Reel usará los Canales Fuente guardados de la cuenta que le toque.",
-                    font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+                    font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
                     text_color=CYAN_ACCENT,
                     justify="left",
-                    wraplength=390,
+                    wraplength=410,
                 ).pack(anchor="w", padx=12, pady=(8, 10))
 
             elif m_sel == "grupo":
                 ctk.CTkLabel(
                     lista_scroll,
                     text="👥 Marca las cuentas que quieres incluir en el grupo de subida:",
-                    font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+                    font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
                     text_color=CYAN_ACCENT,
                 ).pack(anchor="w", padx=12, pady=(6, 8))
 
@@ -5979,14 +6006,14 @@ def iniciar_aplicacion_gui() -> None:
                 ctk.CTkLabel(
                     info_col,
                     text=f"{c_nom}{s_txt}",
-                    font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+                    font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
                     text_color="#ffffff" if es_activa else TEXT_MAIN,
                 ).pack(anchor="w")
 
                 ctk.CTkLabel(
                     info_col,
                     text=f"{n_can} canal(es) fuente guardados",
-                    font=ctk.CTkFont(family="Segoe UI", size=11),
+                    font=ctk.CTkFont(family="Segoe UI", size=12),
                     text_color=CYAN_ACCENT if es_activa else TEXT_MUTED,
                 ).pack(anchor="w")
 
@@ -5997,11 +6024,11 @@ def iniciar_aplicacion_gui() -> None:
                         command=lambda cid_x=c_id: _seleccionar_cuenta_unica(cid_x),
                         corner_radius=12,
                         height=30,
-                        width=82,
+                        width=84,
                         fg_color=GREEN_ACCENT if es_activa else PURPLE_MAIN,
                         hover_color="#059669" if es_activa else PURPLE_HOVER,
                         text_color="#052e16" if es_activa else "#ffffff",
-                        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
                     ).pack(side="right", padx=10)
                 elif m_sel == "grupo":
                     if c_id not in vars_checks_grupo:
@@ -6028,7 +6055,7 @@ def iniciar_aplicacion_gui() -> None:
             corner_radius=14,
             height=34,
             selected_color=PURPLE_MAIN,
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         )
         seg_modo.pack(fill="x", padx=22, pady=(0, 10))
         lista_scroll.pack(fill="both", expand=True, padx=22, pady=(0, 10))
@@ -6047,7 +6074,7 @@ def iniciar_aplicacion_gui() -> None:
             fg_color="#1e293b",
             hover_color="#334155",
             text_color=CYAN_ACCENT,
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         ).pack(side="left", fill="x", expand=True, padx=(0, 6))
 
         def _aplicar_cierre_popup() -> None:
@@ -6242,8 +6269,8 @@ def iniciar_aplicacion_gui() -> None:
     def abrir_ventana_shorts_programados() -> None:
         win_p = ctk.CTkToplevel(root)
         win_p.title("Shorts Programados en Cola")
-        win_p.geometry("720x600")
-        win_p.minsize(640, 500)
+        win_p.geometry("740x630")
+        win_p.minsize(660, 520)
         win_p.configure(fg_color=BG_DARK)
         win_p.transient(root)
         aplicar_icono_ventana(win_p)
@@ -6258,14 +6285,14 @@ def iniciar_aplicacion_gui() -> None:
         ctk.CTkLabel(
             tit_f,
             text="📆 Shorts Programados en Cola",
-            font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=20, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(anchor="w")
 
         lbl_sub = ctk.CTkLabel(
             tit_f,
             text="Próximos videos a publicarse automáticamente según tu calendario de subidas.",
-            font=ctk.CTkFont(family="Segoe UI", size=11),
+            font=ctk.CTkFont(family="Segoe UI", size=12),
             text_color=TEXT_MUTED,
         )
         lbl_sub.pack(anchor="w", pady=(2, 0))
@@ -6303,14 +6330,14 @@ def iniciar_aplicacion_gui() -> None:
             ctk.CTkLabel(
                 sec_prog_header,
                 text="📆  Shorts en Cola de Publicación",
-                font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+                font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
                 text_color=TEXT_MAIN,
             ).pack(side="left")
 
             ctk.CTkLabel(
                 sec_prog_header,
                 text=f"{len(items_a_mostrar)} en cola",
-                font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
                 text_color=CYAN_ACCENT,
                 fg_color="#0e2a3a",
                 corner_radius=8,
@@ -6324,13 +6351,13 @@ def iniciar_aplicacion_gui() -> None:
                 ctk.CTkLabel(
                     empty_card,
                     text=f"🎉 No tienes Shorts programados {titulo_filtro}.",
-                    font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+                    font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
                     text_color=TEXT_MAIN,
                 ).pack(pady=(16, 2))
                 ctk.CTkLabel(
                     empty_card,
                     text="Todos tus videos ya se encuentran publicados o listos para programar.",
-                    font=ctk.CTkFont(family="Segoe UI", size=11),
+                    font=ctk.CTkFont(family="Segoe UI", size=12),
                     text_color=TEXT_MUTED,
                 ).pack(pady=(0, 14))
 
@@ -6345,7 +6372,7 @@ def iniciar_aplicacion_gui() -> None:
                         fg_color=PURPLE_MAIN,
                         hover_color=PURPLE_HOVER,
                         text_color="#ffffff",
-                        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
                     ).pack(pady=(0, 14))
             else:
                 from collections import OrderedDict
@@ -6382,7 +6409,7 @@ def iniciar_aplicacion_gui() -> None:
                     ctk.CTkLabel(
                         dia_header,
                         text=dia_label,
-                        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+                        font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
                         text_color=color_dia,
                     ).pack(side="left")
 
@@ -6396,7 +6423,7 @@ def iniciar_aplicacion_gui() -> None:
                         ctk.CTkLabel(
                             row_top,
                             text=f"⏰ {it.get('hora_local', '--:--')} hs",
-                            font=ctk.CTkFont(family="Consolas", size=11, weight="bold"),
+                            font=ctk.CTkFont(family="Consolas", size=12, weight="bold"),
                             text_color="#facc15",
                             fg_color="#232938",
                             corner_radius=8,
@@ -6409,7 +6436,7 @@ def iniciar_aplicacion_gui() -> None:
                         ctk.CTkLabel(
                             row_top,
                             text=f"📺 {it.get('cuenta_nombre', 'Canal')[:20]}{s_str}",
-                            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
                             text_color="#c084fc",
                             fg_color="#251a3a",
                             corner_radius=8,
@@ -6420,7 +6447,7 @@ def iniciar_aplicacion_gui() -> None:
                         ctk.CTkLabel(
                             row_top,
                             text="⏳ Programado",
-                            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+                            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
                             text_color=CYAN_ACCENT,
                             fg_color="#122338",
                             corner_radius=8,
@@ -6434,19 +6461,19 @@ def iniciar_aplicacion_gui() -> None:
                                 row_top,
                                 text="🔗 Ver en YouTube",
                                 command=lambda u=url_v: webbrowser.open(u),
-                                width=115,
+                                width=120,
                                 height=24,
                                 corner_radius=10,
                                 fg_color="#1e2436",
                                 hover_color="#2b354f",
                                 text_color=CYAN_ACCENT,
-                                font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+                                font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
                             ).pack(side="right")
 
                         lbl_tit = ctk.CTkLabel(
                             item_card,
                             text=str(it.get("titulo") or "Short sin título"),
-                            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+                            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
                             text_color=TEXT_MAIN,
                             anchor="w",
                             justify="left",
@@ -6476,7 +6503,7 @@ def iniciar_aplicacion_gui() -> None:
             corner_radius=12,
             height=30,
             border_width=1,
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         )
         tab_canal.pack(side="left", padx=(0, 8))
 
@@ -6487,7 +6514,7 @@ def iniciar_aplicacion_gui() -> None:
             corner_radius=12,
             height=30,
             border_width=1,
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         )
         tab_todas.pack(side="left")
 
@@ -6499,7 +6526,7 @@ def iniciar_aplicacion_gui() -> None:
                 ctk.CTkLabel(
                     scroll_f,
                     text="⏳ Consultando canales de YouTube en tiempo real...",
-                    font=ctk.CTkFont(family="Segoe UI", size=12),
+                    font=ctk.CTkFont(family="Segoe UI", size=13),
                     text_color=TEXT_MUTED,
                 ).pack(pady=30)
 
@@ -6535,13 +6562,13 @@ def iniciar_aplicacion_gui() -> None:
             command=_refrescar_en_vivo,
             corner_radius=14,
             height=30,
-            width=95,
+            width=100,
             fg_color=CARD_BG,
             hover_color="#252d42",
             border_width=1,
             border_color=CARD_BORDER,
             text_color=CYAN_ACCENT,
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         )
         btn_refrescar.pack(side="right")
 
@@ -6554,7 +6581,7 @@ def iniciar_aplicacion_gui() -> None:
     def abrir_ventana_overview_rendimiento() -> None:
         win_o = ctk.CTkToplevel(root)
         win_o.title("Overview de Rendimiento — Videos Publicados")
-        win_o.geometry("740x650")
+        win_o.geometry("750x660")
         win_o.minsize(660, 520)
         win_o.configure(fg_color=BG_DARK)
         win_o.transient(root)
@@ -6570,14 +6597,14 @@ def iniciar_aplicacion_gui() -> None:
         ctk.CTkLabel(
             tit_f,
             text="📊 Overview de Rendimiento — Videos Publicados",
-            font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=20, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(anchor="w")
 
         lbl_sub = ctk.CTkLabel(
             tit_f,
             text="Métricas en vivo de vistas, likes y comentarios de tus últimos videos (máx. 10).",
-            font=ctk.CTkFont(family="Segoe UI", size=11),
+            font=ctk.CTkFont(family="Segoe UI", size=12),
             text_color=TEXT_MUTED,
         )
         lbl_sub.pack(anchor="w", pady=(2, 0))
@@ -6616,14 +6643,14 @@ def iniciar_aplicacion_gui() -> None:
             ctk.CTkLabel(
                 sec_pub_header,
                 text="📈 Videos Publicados Recientemente",
-                font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+                font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
                 text_color=CYAN_ACCENT,
             ).pack(side="left")
 
             ctk.CTkLabel(
                 sec_pub_header,
                 text=f"{len(pubs_a_mostrar)} video{'s' if len(pubs_a_mostrar) != 1 else ''} {titulo_filtro}",
-                font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
                 text_color=TEXT_MUTED,
                 fg_color="#182030",
                 corner_radius=8,
@@ -6637,13 +6664,13 @@ def iniciar_aplicacion_gui() -> None:
                 ctk.CTkLabel(
                     empty_pub_card,
                     text="⏳ Aún no se cargaron métricas de videos publicados para esta vista.",
-                    font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+                    font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
                     text_color=TEXT_MAIN,
                 ).pack(pady=(16, 4))
                 ctk.CTkLabel(
                     empty_pub_card,
                     text="Toca '🔄 Refrescar' arriba para consultar los videos y estadísticas en vivo de YouTube.",
-                    font=ctk.CTkFont(family="Segoe UI", size=11),
+                    font=ctk.CTkFont(family="Segoe UI", size=12),
                     text_color=TEXT_MUTED,
                 ).pack(pady=(0, 16))
             else:
@@ -6659,7 +6686,7 @@ def iniciar_aplicacion_gui() -> None:
                     ctk.CTkLabel(
                         row_p_top,
                         text=f"📺 {it_pub.get('cuenta_nombre', 'Canal')[:20]}{s_str}",
-                        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
                         text_color="#c084fc",
                         fg_color="#251a3a",
                         corner_radius=8,
@@ -6670,7 +6697,7 @@ def iniciar_aplicacion_gui() -> None:
                     ctk.CTkLabel(
                         row_p_top,
                         text=f"📅 {it_pub.get('fecha_dia', '')} · {it_pub.get('hora_local', '')} hs",
-                        font=ctk.CTkFont(family="Consolas", size=10),
+                        font=ctk.CTkFont(family="Consolas", size=11),
                         text_color=TEXT_MUTED,
                         fg_color="#182030",
                         corner_radius=8,
@@ -6681,7 +6708,7 @@ def iniciar_aplicacion_gui() -> None:
                     ctk.CTkLabel(
                         row_p_top,
                         text="✨ Publicado",
-                        font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+                        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
                         text_color="#4ade80",
                         fg_color="#0f291e",
                         corner_radius=8,
@@ -6695,19 +6722,19 @@ def iniciar_aplicacion_gui() -> None:
                             row_p_top,
                             text="🔗 Ver en YouTube",
                             command=lambda u=u_pub: webbrowser.open(u),
-                            width=115,
+                            width=120,
                             height=24,
                             corner_radius=10,
                             fg_color="#1e2436",
                             hover_color="#2b354f",
                             text_color=CYAN_ACCENT,
-                            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+                            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
                         ).pack(side="right")
 
                     lbl_tit_pub = ctk.CTkLabel(
                         card_pub_v,
                         text=str(it_pub.get("titulo") or "Video sin título"),
-                        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+                        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
                         text_color=TEXT_MAIN,
                         anchor="w",
                         justify="left",
@@ -6727,7 +6754,7 @@ def iniciar_aplicacion_gui() -> None:
                     ctk.CTkLabel(
                         row_metrics,
                         text=f"👁️  {v_num:,} vistas",
-                        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
                         text_color="#38bdf8",
                         fg_color="#0e2338",
                         corner_radius=8,
@@ -6739,7 +6766,7 @@ def iniciar_aplicacion_gui() -> None:
                     ctk.CTkLabel(
                         row_metrics,
                         text=f"👍  {l_num:,} likes",
-                        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
                         text_color="#4ade80",
                         fg_color="#0f291e",
                         corner_radius=8,
@@ -6751,7 +6778,7 @@ def iniciar_aplicacion_gui() -> None:
                     ctk.CTkLabel(
                         row_metrics,
                         text=f"💬  {c_num:,} comentarios",
-                        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
                         text_color="#e879f9",
                         fg_color="#2b1535",
                         corner_radius=8,
@@ -6781,7 +6808,7 @@ def iniciar_aplicacion_gui() -> None:
             corner_radius=12,
             height=30,
             border_width=1,
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         )
         tab_canal.pack(side="left", padx=(0, 8))
 
@@ -6792,7 +6819,7 @@ def iniciar_aplicacion_gui() -> None:
             corner_radius=12,
             height=30,
             border_width=1,
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         )
         tab_todas.pack(side="left")
 
@@ -6804,7 +6831,7 @@ def iniciar_aplicacion_gui() -> None:
                 ctk.CTkLabel(
                     scroll_f,
                     text="⏳ Consultando métricas de videos en YouTube en tiempo real...",
-                    font=ctk.CTkFont(family="Segoe UI", size=12),
+                    font=ctk.CTkFont(family="Segoe UI", size=13),
                     text_color=TEXT_MUTED,
                 ).pack(pady=30)
 
@@ -6840,13 +6867,13 @@ def iniciar_aplicacion_gui() -> None:
             command=_refrescar_en_vivo,
             corner_radius=14,
             height=30,
-            width=95,
+            width=100,
             fg_color=CARD_BG,
             hover_color="#252d42",
             border_width=1,
             border_color=CARD_BORDER,
             text_color=CYAN_ACCENT,
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         )
         btn_refrescar.pack(side="right")
 
@@ -6868,7 +6895,7 @@ def iniciar_aplicacion_gui() -> None:
         border_width=1,
         border_color=PURPLE_MAIN,
         text_color=TEXT_MAIN,
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
     btn_cuenta_top.pack(side="right", padx=(8, 0), pady=4)
 
@@ -6886,7 +6913,7 @@ def iniciar_aplicacion_gui() -> None:
         border_width=1,
         border_color=CARD_BORDER,
         text_color=TEXT_MAIN,
-        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
     )
     btn_ajustes.pack(side="right", pady=4)
 
@@ -7062,7 +7089,7 @@ def iniciar_aplicacion_gui() -> None:
         fg_color=PURPLE_MAIN,
         hover_color=PURPLE_HOVER,
         text_color="#ffffff",
-        font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=17, weight="bold"),
     )
     btn_auto_1clic.pack(fill="x")
     refrescar_texto_boton_accion()
@@ -7072,13 +7099,13 @@ def iniciar_aplicacion_gui() -> None:
         text="📆  Consultando cola de Shorts...",
         command=lambda: abrir_ventana_shorts_programados(),
         corner_radius=16,
-        height=36,
+        height=38,
         fg_color=CARD_BG,
         hover_color="#1a2030",
         border_width=1,
         border_color=CARD_BORDER,
         text_color=CYAN_ACCENT,
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
     btn_cola_programados.pack(fill="x", pady=(10, 0))
     _actualizar_pildora_cola()
@@ -7088,13 +7115,13 @@ def iniciar_aplicacion_gui() -> None:
         text="📊  Consultando rendimiento de videos...",
         command=lambda: abrir_ventana_overview_rendimiento(),
         corner_radius=16,
-        height=36,
+        height=38,
         fg_color=CARD_BG,
         hover_color="#1d162d",
         border_width=1,
         border_color=CARD_BORDER,
         text_color="#c084fc",
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
     btn_rendimiento_videos.pack(fill="x", pady=(6, 0))
     _actualizar_pildora_rendimiento()
@@ -7126,6 +7153,7 @@ def iniciar_aplicacion_gui() -> None:
             btn_auto_1clic.pack(fill="x")
             btn_cola_programados.pack(fill="x", pady=(10, 0))
             btn_rendimiento_videos.pack(fill="x", pady=(6, 0))
+        autoajustar_tamano_ventana()
 
     prog_top_row = ctk.CTkFrame(progress_card, fg_color="transparent")
     prog_top_row.pack(fill="x", padx=20, pady=(14, 6))
@@ -7133,7 +7161,7 @@ def iniciar_aplicacion_gui() -> None:
     lbl_estado = ctk.CTkLabel(
         prog_top_row,
         text="✨ Listo — Elige tus canales o link arriba y dale a Crear y Subir",
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         text_color=CYAN_ACCENT,
     )
     lbl_estado.pack(side="left")
@@ -7141,7 +7169,7 @@ def iniciar_aplicacion_gui() -> None:
     lbl_porcentaje_proceso = ctk.CTkLabel(
         prog_top_row,
         text="0%",
-        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
         text_color="#ffffff",
     )
     lbl_porcentaje_proceso.pack(side="right")
@@ -7381,7 +7409,7 @@ def iniciar_aplicacion_gui() -> None:
     ) -> None:
         win_c = ctk.CTkToplevel(root)
         win_c.title("✍️ Personalizar Reels Seleccionados")
-        win_c.geometry("680x510")
+        win_c.geometry("700x535")
         win_c.resizable(False, False)
         win_c.configure(fg_color=BG_DARK)
         win_c.transient(root)
@@ -7397,7 +7425,7 @@ def iniciar_aplicacion_gui() -> None:
         ctk.CTkLabel(
             top_bar,
             text="✍️  Videos Elegidos — Personaliza Título, Descripción y Guión",
-            font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(side="left")
 
@@ -7419,7 +7447,7 @@ def iniciar_aplicacion_gui() -> None:
         lbl_nav_r = ctk.CTkLabel(
             nav_box,
             text=f"Reel 1 de {total_v}",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             text_color=CYAN_ACCENT,
             width=95,
         )
@@ -7444,7 +7472,7 @@ def iniciar_aplicacion_gui() -> None:
         lbl_info_vid = ctk.CTkLabel(
             info_card,
             text="",
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             text_color="#facc15",
             anchor="w",
         )
@@ -7460,7 +7488,7 @@ def iniciar_aplicacion_gui() -> None:
             fg_color=INPUT_BG,
             border_color="#2a3147",
             text_color=CYAN_ACCENT,
-            font=ctk.CTkFont(family="Consolas", size=11),
+            font=ctk.CTkFont(family="Consolas", size=12),
         )
         ent_link_elegido.pack(side="left", fill="x", expand=True, padx=(0, 8))
 
@@ -7475,11 +7503,11 @@ def iniciar_aplicacion_gui() -> None:
             command=_abrir_link_navegador,
             corner_radius=12,
             height=30,
-            width=165,
+            width=175,
             fg_color="#1e293b",
             hover_color=PURPLE_MAIN,
             text_color="#ffffff",
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         ).pack(side="right")
 
         # Tarjeta de Campos de Personalización
@@ -7489,7 +7517,7 @@ def iniciar_aplicacion_gui() -> None:
         ctk.CTkLabel(
             form_card,
             text="📌 Título de YouTube Shorts (deja vacío para que lo arme la IA):",
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(anchor="w", padx=16, pady=(10, 2))
 
@@ -7500,14 +7528,14 @@ def iniciar_aplicacion_gui() -> None:
             height=34,
             fg_color=INPUT_BG,
             border_color="#2a3147",
-            font=ctk.CTkFont(family="Segoe UI", size=12),
+            font=ctk.CTkFont(family="Segoe UI", size=13),
         )
         ent_m_tit.pack(fill="x", padx=16, pady=(0, 8))
 
         ctk.CTkLabel(
             form_card,
             text="📝 Descripción y Hashtags (deja vacío para que lo arme la IA):",
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(anchor="w", padx=16, pady=(0, 2))
 
@@ -7518,14 +7546,14 @@ def iniciar_aplicacion_gui() -> None:
             height=34,
             fg_color=INPUT_BG,
             border_color="#2a3147",
-            font=ctk.CTkFont(family="Segoe UI", size=12),
+            font=ctk.CTkFont(family="Segoe UI", size=13),
         )
         ent_m_desc.pack(fill="x", padx=16, pady=(0, 8))
 
         ctk.CTkLabel(
             form_card,
             text="🎙️ Guión / Narración del Reel (escribe el texto a narrar o déjalo vacío para la IA):",
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(anchor="w", padx=16, pady=(0, 2))
 
@@ -7537,7 +7565,7 @@ def iniciar_aplicacion_gui() -> None:
             border_width=1,
             border_color="#2a3147",
             text_color="#ffffff",
-            font=ctk.CTkFont(family="Segoe UI", size=12),
+            font=ctk.CTkFont(family="Segoe UI", size=13),
         )
         txt_m_guion.pack(fill="both", expand=True, padx=16, pady=(0, 12))
 
@@ -7623,7 +7651,7 @@ def iniciar_aplicacion_gui() -> None:
             width=130,
             fg_color="#1e2436",
             hover_color="#334155",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
         ).pack(side="left")
 
         txt_confirmar = (
@@ -7640,7 +7668,7 @@ def iniciar_aplicacion_gui() -> None:
             fg_color=GREEN_ACCENT,
             hover_color="#059669",
             text_color="#052e16",
-            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
         ).pack(side="right", fill="x", expand=True, padx=(12, 0))
 
         _mostrar_reel_idx()
@@ -8081,6 +8109,8 @@ def iniciar_aplicacion_gui() -> None:
     btn_auto_1clic.configure(command=ejecutar_flujo_1_clic)
     root.after(200, vaciar_cola_logs)
     root.after(700, sincronizar_cola_programados_async)
+    root.after(60, autoajustar_tamano_ventana)
+    root.after(300, autoajustar_tamano_ventana)
     root.deiconify()
     root.lift()
     root.focus_force()
