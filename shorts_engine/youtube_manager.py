@@ -110,7 +110,14 @@ def descargar_video_youtube(url: str) -> Path:
                 "-of", "json",
                 str(ruta_res),
             ]
-            res_p = subprocess.run(cmd_probe, capture_output=True, text=True, check=False)
+            res_p = subprocess.run(
+                cmd_probe,
+                capture_output=True,
+                text=True,
+                check=False,
+                creationflags=WIN_NO_WINDOW,
+                startupinfo=WIN_STARTUPINFO,
+            )
             if res_p.returncode == 0:
                 st = json.loads(res_p.stdout).get("streams", [{}])[0]
                 w_dl = int(st.get("width") or 0)

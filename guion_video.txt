@@ -1,6 +1,6 @@
-TITULO_SUPERIOR: Troleo Epico en Tienda de Abarrotes
-TITULO_YOUTUBE: ¡Le aplican la broma perfecta al dependiente de la tienda! #shorts
-DESCRIPCION_YOUTUBE: Un cliente travieso intenta engañar al tendero en esta divertida broma. ¡Mira cómo termina este épico enredo! #shorts #humor #broma #viral
+TITULO_SUPERIOR: Empleada Desconecta Camara Troleo Fallido
+TITULO_YOUTUBE: ¡Atrapó a su empleada apagando la cámara! 😱 #shorts
+DESCRIPCION_YOUTUBE: La empleada intentó apagar la cámara de seguridad sin saber que su jefe la estaba viendo en vivo. ¿Qué habrías hecho en el lugar del jefe? #shorts #humor #fail #viral
 ESTADO_PUBLICACION: privado
 SCHEDULE: 2026-10-29 19:00
 PARA_NINOS: no
@@ -10,17 +10,8 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | whoosh | sorprendido:derecha | izquierda | ninguno | ¡Mira cómo este joven intenta abrir un frasco con jugo en la tienda! ¡El tendero le enseña un truco súper rápido!
-00:05 - 00:10 | zoom_in | pop | risa:izquierda | ninguna | ninguno | ¡El tendero le da dos golpes abajo y el frasco se abre al instante frente a todos! ¡Increíble truco!
-00:10 - 00:15 | alerta_roja | error | enojo:derecha | ninguna | ninguno | ¡Ahora el tendero le cobra doscientos pesos por abrirlo, pero el cliente dice que él jamás pidió eso!
-00:15 - 00:20 | zoom_out | click | sorprendido:izquierda | ninguna | ninguno | ¡El joven acepta pagar y revisa la tapa roja buscando algún mensaje oculto con mucha curiosidad hoy!
-00:20 - 00:25 | flash | cash_ting | fiesta:derecha | ninguna | ninguno | ¡Aparece un texto oculto en la tapa y el joven grita emocionado porque ganó un premio increíble gratis!
-00:25 - 00:30 | zoom_in | whoosh | risa:izquierda | ninguna | ninguno | ¡El tendero se burla diciendo que la empresa solo pone eso por diversión y no significa nada real!
-00:30 - 00:35 | temblor | xp_Error | enojo:derecha | ninguna | ninguno | ¡El cliente graba todo con su celular y amenaza con llevar el video directamente a la policía local!
-00:35 - 00:40 | brillo_epico | party_horn | fiesta:izquierda | ninguna | ninguno | ¡El tendero se asusta por el video y le entrega un montón de botellas gratis para evitar más problemas!
-00:40 - 00:45 | zoom_in | cash_ting | sorprendido:derecha | ninguna | ninguno | ¡El tendero lanza otra oferta loca donde si pagas cien pesos te regresa quinientos en efectivo ahora mismo!
-00:45 - 00:50 | flash | error | risa:izquierda | ninguna | ninguno | ¡El cliente paga los cien pesos pero el tendero le entrega una foto con una mano abierta de broma!
-00:50 - 00:55 | zoom_out | punch | enojo:derecha | ninguna | ninguno | ¡El joven se da cuenta de que cayó en la trampa y ahora busca la forma de vengarse!
-00:55 - 01:00 | zoom_in | whoosh | sorprendido:izquierda | ninguna | ninguno | ¡Pregunta el precio de toda la mercancía de la tienda y el tendero dice ochocientos pesos exactos!
-01:00 - 01:05 | alerta_roja | good_idea | diablo:derecha | ninguna | ninguno | ¡El joven paga los ochocientos pesos y rápidamente se lleva a la hermosa hija del tendero de la mano!
-01:05 - 01:10 | flash | crowd_shocked | lloros:izquierda | ninguna | ninguno | ¡El tendero se queda completamente solo gritando desesperado mientras ve cómo se llevan a su adorada hija!
+00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | ¡Esta empleada descubre que su jefe puso una cámara para vigilarla! ¡Así que decide desconectar el cable de inmediato!
+00:05 - 00:10 | zoom_in | whoosh | risa:izquierda | ninguna | ninguno | ¡Pensó que nadie la descubriría jamás mientras comía su fruta! ¡Pero de repente recibe la llamada furiosa de su jefe!
+00:10 - 00:15 | alerta_roja | riser_suction | enojo:derecha | ninguna | centro:grande | ¡El dueño le reclama por apagar la cámara en secreto! ¡Y ella inventa descaradamente que se cortó la luz eléctrica!
+00:15 - 00:20 | temblor | xp_Error | diablo:izquierda | abajo | ninguno | ¡El jefe la amenaza con descontarle el sueldo entero! ¡Asustada corre a conectar todo diciendo que la luz ya volvió!
+00:20 - 00:24 | brillo_epico | cartoon_laugh | fiesta:derecha | ninguna | ninguno | ¡El dueño le dice que no puede engañarlo a él porque es el maestro de la trampa!

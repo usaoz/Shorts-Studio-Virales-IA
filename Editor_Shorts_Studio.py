@@ -315,6 +315,7 @@ def iniciar_aplicacion_gui() -> None:
             "canales": [],
             "indice_rotacion": 0,
             "custom_reels": [],
+            "modo_render": "Automático (GPU)",
         }
         if SCHEDULE_MEM_FILE.exists():
             try:
@@ -355,6 +356,7 @@ def iniciar_aplicacion_gui() -> None:
                     "canales": list(leido.get("canales", [])),
                     "indice_rotacion": int(leido.get("indice_rotacion", 0)),
                     "custom_reels": list(leido.get("custom_reels", [])),
+                    "modo_render": str(leido.get("modo_render", "Automático (GPU)")),
                 }
             except Exception:
                 pass
@@ -378,6 +380,7 @@ def iniciar_aplicacion_gui() -> None:
     modo_contenido_var = tk.StringVar(value=str(mem["modo_contenido"]))
     accion_final_var = tk.StringVar(value=str(mem.get("accion_final", "Subir automáticamente")))
     modelo_ia_var = tk.StringVar(value=str(mem["modelo_ia"]))
+    modo_render_var = tk.StringVar(value=str(mem.get("modo_render", "Automático (GPU)")))
     orden_canales_var = tk.StringVar(value=str(mem["orden_canales"]))
     min_views_var = tk.StringVar(value=str(mem["min_views_millones"]))
     cantidad_total_var = tk.StringVar(value=str(mem["cantidad_total"]))
@@ -508,6 +511,7 @@ def iniciar_aplicacion_gui() -> None:
                         "canales": lista_canales,
                         "indice_rotacion": estado_rotacion["idx"],
                         "custom_reels": datos_custom_reels[:12],
+                        "modo_render": modo_render_var.get(),
                     },
                     indent=2,
                 ),
@@ -1740,7 +1744,7 @@ def iniciar_aplicacion_gui() -> None:
     def abrir_ventana_ajustes() -> None:
         win = ctk.CTkToplevel(root)
         win.title("Ajustes y Herramientas")
-        win.geometry("600x700")
+        win.geometry("600x760")
         win.resizable(False, False)
         win.configure(fg_color=BG_DARK)
         win.transient(root)
@@ -1847,6 +1851,25 @@ def iniciar_aplicacion_gui() -> None:
             card_cfg,
             variable=encuadre_var,
             values=list(encuadre_map.keys()),
+            command=_guardar_memoria,
+            corner_radius=14,
+            height=32,
+            font=ctk.CTkFont(family="Segoe UI", size=12),
+            fg_color="#1e2436",
+            button_color="#2d354d",
+        ).pack(fill="x", padx=18, pady=(0, 8))
+
+        ctk.CTkLabel(
+            card_cfg,
+            text="Aceleración de Video (Render)",
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+            text_color=TEXT_MAIN,
+        ).pack(anchor="w", padx=18, pady=(0, 4))
+
+        ctk.CTkOptionMenu(
+            card_cfg,
+            variable=modo_render_var,
+            values=["Automático (GPU)", "Procesador CPU Equilibrado (Recomendado al jugar)"],
             command=_guardar_memoria,
             corner_radius=14,
             height=32,
@@ -4447,6 +4470,7 @@ def iniciar_aplicacion_gui() -> None:
                             frac_interna = 0.30 + (max(0.0, min(100.0, pct_edit)) / 100.0) * 0.58
                             _set_subprogreso(frac_interna, f"{pref_lote}{txt_edit}", CYAN_ACCENT)
 
+                        modo_render_elegido = "cpu" if "CPU" in modo_render_var.get() else "auto"
                         ruta_final = asyncio.run(
                             editar_video_con_guion(
                                 ruta_video=ruta_video_usar,
@@ -4455,6 +4479,7 @@ def iniciar_aplicacion_gui() -> None:
                                 modo_encuadre_override=encuadre_elegido,
                                 progreso_cb=_cb_edicion,
                                 cancelar_check=lambda: evento_cancelar.is_set(),
+                                encoder_override=modo_render_elegido,
                             )
                         )
                     ultimo_video_generado[0] = ruta_final

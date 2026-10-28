@@ -878,12 +878,21 @@ def calcular_envolvente_rms(ruta_wav: Path, fps: int) -> np.ndarray:
 _ENCODER_SELECCIONADO: Optional[Tuple[str, List[str]]] = None
 
 
-def detectar_encoder_video() -> Tuple[str, List[str]]:
+def detectar_encoder_video(forzar_cpu: bool = False) -> Tuple[str, List[str]]:
     """
     Detecta y prueba qué codificador de video H.264 acelerado por hardware
     (NVIDIA NVENC, AMD AMF o Intel QSV) o CPU (libx264) es compatible
     y funcional en la GPU/sistema actual mediante una prueba real de 1 frame.
+    Si forzar_cpu=True, utiliza libx264 equilibrado sin tocar la GPU (ideal al jugar).
     """
+    hilos_cpu = max(4, min(8, CPU_THREADS // 2))
+    args_cpu = [
+        "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+        "-threads", str(hilos_cpu), "-pix_fmt", "yuv420p",
+    ]
+    if forzar_cpu:
+        return ("libx264", args_cpu)
+
     global _ENCODER_SELECCIONADO
     if _ENCODER_SELECCIONADO is not None:
         return _ENCODER_SELECCIONADO
@@ -919,11 +928,7 @@ def detectar_encoder_video() -> Tuple[str, List[str]]:
         except Exception:
             continue
 
-    # Fallback universal por CPU (libx264 CRF 17 calidad casi sin pérdidas)
-    args_cpu = [
-        "-c:v", "libx264", "-preset", "medium", "-crf", "17",
-        "-threads", str(CPU_THREADS), "-pix_fmt", "yuv420p",
-    ]
+    # Fallback equilibrado por CPU (libx264 preset fast CRF 18)
     _ENCODER_SELECCIONADO = ("libx264", args_cpu)
     return _ENCODER_SELECCIONADO
 
@@ -1046,6 +1051,7 @@ async def editar_video_con_guion(
     modo_encuadre_override: Optional[str] = None,
     progreso_cb: Optional[object] = None,
     cancelar_check: Optional[Callable[[], bool]] = None,
+    encoder_override: Optional[str] = None,
 ) -> Path:
     def _notificar_prog(frac_0_1: float, detalle: str) -> None:
         if callable(progreso_cb):
@@ -1237,278 +1243,301 @@ async def editar_video_con_guion(
     if not nombre_out.lower().endswith(".mp4"):
         nombre_out += ".mp4"
     ruta_mp4_final = OUTPUT_DIR / nombre_out
-    encoder, args_codec = detectar_encoder_video()
-    if "amf" in encoder:
-        tipo_gpu = "Aceleración Hardware AMD Radeon (AMF)"
-    elif "nvenc" in encoder:
-        tipo_gpu = "Aceleración Hardware NVIDIA (NVENC)"
-    elif "qsv" in encoder:
-        tipo_gpu = "Aceleración Hardware Intel (QSV)"
-    else:
-        tipo_gpu = "Procesador CPU (libx264)"
-    print(f"[*] Renderizando Short final con {encoder} [{tipo_gpu}] ({WIDTH}x{HEIGHT} a {FPS} FPS)...")
+    forzar_cpu = (encoder_override == "cpu")
+    encoder, args_codec = detectar_encoder_video(forzar_cpu=forzar_cpu)
 
-    cmd_ffmpeg = [
-        "ffmpeg", "-y",
-        "-f", "rawvideo",
-        "-vcodec", "rawvideo",
-        "-s", f"{WIDTH}x{HEIGHT}",
-        "-pix_fmt", "rgb24",
-        "-r", str(FPS),
-        "-i", "-",
-        "-i", str(ruta_audio_final),
-        *args_codec,
-        "-colorspace", "bt709",
-        "-color_primaries", "bt709",
-        "-color_trc", "bt709",
-        "-color_range", "tv",
-        "-c:a", "aac",
-        "-b:a", "192k",
-        "-shortest",
-        str(ruta_mp4_final),
-    ]
+    def _ejecutar_render(enc_actual: str, args_actual: List[str]) -> Path:
+        if "amf" in enc_actual:
+            tipo_gpu = "Aceleración Hardware AMD Radeon (AMF)"
+        elif "nvenc" in enc_actual:
+            tipo_gpu = "Aceleración Hardware NVIDIA (NVENC)"
+        elif "qsv" in enc_actual:
+            tipo_gpu = "Aceleración Hardware Intel (QSV)"
+        else:
+            tipo_gpu = "Procesador CPU Equilibrado (libx264 fast CRF 18)"
+        print(f"[*] Renderizando Short final con {enc_actual} [{tipo_gpu}] ({WIDTH}x{HEIGHT} a {FPS} FPS)...")
 
-    TEMP_DIR.mkdir(parents=True, exist_ok=True)
-    ruta_err_ffmpeg = TEMP_DIR / "ffmpeg_render_error.log"
-    f_err = open(ruta_err_ffmpeg, "w", encoding="utf-8", errors="replace")
-    proceso_ffmpeg = subprocess.Popen(
-        cmd_ffmpeg,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.DEVNULL,
-        stderr=f_err,
-        creationflags=WIN_NO_WINDOW,
-        startupinfo=WIN_STARTUPINFO,
-    )
+        cmd_ffmpeg = [
+            "ffmpeg", "-y",
+            "-f", "rawvideo",
+            "-vcodec", "rawvideo",
+            "-s", f"{WIDTH}x{HEIGHT}",
+            "-pix_fmt", "rgb24",
+            "-r", str(FPS),
+            "-i", "-",
+            "-i", str(ruta_audio_final),
+            *args_actual,
+            "-colorspace", "bt709",
+            "-color_primaries", "bt709",
+            "-color_trc", "bt709",
+            "-color_range", "tv",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-shortest",
+            str(ruta_mp4_final),
+        ]
 
-    # Nota: `config.titulo_superior` se usa únicamente para darle nombre al archivo MP4 exportado
-    # y NO se renderiza encima del video.
+        TEMP_DIR.mkdir(parents=True, exist_ok=True)
+        ruta_err_ffmpeg = TEMP_DIR / "ffmpeg_render_error.log"
+        f_err = open(ruta_err_ffmpeg, "w", encoding="utf-8", errors="replace")
+        proceso_ffmpeg = subprocess.Popen(
+            cmd_ffmpeg,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=f_err,
+            creationflags=WIN_NO_WINDOW,
+            startupinfo=WIN_STARTUPINFO,
+        )
 
-    ultimo_frame_lienzo: Optional[Image.Image] = None
+        ultimo_frame_lienzo: Optional[Image.Image] = None
 
-    # 5. Renderizar segmento por segmento con seguimiento de objetivos (Optical Flow) y subtítulos luminosos
-    for idx_seg, (seg, total_frames_seg, dur_seg_exacta, palabras_sub, rms_env) in enumerate(datos_segmentos):
-        if cancelar_check and cancelar_check():
-            try:
-                if proceso_ffmpeg and proceso_ffmpeg.stdin:
+        try:
+            # 5. Renderizar segmento por segmento con seguimiento de objetivos (Optical Flow) y subtítulos luminosos
+            for idx_seg, (seg, total_frames_seg, dur_seg_exacta, palabras_sub, rms_env) in enumerate(datos_segmentos):
+                if cancelar_check and cancelar_check():
+                    try:
+                        if proceso_ffmpeg and proceso_ffmpeg.stdin:
+                            proceso_ffmpeg.stdin.close()
+                        proceso_ffmpeg.terminate()
+                        f_err.close()
+                    except Exception:
+                        pass
+                    if ruta_mp4_final.exists():
+                        try:
+                            ruta_mp4_final.unlink()
+                        except Exception:
+                            pass
+                    raise InterruptedError("Edición cancelada por el usuario.")
+                _notificar_prog(
+                    0.40 + 0.58 * (idx_seg / float(max(1, len(datos_segmentos)))),
+                    f"Renderizando video a 60 FPS con subtítulos neón y tracking ({idx_seg + 1}/{len(datos_segmentos)})...",
+                )
+                t_vid_ini = float(seg.t_inicio_video or 0.0)
+                t_vid_fin = float(seg.t_fin_video or dur_video_origen)
+
+                frames_seg_rgb = extraer_frames_segmento_video(
+                    ruta_video=ruta_video,
+                    t_ini=t_vid_ini,
+                    t_fin=t_vid_fin,
+                    total_frames_salida=total_frames_seg,
+                    modo_encuadre=config.modo_encuadre,
+                )
+
+                # Calcular trayectorias rastreadas por visión artificial para FLECHA y CIRCULO
+                mismo_objetivo = bool(
+                    seg.track_flecha_activo
+                    and seg.track_circulo_activo
+                    and seg.callout_flecha
+                    and seg.callout_circulo
+                    and (seg.callout_flecha.strip() == seg.callout_circulo.strip())
+                )
+
+                pos_flecha_lista: List[Optional[Tuple[int, int]]] = [None] * total_frames_seg
+                pos_circulo_lista: List[Optional[Tuple[int, int]]] = [None] * total_frames_seg
+
+                if seg.track_circulo_activo and seg.callout_circulo:
+                    pos_circulo_lista = rastrear_objetivo_en_segmento(frames_seg_rgb, seg.callout_circulo)
+
+                if seg.track_flecha_activo and seg.callout_flecha:
+                    if mismo_objetivo and pos_circulo_lista:
+                        pos_flecha_lista = list(pos_circulo_lista)
+                    else:
+                        pos_flecha_lista = rastrear_objetivo_en_segmento(frames_seg_rgb, seg.callout_flecha)
+
+                for f_idx in range(total_frames_seg):
+                    t_seg = f_idx / float(FPS)
+                    frame_pil = frames_seg_rgb[f_idx] if f_idx < len(frames_seg_rgb) else frames_seg_rgb[-1]
+                    lienzo = frame_pil.copy()
+
+                    p_flecha = pos_flecha_lista[f_idx] if f_idx < len(pos_flecha_lista) else None
+                    p_circulo = pos_circulo_lista[f_idx] if f_idx < len(pos_circulo_lista) else None
+
+                    gestor_assets.dibujar_efectos_en_frame(
+                        lienzo=lienzo,
+                        t_seg=t_seg,
+                        dur_seg=dur_seg_exacta,
+                        pos_flecha_track=p_flecha,
+                        pos_circulo_track=p_circulo,
+                        tiene_circulo=seg.tiene_circulo,
+                        tiene_flecha=seg.tiene_flecha,
+                        tiene_emoji=seg.tiene_emoji,
+                        emoji_nombre=seg.emoji_nombre,
+                        tiene_foto=seg.tiene_foto,
+                        foto_nombre=seg.foto_nombre,
+                        callout_flecha=seg.callout_flecha,
+                        callout_circulo=seg.callout_circulo,
+                    )
+
+                    # Subtítulos neón dinámicos con zoom y colores clave
+                    rms_val = float(rms_env[f_idx]) if f_idx < len(rms_env) else 0.0
+                    renderizar_subtitulos_luminosos(
+                        lienzo=lienzo,
+                        palabras=palabras_sub,
+                        t_actual=t_seg,
+                        nivel_voz_rms=rms_val,
+                        y_centro=1340,
+                        palabras_verdes_extra=config.palabras_verdes_extra,
+                        palabras_rojas_extra=config.palabras_rojas_extra,
+                        palabras_cian_extra=config.palabras_cian_extra,
+                    )
+
+                    if proceso_ffmpeg.poll() is not None:
+                        try:
+                            if proceso_ffmpeg.stdin:
+                                proceso_ffmpeg.stdin.close()
+                        except Exception:
+                            pass
+                        proceso_ffmpeg.terminate()
+                        f_err.flush()
+                        f_err.close()
+                        err_txt = ""
+                        try:
+                            err_txt = ruta_err_ffmpeg.read_text(encoding="utf-8", errors="replace").strip()
+                        except Exception:
+                            pass
+                        raise RuntimeError(
+                            f"FFmpeg se cerró antes de tiempo con código {proceso_ffmpeg.returncode}.\n"
+                            f"Detalles:\n{err_txt}"
+                        )
+
+                    if idx_seg == len(datos_segmentos) - 1 and f_idx == total_frames_seg - 1:
+                        ultimo_frame_lienzo = lienzo.copy()
+
+                    if proceso_ffmpeg.stdin:
+                        try:
+                            proceso_ffmpeg.stdin.write(lienzo.convert("RGB").tobytes())
+                        except OSError as e:
+                            try:
+                                proceso_ffmpeg.stdin.close()
+                            except Exception:
+                                pass
+                            proceso_ffmpeg.terminate()
+                            f_err.flush()
+                            f_err.close()
+                            err_txt = ""
+                            try:
+                                err_txt = ruta_err_ffmpeg.read_text(encoding="utf-8", errors="replace").strip()
+                            except Exception:
+                                pass
+                            raise RuntimeError(
+                                f"Error al enviar frame a FFmpeg ({e}).\nDetalles del encoder:\n{err_txt}"
+                            ) from e
+
+            # 6. Renderizar Outro automático de 1 segundo (Freeze-Frame + Desenfoque + Flecha al Like + Subtítulo Luminoso)
+            if ultimo_frame_lienzo is not None and total_frames_outro > 0:
+                _notificar_prog(0.97, "Renderizando outro de 1 segundo (¡Deja tu like!)...")
+                print("[*] Renderizando Outro de 1 segundo (Freeze-frame + desenfoque + flecha al Like)...")
+                bg_blur = ultimo_frame_lienzo.filter(ImageFilter.GaussianBlur(16))
+                oscurecedor = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 95))
+                lienzo_base_outro = Image.alpha_composite(bg_blur.convert("RGBA"), oscurecedor)
+
+                for f_idx in range(total_frames_outro):
+                    t_seg = f_idx / float(FPS)
+                    rms_val = float(rms_env_outro[f_idx]) if f_idx < len(rms_env_outro) else 0.0
+                    lienzo_out = lienzo_base_outro.copy()
+
+                    # Flecha Roja al botón de Like de YouTube Shorts (X: 985, Y: 1040)
+                    gestor_assets.dibujar_flecha_outro_like(
+                        lienzo=lienzo_out,
+                        t_seg=t_seg,
+                        dur_seg=dur_outro_seg,
+                    )
+
+                    # Subtítulo neón animado
+                    renderizar_subtitulos_luminosos(
+                        lienzo=lienzo_out,
+                        palabras=palabras_sub_outro,
+                        t_actual=t_seg,
+                        nivel_voz_rms=rms_val,
+                        y_centro=1340,
+                        palabras_verdes_extra={"LIKE!", "LIKE"},
+                    )
+
+                    if proceso_ffmpeg.poll() is not None:
+                        try:
+                            if proceso_ffmpeg.stdin:
+                                proceso_ffmpeg.stdin.close()
+                        except Exception:
+                            pass
+                        proceso_ffmpeg.terminate()
+                        f_err.flush()
+                        f_err.close()
+                        err_txt = ""
+                        try:
+                            err_txt = ruta_err_ffmpeg.read_text(encoding="utf-8", errors="replace").strip()
+                        except Exception:
+                            pass
+                        raise RuntimeError(
+                            f"FFmpeg se cerró antes de tiempo durante el outro con código {proceso_ffmpeg.returncode}.\n"
+                            f"Detalles:\n{err_txt}"
+                        )
+
+                    if proceso_ffmpeg.stdin:
+                        try:
+                            proceso_ffmpeg.stdin.write(lienzo_out.convert("RGB").tobytes())
+                        except OSError as e:
+                            try:
+                                proceso_ffmpeg.stdin.close()
+                            except Exception:
+                                pass
+                            proceso_ffmpeg.terminate()
+                            f_err.flush()
+                            f_err.close()
+                            err_txt = ""
+                            try:
+                                err_txt = ruta_err_ffmpeg.read_text(encoding="utf-8", errors="replace").strip()
+                            except Exception:
+                                pass
+                            raise RuntimeError(f"Error al enviar frame de outro a FFmpeg ({e}).\nDetalles:\n{err_txt}") from e
+
+            if proceso_ffmpeg.stdin:
+                try:
                     proceso_ffmpeg.stdin.close()
-                proceso_ffmpeg.terminate()
-                f_err.close()
+                except Exception:
+                    pass
+            proceso_ffmpeg.wait()
+            f_err.flush()
+            f_err.close()
+
+            if proceso_ffmpeg.returncode != 0:
+                err_txt = ""
+                try:
+                    err_txt = ruta_err_ffmpeg.read_text(encoding="utf-8", errors="replace").strip()
+                except Exception:
+                    pass
+                raise RuntimeError(f"FFmpeg finalizó con código {proceso_ffmpeg.returncode}.\nDetalles:\n{err_txt}")
+
+            return ruta_mp4_final
+        finally:
+            try:
+                if not f_err.closed:
+                    f_err.close()
             except Exception:
                 pass
+
+    try:
+        resultado = _ejecutar_render(encoder, args_codec)
+    except Exception as e:
+        if isinstance(e, InterruptedError):
+            raise
+        if encoder != "libx264":
+            print(f"[!] Falló la GPU ({encoder}): {e}")
+            print("[*] Reintentando renderizado automáticamente con Procesador CPU equilibrado (libx264 fast CRF 18)...")
+            _notificar_prog(0.40, "GPU sin memoria (posible juego abierto). Reintentando por CPU equilibrada...")
             if ruta_mp4_final.exists():
                 try:
                     ruta_mp4_final.unlink()
                 except Exception:
                     pass
-            raise InterruptedError("Edición cancelada por el usuario.")
-        _notificar_prog(
-            0.40 + 0.58 * (idx_seg / float(max(1, len(datos_segmentos)))),
-            f"Renderizando video a 60 FPS con subtítulos neón y tracking ({idx_seg + 1}/{len(datos_segmentos)})...",
-        )
-        t_vid_ini = float(seg.t_inicio_video or 0.0)
-        t_vid_fin = float(seg.t_fin_video or dur_video_origen)
-
-        frames_seg_rgb = extraer_frames_segmento_video(
-            ruta_video=ruta_video,
-            t_ini=t_vid_ini,
-            t_fin=t_vid_fin,
-            total_frames_salida=total_frames_seg,
-            modo_encuadre=config.modo_encuadre,
-        )
-
-        # Calcular trayectorias rastreadas por visión artificial para FLECHA y CIRCULO
-        mismo_objetivo = bool(
-            seg.flecha and seg.circulo and (_quitar_acentos(seg.flecha) == _quitar_acentos(seg.circulo))
-        )
-
-        trayectoria_flecha: Optional[List[Tuple[float, float]]] = None
-        trayectoria_circulo: Optional[List[Tuple[float, float]]] = None
-
-        if seg.circulo:
-            trayectoria_circulo = RastreadorObjetivosVideo.calcular_trayectoria(frames_seg_rgb, seg.circulo)
-        if seg.flecha:
-            if mismo_objetivo and trayectoria_circulo is not None:
-                trayectoria_flecha = trayectoria_circulo
-            else:
-                trayectoria_flecha = RastreadorObjetivosVideo.calcular_trayectoria(frames_seg_rgb, seg.flecha)
-
-        print(
-            f"    -> Renderizando segmento {idx_seg + 1}/{len(datos_segmentos)} "
-            f"({total_frames_seg} frames | video {t_vid_ini:.1f}s..{t_vid_fin:.1f}s)..."
-        )
-
-        for f_idx in range(total_frames_seg):
-            t_seg = f_idx / float(FPS)
-            rms_val = float(rms_env[f_idx]) if f_idx < len(rms_env) else 0.0
-            frame_rgb = frames_seg_rgb[f_idx]
-
-            pt_c_vid = trayectoria_circulo[f_idx] if trayectoria_circulo else (WIDTH / 2.0, HEIGHT * 0.44)
-            pt_f_vid = trayectoria_flecha[f_idx] if trayectoria_flecha else pt_c_vid
-            foco_camara = pt_c_vid if trayectoria_circulo else (pt_f_vid if trayectoria_flecha else (WIDTH / 2.0, HEIGHT * 0.46))
-
-            lienzo, pts_pantalla = gestor_assets.aplicar_efecto_camara_y_transformar_puntos(
-                frame_rgb=frame_rgb,
-                efecto=seg.efecto_visual,
-                t_seg=t_seg,
-                dur_seg=dur_seg_exacta,
-                foco_video=foco_camara,
-                puntos_rastreados=[pt_c_vid, pt_f_vid],
-            )
-            pt_c_screen, pt_f_screen = pts_pantalla[0], pts_pantalla[1]
-
-            # 1) Círculo Rojo siguiendo al objetivo
-            radio_circulo = gestor_assets.dibujar_circulo_rojo(
-                lienzo=lienzo,
-                activo=bool(seg.circulo),
-                target_xy=pt_c_screen,
-                tamano_mod=seg.tamano_circulo,
-                t_seg=t_seg,
-                dur_seg=dur_seg_exacta,
-            )
-
-            # 2) Flecha Roja siguiendo al objetivo (si comparte objetivo con el círculo, apunta a su borde)
-            radio_para_flecha = radio_circulo if mismo_objetivo else 0.0
-            gestor_assets.dibujar_flecha_roja(
-                lienzo=lienzo,
-                activo=bool(seg.flecha),
-                target_xy=pt_f_screen,
-                radio_circulo_activo=radio_para_flecha,
-                t_seg=t_seg,
-                dur_seg=dur_seg_exacta,
-            )
-
-            # 3) Emoji animado (evitando superponerse con el objetivo rastreado)
-            target_ref_emoji = pt_c_screen if seg.circulo else (pt_f_screen if seg.flecha else None)
-            gestor_assets.dibujar_emoji(
-                lienzo=lienzo,
-                nombre_emoji=seg.emoji,
-                posicion_solicitada=seg.posicion_emoji,
-                target_principal_xy=target_ref_emoji,
-                t_seg=t_seg,
-                dur_seg=dur_seg_exacta,
-            )
-
-            # 4) Subtítulos dinámicos ultra llamativos con resplandor neón y pulso reactivo a la voz
-            renderizar_subtitulos_luminosos(
-                lienzo=lienzo,
-                palabras=palabras_sub,
-                t_actual=t_seg,
-                nivel_voz_rms=rms_val,
-                y_centro=1340,
-                palabras_verdes_extra=config.palabras_verdes_extra,
-                palabras_rojas_extra=config.palabras_rojas_extra,
-                palabras_cian_extra=config.palabras_cian_extra,
-            )
-
-            if proceso_ffmpeg.poll() is not None:
-                f_err.flush()
-                f_err.close()
-                err_txt = ""
-                try:
-                    err_txt = ruta_err_ffmpeg.read_text(encoding="utf-8", errors="replace").strip()
-                except Exception:
-                    pass
-                raise RuntimeError(
-                    f"FFmpeg se cerró antes de tiempo con código {proceso_ffmpeg.returncode}.\n"
-                    f"Detalles:\n{err_txt}"
-                )
-
-            if idx_seg == len(datos_segmentos) - 1 and f_idx == total_frames_seg - 1:
-                ultimo_frame_lienzo = lienzo.copy()
-
-            if proceso_ffmpeg.stdin:
-                try:
-                    proceso_ffmpeg.stdin.write(lienzo.convert("RGB").tobytes())
-                except OSError as e:
-                    f_err.flush()
-                    f_err.close()
-                    err_txt = ""
-                    try:
-                        err_txt = ruta_err_ffmpeg.read_text(encoding="utf-8", errors="replace").strip()
-                    except Exception:
-                        pass
-                    raise RuntimeError(
-                        f"Error al enviar frame a FFmpeg ({e}).\nDetalles del encoder:\n{err_txt}"
-                    ) from e
-
-    # 6. Renderizar Outro automático de 1 segundo (Freeze-Frame + Desenfoque + Flecha al Like + Subtítulo Luminoso)
-    if ultimo_frame_lienzo is not None and total_frames_outro > 0:
-        _notificar_prog(0.97, "Renderizando outro de 1 segundo (¡Deja tu like!)...")
-        print("[*] Renderizando Outro de 1 segundo (Freeze-frame + desenfoque + flecha al Like)...")
-        bg_blur = ultimo_frame_lienzo.filter(ImageFilter.GaussianBlur(16))
-        oscurecedor = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 95))
-        lienzo_base_outro = Image.alpha_composite(bg_blur.convert("RGBA"), oscurecedor)
-
-        for f_idx in range(total_frames_outro):
-            t_seg = f_idx / float(FPS)
-            rms_val = float(rms_env_outro[f_idx]) if f_idx < len(rms_env_outro) else 0.0
-            lienzo_out = lienzo_base_outro.copy()
-
-            # Flecha Roja al botón de Like de YouTube Shorts (X: 985, Y: 1040)
-            gestor_assets.dibujar_flecha_outro_like(
-                lienzo=lienzo_out,
-                t_seg=t_seg,
-                dur_seg=dur_outro_seg,
-            )
-
-            # Subtítulo neón animado
-            renderizar_subtitulos_luminosos(
-                lienzo=lienzo_out,
-                palabras=palabras_sub_outro,
-                t_actual=t_seg,
-                nivel_voz_rms=rms_val,
-                y_centro=1340,
-                palabras_verdes_extra={"LIKE!", "LIKE"},
-            )
-
-            if proceso_ffmpeg.poll() is not None:
-                f_err.flush()
-                f_err.close()
-                err_txt = ""
-                try:
-                    err_txt = ruta_err_ffmpeg.read_text(encoding="utf-8", errors="replace").strip()
-                except Exception:
-                    pass
-                raise RuntimeError(
-                    f"FFmpeg se cerró antes de tiempo durante el outro con código {proceso_ffmpeg.returncode}.\n"
-                    f"Detalles:\n{err_txt}"
-                )
-
-            if proceso_ffmpeg.stdin:
-                try:
-                    proceso_ffmpeg.stdin.write(lienzo_out.convert("RGB").tobytes())
-                except OSError as e:
-                    f_err.flush()
-                    f_err.close()
-                    err_txt = ""
-                    try:
-                        err_txt = ruta_err_ffmpeg.read_text(encoding="utf-8", errors="replace").strip()
-                    except Exception:
-                        pass
-                    raise RuntimeError(f"Error al enviar frame de outro a FFmpeg ({e}).\nDetalles:\n{err_txt}") from e
-
-    if proceso_ffmpeg.stdin:
-        try:
-            proceso_ffmpeg.stdin.close()
-        except Exception:
-            pass
-    proceso_ffmpeg.wait()
-    f_err.flush()
-    f_err.close()
-
-    if proceso_ffmpeg.returncode != 0:
-        err_txt = ""
-        try:
-            err_txt = ruta_err_ffmpeg.read_text(encoding="utf-8", errors="replace").strip()
-        except Exception:
-            pass
-        raise RuntimeError(f"FFmpeg finalizó con código {proceso_ffmpeg.returncode}.\nDetalles:\n{err_txt}")
+            enc_cpu, args_cpu = detectar_encoder_video(forzar_cpu=True)
+            resultado = _ejecutar_render(enc_cpu, args_cpu)
+        else:
+            raise
 
     _notificar_prog(1.0, "Renderizado 60 FPS completado con éxito.")
     print("=" * 78)
-    print(f"[ÉXITO] Short generado y listo en: {ruta_mp4_final}")
+    print(f"[ÉXITO] Short generado y listo en: {resultado}")
     print("=" * 78)
-    return ruta_mp4_final
-
+    return resultado
 
 
