@@ -309,11 +309,13 @@ def generar_guion_con_gemini_flash(
     # Plan escalonado con reintentos y timeouts realistas para multimodalidad (video + mosaico):
     candidatos_base: List[Tuple[str, List[object], float]] = [
         (modelo_preferido, partes_con_video, 45.0),
+        ("gemini-3.5-flash-lite", partes_con_video, 45.0),
+        ("gemini-flash-lite-latest", partes_con_video, 45.0),
         ("gemini-3.6-flash", partes_con_video, 45.0),
         ("gemini-3.8-flash", partes_con_video, 45.0),
-        ("gemini-3.5-flash-lite", partes_con_video, 40.0),
-        ("gemini-3.6-flash", partes_solo_mosaico, 35.0),
         ("gemini-3.5-flash-lite", partes_solo_mosaico, 35.0),
+        ("gemini-flash-lite-latest", partes_solo_mosaico, 35.0),
+        ("gemini-3.6-flash", partes_solo_mosaico, 35.0),
     ]
     plan_intentos: List[Tuple[str, List[object], float]] = []
     vistos: Set[Tuple[str, int]] = set()
@@ -357,10 +359,15 @@ def generar_guion_con_gemini_flash(
         except Exception as e:
             ultimo_err = e
             ex_pool.shutdown(wait=False, cancel_futures=True)
-            print(f"[!] {mod} ocupado o sin cuota en este segundo, pasando al siguiente ({str(e)[:75]})...")
+            err_msg_corto = str(e) or repr(e)
+            if "429" in err_msg_corto or "RESOURCE_EXHAUSTED" in err_msg_corto:
+                print(f"[!] {mod} sin cuota disponible hoy en Free Tier (límite de 20/día alcanzado), pasando al siguiente...")
+            else:
+                print(f"[!] {mod} ocupado o con demora ({err_msg_corto[:75]}), pasando al siguiente...")
 
     if not texto_respuesta:
-        raise RuntimeError(f"No se pudo obtener respuesta de Gemini: {ultimo_err}")
+        det_err = str(ultimo_err) if str(ultimo_err).strip() else f"Tiempo de espera agotado ({repr(ultimo_err)})"
+        raise RuntimeError(f"No se pudo obtener respuesta de Gemini: {det_err}")
 
     # Limpiar posibles bloques markdown ```
     if texto_respuesta.startswith("```"):

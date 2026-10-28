@@ -282,10 +282,10 @@ def iniciar_aplicacion_gui() -> None:
     }
 
     MAPA_MODELOS_IA = {
-        "Gemini 3.6 Flash · Recomendado (gratis, rápido, ideal para video)": "gemini-3.6-flash",
-        "Gemini 3.8 Flash · Razonamiento extra (más lento, más tokens)": "gemini-3.8-flash",
+        "Gemini 3.5 Flash Lite · Recomendado (rápido, cuota amplia, ideal para video)": "gemini-3.5-flash-lite",
+        "Gemini 3.6 Flash · Alta calidad (cuota diaria limitada a 20/día en Free Tier)": "gemini-3.6-flash",
+        "Gemini 3.8 Flash · Razonamiento extra (sujeto a disponibilidad)": "gemini-3.8-flash",
         "Argon 4 · Máxima calidad (requiere facturación en AI Studio)": "gemini-4-argon",
-        "Gemini 3.5 Flash Lite · Ultra rápido (menor detalle)": "gemini-3.5-flash-lite",
     }
 
     def _cargar_memoria() -> Dict[str, object]:
@@ -4444,7 +4444,7 @@ def iniciar_aplicacion_gui() -> None:
                             )
                             _set_subprogreso(
                                 0.22,
-                                f"{pref_lote}Analizando video completo y contexto real con IA ({pref_modelo_ia})...",
+                                f"{pref_lote}Analizando video completo y contexto real con IA (es la parte que más tiempo toma)...",
                             )
                             generar_guion_con_gemini_flash(
                                 ruta_video=ruta_video_usar,

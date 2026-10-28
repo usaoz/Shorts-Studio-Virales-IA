@@ -1,8 +1,8 @@
-TITULO_SUPERIOR: Barbilla De Acero En Clase
-TITULO_YOUTUBE: ¡Sorprendió al profesor con su barbilla! #shorts
-DESCRIPCION_YOUTUBE: Unos estudiantes demuestran la increíble fuerza de su barbilla rompiendo varios objetos en plena clase. ¡El último alumno dejó a todos sin palabras! #shorts #humor #fail #viral
+TITULO_SUPERIOR: Mesero Molesto Broma Extrema
+TITULO_YOUTUBE: ¡Broma pesada al mesero en el restaurante! #shorts
+DESCRIPCION_YOUTUBE: Este mesero no aguanta ni un segundo más las locuras de los clientes. ¡Mira cómo termina esta divertida broma! #shorts #humor #broma #viral
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-29 19:00
+SCHEDULE: auto
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
@@ -10,9 +10,9 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | ¡El profesor camina sorprendido mientras ve a este estudiante romper una papa frita usando solo su propia barbilla!
-00:05 - 00:10 | zoom_in | whoosh+punch | sorprendido:izquierda | ninguna | ninguno | ¡El maestro avanza y el segundo alumno destruye un huevo completo sin dudarlo usando la misma fuerza mental!
-00:10 - 00:15 | alerta_roja | riser_suction | diablo:derecha | ninguna | centro | ¡Llega al tercer chico y todos piensan que va a fracasar al intentar aplastar esa dura fruta del dragón!
-00:15 - 00:20 | temblor | punch+cartoon_laugh | risa:derecha | ninguna | ninguno | ¡Pero de un solo golpe con su mentón la destruye por completo dejando al profesor totalmente impresionado y sin palabras!
-00:20 - 00:25 | zoom_in | whoosh+error | sorprendido:izquierda | derecha | ninguno | ¡El cuarto estudiante mira aterrado la enorme fruta espinosa que tiene enfrente y no sabe exactamente qué hacer!
-00:25 - 00:28 | brillo_epico | party_horn+cartoon_laugh | risa:derecha | ninguna | ninguno | ¡Así que decide darle un tierno beso para no lastimarse la cara!
+00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | 20,40 | ninguno | ¡Mira a este mesero intentando descansar mientras alguien lo interrumpe sin parar! ¡Está completamente harto de la situación actual!
+00:05 - 00:10 | zoom_in | whoosh | enojo:izquierda | ninguna | 50,45 | ¡La clienta le exige que atienda rápido y le señala el lugar donde debe sentarse! ¡El pobre empleado ya no sabe qué hacer!
+00:10 - 00:15 | flash | xp_Error | risa:derecha | ninguna | ninguno | ¡Le preparan platos para todos incluyendo a un muñeco extraño sentado en la mesa! ¡La confusión es total en este restaurante!
+00:15 - 00:20 | zoom_out | click | diablo:izquierda | ninguna | ninguno | ¡En lugar de anotar el pedido la clienta dibuja garabatos en el menú! ¡El mesero se queda sin palabras al ver semejante escena!
+00:20 - 00:25 | alerta_roja | punch | lloro:derecha | ninguna | 75,50 | ¡Para colmo le untan salsa directamente en la cara sin previo aviso! ¡El pobre empleado explota de la furia acumulada!
+00:25 - 00:29 | temblor | cartoon_laugh | fiesta:izquierda | ninguna | ninguno | ¡Da un salto desesperado para escapar del lugar mientras todos se burlan! ¡Un final totalmente caótico e inesperado!
