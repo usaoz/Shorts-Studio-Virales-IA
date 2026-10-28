@@ -240,12 +240,14 @@ class RastreadorObjetivosVideo:
             g_prev = grises[k - 1]
             g_curr = grises[k]
 
-            # Detectar si hubo un corte brusco de escena dentro del segmento
+            # Detectar si hubo un corte brusco de escena dentro del segmento (transición suave)
             diff_medio = float(np.mean(cv2.absdiff(g_curr, g_prev)))
             if diff_medio > 26.0:
-                tx, ty = cls._adquirir_objetivo_saliente(
+                new_tx, new_ty = cls._adquirir_objetivo_saliente(
                     grises[k : min(len(grises), k + 5)], rgbs_peq[k], x_nom, y_nom, radio_busq, es_exacta
                 )
+                tx = 0.60 * tx + 0.40 * new_tx
+                ty = 0.60 * ty + 0.40 * new_ty
                 pts_activos = cls._extraer_puntos_locales(g_curr, tx, ty, radio=48)
                 xs_m.append(tx)
                 ys_m.append(ty)
@@ -271,9 +273,12 @@ class RastreadorObjetivosVideo:
                             if np.count_nonzero(buenos) >= 3:
                                 dx = float(np.median(deltas[buenos, 0]))
                                 dy = float(np.median(deltas[buenos, 1]))
-                                # Seguimiento fiel del objetivo en movimiento con mínimo resorte de seguridad
-                                tx = tx + dx * 0.96 + (x_nom - tx) * 0.015
-                                ty = ty + dy * 0.96 + (y_nom - ty) * 0.015
+                                # Anclaje elástico firme al objetivo nominal para evitar derivas o pérdidas de rumbo
+                                tx = tx + dx * 0.50 + (x_nom - tx) * 0.15
+                                ty = ty + dy * 0.50 + (y_nom - ty) * 0.15
+                                # Limitar desviación máxima a 40px en 360x640 para mantener el objetivo siempre centrado
+                                tx = float(np.clip(tx, x_nom - 40.0, x_nom + 40.0))
+                                ty = float(np.clip(ty, y_nom - 40.0, y_nom + 40.0))
                                 pts_activos = p1_v[buenos].reshape(-1, 1, 2)
                                 desplazado = True
 
@@ -318,8 +323,8 @@ class RastreadorObjetivosVideo:
         xs_interp = np.interp(t_todos, t_muestras, np.array(xs_m, dtype=np.float32)) * cls.ESC_TRACK
         ys_interp = np.interp(t_todos, t_muestras, np.array(ys_m, dtype=np.float32)) * cls.ESC_TRACK
 
-        xs_suave = cls._suavizar_serie_1d(xs_interp, sigma=4.5)
-        ys_suave = cls._suavizar_serie_1d(ys_interp, sigma=4.5)
+        xs_suave = cls._suavizar_serie_1d(xs_interp, sigma=8.0)
+        ys_suave = cls._suavizar_serie_1d(ys_interp, sigma=8.0)
 
         return list(zip(xs_suave.tolist(), ys_suave.tolist()))
 

@@ -1,12 +1,8 @@
-TITULO_SUPERIOR: Broma de Riñón y Refrigerador Hermano
-TITULO_YOUTUBE: ¡Le hizo una broma de riñón y se arrepintió! #shorts
-DESCRIPCION_YOUTUBE: #Comedy #Funny #ComedyVideo #FunnyVideo #ComedyShorts #FunnyShorts #ComedyClips #FunnyClips #Hilarious #LOL #LaughOutLoud #YouTubeShorts
-
-comedy, funny video, comedy shorts, funny shorts, hilarious, viral comedy, comedy clips, entertainment, YouTube Shorts
-
-He Pranked His Brother by Pretending to Take His Kidney… But the Fridge Made It Even Funnier
+TITULO_SUPERIOR: Profesor Confunde a Maestra
+TITULO_YOUTUBE: ¡Estudiante confunde a su maestra con una alumna! #shorts
+DESCRIPCION_YOUTUBE: Un alumno entra al aula y confunde a la profesora con una colega o compañera. ¿Alguna vez te ha pasado algo tan vergonzoso en la escuela? #shorts #comedy #funny #viral #school
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-31 20:00
+SCHEDULE: 2026-10-31 11:30
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
@@ -14,9 +10,10 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | auto | ninguno | ¡Mira cómo este chico le hace una broma extrema a su hermano durmiendo! ¡Le muestra un plato con un trozo de carne simulando su riñón!
-00:05 - 00:10 | zoom_in | whoosh+xp_Error | enojo:izquierda | ninguna | ninguno | ¡El hermano despierta totalmente confundido y asustado al ver su propia panza vendada! ¡Se cree por completo que le quitaron un órgano por un teléfono!
-00:10 - 00:15 | alerta_roja | riser_suction | diablo:derecha | ninguna | izquierda:grande | ¡Desesperado intenta reclamar su riñón mientras el bromista se lo lleva rápidamente a la cocina! ¡No puede creer que hayan hecho semejante locura!
-00:15 - 00:20 | temblor | punch+cartoon_laugh | risa:izquierda | derecha | ninguno | ¡Unos minutos después están comiendo juntos como si nada mientras el bromista disfruta el trozo de carne! ¡El hermano cree que se está comiendo su propio órgano con asco!
-00:20 - 00:25 | flash | camera_flash | fiesta:derecha | ninguna | ninguno | ¡Cuando le confiesa que solo era comida del refrigerador, el hermano explota de rabia y empieza a golpearlo con furia incontrolable!
-00:25 - 00:27 | brillo_epico | cash_ting+party_horn | enojo:izquierda | ninguna | ninguno | ¡Una venganza perfecta y muy graciosa que terminó con una paliza inolvidable entre risas!
+00:00 - 00:05 | zoom_impacto | whoosh | sorprendido:izquierda | izquierda | ninguno | ¡Este alumno entra despistado al aula y confunde a la profesora con una compañera!
+00:05 - 00:10 | zoom_in | error | ninguno | centro | ninguno | ¡El estudiante le habla como si fuera una colega mientras ella limpia la pizarra!
+00:10 - 00:15 | ningunos | riser_suction | risa:derecha | ninguna | ninguno | ¡Ella le sigue la broma con mucha paciencia mientras él intenta ayudar en clase!
+00:15 - 00:20 | zoom_in | good_idea | diablo:izquierda | derecha | centro:grande | ¡Ahora ella se sienta en el pupitre y él asume el rol principal organizando los teléfonos!
+00:20 - 00:25 | ninguno | click | ninguno | ninguna | ninguno | ¡La profesora aprovecha la confusión para confiscar los celulares de todos los compañeros!
+00:25 - 00:30 | zoom_out | cash_ting | fiesta:derecha | ninguna | ninguno | ¡Le devuelve los celulares a su cómplice sin que él note su verdadera identidad docente!
+00:30 - 00:34 | brillo_epico | cartoon_laugh | risa:izquierda | ninguna | ninguno | ¡Una broma maestra perfecta que salió a la perfección frente a toda la clase atónita!

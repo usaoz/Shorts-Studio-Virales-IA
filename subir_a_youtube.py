@@ -754,6 +754,26 @@ def subir_video(
     url_short = f"https://youtube.com/shorts/{video_id}"
     url_normal = f"https://youtu.be/{video_id}"
 
+    # Subir automáticamente la portada de alto impacto como miniatura oficial
+    dir_salida = Path(__file__).resolve().parent / "output_shorts"
+    candidatos_portada = [
+        ruta_video.parent / f"portada_{ruta_video.stem}.jpg",
+        ruta_video.parent / f"portada_{ruta_video.stem}.png",
+        dir_salida / f"portada_{ruta_video.stem}.jpg",
+    ]
+    for p_cand in candidatos_portada:
+        if p_cand.exists():
+            try:
+                print(f"[*] Vinculando miniatura oficial a YouTube ({p_cand.name})...")
+                media_thumb = MediaFileUpload(str(p_cand), mimetype="image/jpeg")
+                youtube.thumbnails().set(videoId=video_id, media_body=media_thumb).execute()
+                print(f"[+] ¡Miniatura de portada vinculada exitosamente a tu video en YouTube!")
+                break
+            except Exception as e_th:
+                # Si el canal requiere verificación por SMS para miniaturas personalizadas, no rompe la subida
+                print(f"[*] Nota miniatura en YouTube: {e_th}")
+                break
+
     print("=" * 80)
     print(f"TU SHORT YA ESTÁ EN YOUTUBE:")
     print(f"   -> Link Short: {url_short}")

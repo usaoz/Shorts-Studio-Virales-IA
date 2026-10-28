@@ -239,12 +239,13 @@ class GestorEfectosYAssets:
         crop_w = WIDTH / zoom
         crop_h = HEIGHT / zoom
 
-        # Acercar el centro de cámara suavemente hacia el objetivo (foco_video)
-        cx_cam = 0.55 * (WIDTH / 2.0) + 0.45 * fx + shake_x
-        cy_cam = 0.55 * (HEIGHT / 2.0) + 0.45 * fy + shake_y
+        # Centro base estable de cámara (suave hacia el objetivo, sin acoplar vibraciones a overlays)
+        cx_base = 0.65 * (WIDTH / 2.0) + 0.35 * fx
+        cy_base = 0.65 * (HEIGHT / 2.0) + 0.35 * fy
 
-        x0 = float(np.clip(cx_cam - crop_w / 2.0, 0.0, WIDTH - crop_w))
-        y0 = float(np.clip(cy_cam - crop_h / 2.0, 0.0, HEIGHT - crop_h))
+        # El temblor (shake) afecta el encuadre del fotograma para impacto visual
+        x0 = float(np.clip(cx_base + shake_x - crop_w / 2.0, 0.0, WIDTH - crop_w))
+        y0 = float(np.clip(cy_base + shake_y - crop_h / 2.0, 0.0, HEIGHT - crop_h))
 
         ix0 = int(round(x0))
         iy0 = int(round(y0))
@@ -257,15 +258,13 @@ class GestorEfectosYAssets:
         else:
             frame_zoomed = frame_rgb
 
-        # Transformar cada punto rastreado (vx, vy) al espacio de pantalla (screen_x, screen_y)
-        escala_x = WIDTH / float(max(1, ix1 - ix0))
-        escala_y = HEIGHT / float(max(1, iy1 - iy0))
+        # Coordenadas de pantalla firmes y desacopladas de sacudidas de alta frecuencia
         puntos_pantalla: List[Tuple[float, float]] = []
         for vx, vy in puntos_rastreados:
-            sx = (vx - ix0) * escala_x
-            sy = (vy - iy0) * escala_y
-            sx = float(np.clip(sx, 28.0, WIDTH - 28.0))
-            sy = float(np.clip(sy, 40.0, HEIGHT - 160.0))
+            sx = (vx - (cx_base - crop_w / 2.0)) * (WIDTH / crop_w)
+            sy = (vy - (cy_base - crop_h / 2.0)) * (HEIGHT / crop_h)
+            sx = float(np.clip(sx, 48.0, WIDTH - 48.0))
+            sy = float(np.clip(sy, 64.0, HEIGHT - 180.0))
             puntos_pantalla.append((sx, sy))
 
         # Efecto de aberración cromática RGB durante impactos fuertes (temblor / zoom_impacto inicial)
@@ -354,8 +353,8 @@ class GestorEfectosYAssets:
             escala = 0.75 + 0.25 * p_out
             alpha_f = p_out
         else:
-            # Pulso rítmico llamativo alrededor del objetivo
-            escala = 1.0 + 0.075 * math.sin(t_seg * 11.5)
+            # Pulso rítmico sutil y orgánico (estable, sin vibraciones histéricas)
+            escala = 1.0 + 0.025 * math.sin(t_seg * 3.5)
             alpha_f = 1.0
 
         diam_actual = max(48, int(round(diam_base * escala)))
@@ -406,28 +405,17 @@ class GestorEfectosYAssets:
 
         tx, ty = target_xy
 
-        # Elegir el vector unitario u = (ux, uy) que va DESDE el objetivo HACIA la cola de la flecha,
-        # apuntando siempre desde el lado de la pantalla con mayor espacio libre para que la cola
-        # jamás se salga del lienzo 1080x1920.
-        dx_centro = (WIDTH * 0.50) - tx
-        dy_centro = (HEIGHT * 0.42) - ty
-
-        if abs(dx_centro) < 95.0 and abs(dy_centro) < 95.0:
-            # Si el objetivo está en el centro, apuntar en diagonal desde arriba-derecha (-32°)
-            ux, uy = 0.848, -0.530
+        # Dirección diagonal fija, estética y profesional:
+        # NUNCA rotar ni voltear la flecha en mitad del plano (evita giros erráticos).
+        # Si el objetivo está en la mitad izquierda, la flecha viene de arriba-derecha señalando abajo-izquierda.
+        # Si el objetivo está en la mitad derecha, la flecha viene de arriba-izquierda señalando abajo-derecha.
+        if tx < WIDTH * 0.48:
+            ux, uy = 0.82, -0.57
+        elif tx > WIDTH * 0.52:
+            ux, uy = -0.82, -0.57
         else:
-            # Apuntar desde el espacio abierto hacia el objetivo con una inclinación diagonal atractiva
-            ux = dx_centro
-            uy = dy_centro - 90.0 if ty > 420 else dy_centro + 110.0
-            norm = math.hypot(ux, uy)
-            if norm < 1e-3:
-                ux, uy = 0.848, -0.530
-            else:
-                ux /= norm
-                uy /= norm
+            ux, uy = 0.78, -0.62
 
-        # En `flecha.png`, la punta apunta a la IZQUIERDA (-1, 0) y la cola está hacia (+1, 0).
-        # Para orientar el eje de la cola hacia (ux, uy), el ángulo de rotación en PIL es -atan2(uy, ux).
         angulo_pil = -math.degrees(math.atan2(uy, ux))
 
         if t_seg < 0.20:
@@ -451,9 +439,9 @@ class GestorEfectosYAssets:
             a = a.point(lambda p: int(p * alpha_f))
             flecha_rot = Image.merge("RGBA", (r, g, b, a))
 
-        # Distancia exacta desde el objetivo hasta la punta de la flecha + rebote rítmico a lo largo de su eje
-        gap_objetivo = (radio_circulo_activo + 6.0) if radio_circulo_activo > 10.0 else 18.0
-        rebote = 28.0 * abs(math.sin(t_seg * 10.5))
+        # Distancia al objetivo con rebote elástico suave a lo largo del eje (2.2 Hz: profesional y limpio)
+        gap_objetivo = (radio_circulo_activo + 10.0) if radio_circulo_activo > 10.0 else 24.0
+        rebote = 16.0 * (1.0 - math.cos(t_seg * math.pi * 2.2)) * 0.5
         dist_centro_a_punta = tam_flecha * 0.472
         dist_total = gap_objetivo + rebote + dist_centro_a_punta
 
@@ -1304,6 +1292,7 @@ async def editar_video_con_guion(
 
         ultimo_frame_lienzo: Optional[Image.Image] = None
         frame_portada_candidato: Optional[Image.Image] = None
+        prioridad_portada: int = 0
 
         try:
             # 5. Renderizar segmento por segmento con seguimiento de objetivos (Optical Flow) y subtítulos luminosos
@@ -1447,12 +1436,16 @@ async def editar_video_con_guion(
                             f"Detalles:\n{err_txt}"
                         )
 
-                    # Capturar fotograma de portada de alto CTR (prioriza círculo/flecha o segundo 2 inicial)
-                    if frame_portada_candidato is None:
-                        if (seg.circulo or seg.flecha) and f_idx == total_frames_seg // 2:
-                            frame_portada_candidato = lienzo.copy()
-                        elif idx_seg == 0 and f_idx == min(total_frames_seg - 1, int(round(FPS * 2.0))):
-                            frame_portada_candidato = lienzo.copy()
+                    # Captura de portada de máximo impacto (prioriza clímax con círculo o flecha)
+                    if seg.circulo and f_idx == total_frames_seg // 2:
+                        frame_portada_candidato = lienzo.copy()
+                        prioridad_portada = 3
+                    elif seg.flecha and f_idx == total_frames_seg // 2 and prioridad_portada < 2:
+                        frame_portada_candidato = lienzo.copy()
+                        prioridad_portada = 2
+                    elif prioridad_portada < 1 and idx_seg == max(1, len(datos_segmentos) // 3) and f_idx == total_frames_seg // 2:
+                        frame_portada_candidato = lienzo.copy()
+                        prioridad_portada = 1
 
                     if idx_seg == len(datos_segmentos) - 1 and f_idx == total_frames_seg - 1:
                         ultimo_frame_lienzo = lienzo.copy()

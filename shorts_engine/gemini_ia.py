@@ -185,8 +185,8 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
 6. CIRCULO (`circulo_rojo.png`):
    - Rodea el objeto o revelación más impactante del video: usa `auto`, `izquierda`, `derecha`, `centro` (opcional `:grande`), coordenada `X,Y`, o `ninguno`.
    - **LÍMITE ESTRICTO**: usa el círculo en **1 bloque COMO MÁXIMO** en todo el guion. En todos los demás escribe `ninguno`.
-7. TEXTO (Narración de Voz IA con Cadencia Natural y Dinámica):
-   - Entre **13 y 15 palabras por cada bloque de 5 segundos** (~2.8 a 3.0 palabras/segundo) con máxima emoción (`¡!`). Esta cadencia exacta es perfecta para que la voz IA suene humana, enérgica y fluida, SIN ACELERARSE ni atropellarse. Narra siempre lo que pasa en el video sin pedir likes ni suscripciones.
+7. TEXTO (Narración de Voz IA Rápida y Enérgica estilo Shorts):
+   - Entre **15 y 17 palabras por cada bloque de 5 segundos** (~3.1 a 3.3 palabras/segundo) con máxima emoción (`¡!`). Esta cadencia es rápida, enérgica y atrapante (estilo viral de YouTube Shorts), manteniendo una dicción fluida y continua sin silencios muertos. Narra siempre lo que pasa en el video sin pedir likes ni suscripciones.
 
 ================================================================================
 PLANTILLA DE ENTREGA OBLIGATORIA:
@@ -312,7 +312,7 @@ def generar_guion_con_gemini_flash(
         f"{bloque_contexto_real}\n"
         f"DATOS EXACTOS DEL VIDEO ANALIZADO:\n"
         f"- Duración total exacta del video: {dur_redondeada} segundos (de 00:00 a 00:{dur_redondeada:02d}).\n"
-        f"- Divide los bloques de 00:00 hasta 00:{dur_redondeada:02d} en tramos de 5 segundos (EXACTAMENTE entre 13 y 15 palabras por bloque de 5s, o ~2.8 palabras/segundo, para que la voz suene enérgica y fluida sin apuros ni aceleraciones).\n"
+        f"- Divide los bloques de 00:00 hasta 00:{dur_redondeada:02d} en tramos de 5 segundos (EXACTAMENTE entre 15 y 17 palabras por bloque de 5s, o ~3.2 palabras/segundo, con ritmo rápido y enérgico).\n"
         f"- En ESTADO_PUBLICACION escribe: {modo_privacidad}\n"
         f"- En SCHEDULE escribe: {schedule_str.strip() if schedule_str.strip() else 'no'}\n"
         f"- En PARA_NINOS escribe: no\n"
@@ -452,7 +452,7 @@ def generar_guion_con_gemini_flash(
         f"--- [ANÁLISIS 2: MAPA DE MOMENTOS CLAVE PARA SFX Y FLECHAS] ---\n{analisis_2}\n\n"
         f"TU MISIÓN DE FUSIÓN CRÍTICA:\n"
         f"1. NARRATIVA FLUIDA Y CON SENTIDO: Cuenta exactamente lo que ocurre según el Análisis 1, con máxima intriga, humor o emoción, pero SIN inventar elementos contrarios a la realidad.\n"
-        f"2. CADENCIA DE VOZ NATURAL (¡REGLA DE ORO!): Escribe ESTRICTAMENTE entre 13 y 15 palabras por cada bloque de 5 segundos (~2.8 palabras/segundo). NUNCA escribas más de 15 palabras por bloque para garantizar que la voz IA suene humana, enérgica y fluida sin apurarse ni acelerar el audio.\n"
+        f"2. CADENCIA DE VOZ VIRAL (¡RÁPIDA Y ENÉRGICA!): Escribe EXACTAMENTE entre 15 y 17 palabras por cada bloque de 5 segundos (~3.2 palabras/segundo) para que la narración fluya con ritmo acelerado y atrapante, sin silencios muertos ni arrastrar las palabras.\n"
         f"3. EFECTOS Y SFX: Incorpora el mapa de efectos del Análisis 2 (flecha máx 2 bloques, círculo máx 1 bloque, emojis y sfx sincronizados con los momentos cumbre).\n"
         f"4. HASHTAGS DE NICHO REAL: En DESCRIPCION_YOUTUBE, escribe una descripción atractiva de 2 oraciones, pregunta para debate en comentarios, y 4 o 5 hashtags hiper-específicos del nicho (ej: #shorts #perros #mascotas #viral; #shorts #autos #carreras #viral; etc.).\n\n"
         f"Entrega ÚNICAMENTE el bloque de guion final estructurado con la plantilla obligatoria:"
