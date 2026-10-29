@@ -322,6 +322,7 @@ def iniciar_aplicacion_gui() -> None:
             "canales_por_cuenta": {},
             "canales": [],
             "indice_rotacion": 0,
+            "canal_fijo_seleccionado": "",
             "custom_reels": [],
             "modo_render": "Automático (GPU)",
         }
@@ -366,6 +367,7 @@ def iniciar_aplicacion_gui() -> None:
                     "canales_por_cuenta": dict(leido.get("canales_por_cuenta") or {}),
                     "canales": list(leido.get("canales", [])),
                     "indice_rotacion": int(leido.get("indice_rotacion", 0)),
+                    "canal_fijo_seleccionado": str(leido.get("canal_fijo_seleccionado", "")),
                     "custom_reels": list(leido.get("custom_reels", [])),
                     "modo_render": str(leido.get("modo_render", "Automático (GPU)")),
                 }
@@ -396,6 +398,7 @@ def iniciar_aplicacion_gui() -> None:
     modelo_ia_var = tk.StringVar(value=str(mem["modelo_ia"]))
     modo_render_var = tk.StringVar(value=str(mem.get("modo_render", "Automático (GPU)")))
     orden_canales_var = tk.StringVar(value=str(mem["orden_canales"]))
+    canal_fijo_var = tk.StringVar(value=str(mem.get("canal_fijo_seleccionado", "")))
     min_views_var = tk.StringVar(value=str(mem["min_views_millones"]))
     cantidad_total_var = tk.StringVar(value=str(mem["cantidad_total"]))
     shorts_por_dia_var = tk.StringVar(value=str(mem["shorts_por_dia"]))
@@ -527,6 +530,7 @@ def iniciar_aplicacion_gui() -> None:
                         "canales_por_cuenta": canales_por_cuenta,
                         "canales": lista_canales,
                         "indice_rotacion": estado_rotacion["idx"],
+                        "canal_fijo_seleccionado": canal_fijo_var.get(),
                         "custom_reels": datos_custom_reels[:12],
                         "modo_render": modo_render_var.get(),
                     },
@@ -755,11 +759,11 @@ def iniciar_aplicacion_gui() -> None:
     ctk.CTkOptionMenu(
         cfg_canales_frame,
         variable=orden_canales_var,
-        values=["Rotación (En fila)", "Aleatorio"],
+        values=["Rotación (En fila)", "Aleatorio", "Canal único (Clic para elegir)"],
         command=lambda _: (_guardar_memoria(), renderizar_chips_canales()),
         corner_radius=12,
         height=28,
-        width=150,
+        width=195,
         font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
         fg_color="#1e2436",
         button_color="#2d354d",
@@ -845,32 +849,58 @@ def iniciar_aplicacion_gui() -> None:
 
         row_frame = None
         MAX_POR_FILA = 3
+        modo_ord = orden_canales_var.get()
+        es_modo_fijo = ("Único" in modo_ord or "fijo" in modo_ord.lower())
+
+        if es_modo_fijo and not canal_fijo_var.get() and lista_canales:
+            canal_fijo_var.set(lista_canales[0])
+
         for idx_c, c_url in enumerate(lista_canales):
             if idx_c % MAX_POR_FILA == 0:
                 row_frame = ctk.CTkFrame(chips_container, fg_color="transparent")
                 row_frame.pack(fill="x", padx=8, pady=3)
 
-            es_turno = (idx_c == (estado_rotacion["idx"] % len(lista_canales))) and ("Rotación" in orden_canales_var.get())
+            es_fijo = es_modo_fijo and (c_url == canal_fijo_var.get())
+            es_turno = (not es_modo_fijo) and (idx_c == (estado_rotacion["idx"] % len(lista_canales))) and ("Rotación" in modo_ord)
+
+            bg_chip = "#143828" if es_fijo else ("#251d42" if es_turno else "#1b2234")
+            borde_chip = GREEN_ACCENT if es_fijo else (PURPLE_MAIN if es_turno else "#2c3652")
+            borde_w = 2 if (es_fijo or es_turno) else 1
+
             chip = ctk.CTkFrame(
                 row_frame,
-                fg_color="#251d42" if es_turno else "#1b2234",
+                fg_color=bg_chip,
                 corner_radius=14,
-                border_width=1,
-                border_color=PURPLE_MAIN if es_turno else "#2c3652",
+                border_width=borde_w,
+                border_color=borde_chip,
+                cursor="hand2",
             )
             chip.pack(side="left", padx=5, pady=2)
 
-            pref_turno = "▶ " if es_turno else ""
-            ctk.CTkLabel(
+            pref_turno = "✔ " if es_fijo else ("▶ " if es_turno else "")
+            lbl_c = ctk.CTkLabel(
                 chip,
                 text=f"{pref_turno}{idx_c + 1}. {etiqueta_corta_canal(c_url)}",
                 font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-                text_color="#ffffff" if es_turno else TEXT_MAIN,
-            ).pack(side="left", padx=(12, 6), pady=4)
+                text_color="#ffffff" if (es_fijo or es_turno) else TEXT_MAIN,
+                cursor="hand2",
+            )
+            lbl_c.pack(side="left", padx=(12, 6), pady=4)
+
+            def _click_seleccionar_este_canal(e=None, u=c_url) -> None:
+                canal_fijo_var.set(u)
+                orden_canales_var.set("Canal único (Clic para elegir)")
+                _guardar_memoria()
+                renderizar_chips_canales()
+
+            chip.bind("<Button-1>", _click_seleccionar_este_canal)
+            lbl_c.bind("<Button-1>", _click_seleccionar_este_canal)
 
             def _quitar_c(u: str = c_url) -> None:
                 if u in lista_canales:
                     lista_canales.remove(u)
+                    if canal_fijo_var.get() == u:
+                        canal_fijo_var.set(lista_canales[0] if lista_canales else "")
                     _guardar_memoria()
                     renderizar_chips_canales()
 
@@ -3892,6 +3922,7 @@ def iniciar_aplicacion_gui() -> None:
         ruta_guion: Path,
         on_decision: Callable[[str, str], None],
         es_modo_editado: bool = False,
+        url_video_orig: str = "",
     ) -> None:
         win_r = ctk.CTkToplevel(root)
         win_r.title("Shorts Studio · Revisión Previa")
@@ -4098,6 +4129,71 @@ def iniciar_aplicacion_gui() -> None:
             text_color=TEXT_MUTED,
         ).pack(anchor="w", pady=(2, 0))
 
+        if url_video_orig and url_video_orig.strip():
+            row_link_orig = ctk.CTkFrame(col_der, fg_color="#141a29", corner_radius=10, border_width=1, border_color="#222b42")
+            row_link_orig.pack(fill="x", pady=(0, 8))
+
+            ctk.CTkLabel(
+                row_link_orig,
+                text="🔗 Video Original:",
+                font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                text_color=CYAN_ACCENT,
+            ).pack(side="left", padx=(10, 6), pady=4)
+
+            ent_url_disp = ctk.CTkEntry(
+                row_link_orig,
+                height=26,
+                font=ctk.CTkFont(family="Segoe UI", size=10),
+                fg_color="#0e1320",
+                border_width=0,
+                text_color="#93c5fd",
+            )
+            ent_url_disp.insert(0, url_video_orig.strip())
+            ent_url_disp.configure(state="readonly")
+            ent_url_disp.pack(side="left", fill="x", expand=True, padx=(0, 6), pady=4)
+
+            def _abrir_url_navegador() -> None:
+                import webbrowser
+                try:
+                    webbrowser.open(url_video_orig.strip())
+                except Exception:
+                    pass
+
+            def _copiar_url_clip() -> None:
+                try:
+                    root.clipboard_clear()
+                    root.clipboard_append(url_video_orig.strip())
+                    btn_copiar_url.configure(text="¡Copiado!")
+                    root.after(1400, lambda: btn_copiar_url.configure(text="Copiar"))
+                except Exception:
+                    pass
+
+            btn_abrir_url = ctk.CTkButton(
+                row_link_orig,
+                text="Abrir",
+                width=46,
+                height=22,
+                corner_radius=6,
+                fg_color="#1e293b",
+                hover_color="#334155",
+                font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+                command=_abrir_url_navegador,
+            )
+            btn_abrir_url.pack(side="right", padx=(0, 8), pady=4)
+
+            btn_copiar_url = ctk.CTkButton(
+                row_link_orig,
+                text="Copiar",
+                width=50,
+                height=22,
+                corner_radius=6,
+                fg_color="#1e293b",
+                hover_color="#334155",
+                font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+                command=_copiar_url_clip,
+            )
+            btn_copiar_url.pack(side="right", padx=(0, 4), pady=4)
+
         if not es_modo_editado:
             # Tarjeta 1: Re-editar con indicaciones (solo videos generados desde cero)
             card_reeditar = ctk.CTkFrame(
@@ -4132,6 +4228,19 @@ def iniciar_aplicacion_gui() -> None:
                 text_color=TEXT_MAIN,
             )
             txt_feedback.pack(fill="x", padx=12, pady=(0, 8))
+
+            def _autoajustar_feedback(event=None) -> None:
+                try:
+                    contenido = txt_feedback.get("1.0", "end-1c")
+                    n_lineas = max(2, min(10, len(contenido.splitlines()) + (len(contenido) // 55)))
+                    nuevo_alto = max(58, min(190, n_lineas * 20 + 16))
+                    if txt_feedback.cget("height") != nuevo_alto:
+                        txt_feedback.configure(height=nuevo_alto)
+                except Exception:
+                    pass
+
+            txt_feedback.bind("<KeyRelease>", _autoajustar_feedback)
+            txt_feedback.bind("<Control-v>", lambda e: root.after(50, _autoajustar_feedback))
 
             btn_reeditar = ctk.CTkButton(
                 card_reeditar,
@@ -4669,7 +4778,11 @@ def iniciar_aplicacion_gui() -> None:
                         root.after(0, lambda cm=copia_ms: _renderizar_milestones_ui(cm))
 
                         canales_intentar: List[str] = []
-                        if es_rotacion and canales_de_esta_cuenta:
+                        es_modo_fijo = ("Único" in orden_canales_var.get() or "fijo" in orden_canales_var.get().lower())
+                        if es_modo_fijo and canal_fijo_var.get():
+                            c_fijo = canal_fijo_var.get()
+                            canales_intentar = [c_fijo] if c_fijo in canales_de_esta_cuenta else ([c_fijo] + canales_de_esta_cuenta)
+                        elif es_rotacion and canales_de_esta_cuenta:
                             for offset in range(len(canales_de_esta_cuenta)):
                                 pos = (estado_rotacion["idx"] + offset) % len(canales_de_esta_cuenta)
                                 canales_intentar.append(canales_de_esta_cuenta[pos])
@@ -5007,6 +5120,7 @@ def iniciar_aplicacion_gui() -> None:
                                 def _mostrar_rev(
                                     rf=ruta_final,
                                     tit=(c_tit if (es_custom_activo and c_tit) else titulo_orig) or ruta_final.stem,
+                                    url_v=str(info_sel.get("url") or info_sel.get("link") or link_directo_var.get().strip() or ""),
                                 ):
                                     abrir_dialogo_revision_short(
                                         ruta_video=rf,
@@ -5017,6 +5131,7 @@ def iniciar_aplicacion_gui() -> None:
                                             ev_decision.set(),
                                         ),
                                         es_modo_editado=es_modo_editado,
+                                        url_video_orig=url_v,
                                     )
 
                                 root.after(0, _mostrar_rev)
@@ -5038,9 +5153,11 @@ def iniciar_aplicacion_gui() -> None:
                                         canales_para_este = list(canales_por_cuenta.get(cid_actual) or lista_canales)
                                         if not canales_para_este:
                                             canales_para_este = list(lista_canales)
-                                        if not ("Rotación" in orden_canales_var.get()):
+                                        es_modo_fijo_otro = ("Único" in orden_canales_var.get() or "fijo" in orden_canales_var.get().lower())
+                                        if es_modo_fijo_otro and canal_fijo_var.get():
+                                            canales_para_este = [canal_fijo_var.get()]
+                                        elif not ("Rotación" in orden_canales_var.get()):
                                             random.shuffle(canales_para_este)
-
                                         for c_cand in canales_para_este:
                                             if evento_cancelar.is_set():
                                                 raise InterruptedError("Operación detenida por el usuario.")
@@ -5148,6 +5265,13 @@ def iniciar_aplicacion_gui() -> None:
                                     def _cb_reedit_g(sub_frac: float, msg_ia: str) -> None:
                                         _set_subprogreso(0.15 + max(0.0, min(1.0, sub_frac)) * 0.15, f"{pref_lote}{msg_ia}", PURPLE_MAIN)
 
+                                    guion_prev_texto = ""
+                                    if DEFAULT_GUION_TXT.exists():
+                                        try:
+                                            guion_prev_texto = DEFAULT_GUION_TXT.read_text(encoding="utf-8", errors="replace")
+                                        except Exception:
+                                            pass
+
                                     generar_guion_con_gemini_flash(
                                         ruta_video=ruta_video_usar,
                                         api_key=api_k,
@@ -5157,6 +5281,7 @@ def iniciar_aplicacion_gui() -> None:
                                         modelo_preferido=pref_modelo_ia,
                                         progreso_cb=_cb_reedit_g,
                                         contexto_feedback=feedback_usr,
+                                        guion_previo=guion_prev_texto,
                                     )
                                     _set_subprogreso(0.35, "Re-renderizando video a 60 FPS...", CYAN_ACCENT)
                                     root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}RE-RENDERIZANDO SHORT GPU..."))

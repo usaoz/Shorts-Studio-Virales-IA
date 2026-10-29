@@ -242,6 +242,7 @@ def generar_guion_con_gemini_flash(
     progreso_cb: Optional[object] = None,
     contexto_feedback: str = "",
     auto_auditoria_retrospectiva: bool = False,
+    guion_previo: Optional[str] = None,
 ) -> str:
     """
     Sistema de Triple Pasada (Ensemble Refinement) con IA:
@@ -300,11 +301,18 @@ def generar_guion_con_gemini_flash(
 
     bloque_feedback = ""
     if contexto_feedback and contexto_feedback.strip():
+        bloque_previo_str = f"\n--- [GUION PREVIO QUE EL USUARIO REVISÓ Y ESTÁ CORRIGIENDO]:\n{guion_previo.strip()}\n" if (guion_previo and guion_previo.strip()) else ""
         bloque_feedback = (
-            f"\nCORRECCIONES Y FEEDBACK EXPLÍCITO DEL USUARIO (MÁXIMA PRIORIDAD):\n"
-            f"- El usuario revisó una versión anterior y pide expresamente corregir:\n"
-            f"  \"{contexto_feedback.strip()}\"\n"
-            f"- DIRECTIVA OBLIGATORIA: Aplica estas indicaciones de forma prioritaria en la interpretación y en el guion.\n"
+            f"\n================================================================================\n"
+            f"CORRECCIONES Y FEEDBACK EXPLÍCITO DEL USUARIO (MÁXIMA PRIORIDAD - PALABRA SAGRADA):\n"
+            f"El usuario revisó el video y dio las siguientes correcciones e indicaciones obligatorias:\n"
+            f"\"{contexto_feedback.strip()}\"\n\n"
+            f"🚫 DIRECTIVA DE ORO (EL INPUT DEL USUARIO ES PALABRA SANTA):\n"
+            f"1. Si el usuario escribió un guion, frases, oraciones o correcciones textuales: TÓMALAS COMO PALABRA SAGRADA. Está ESTRICTAMENTE PROHIBIDO cambiarlas, refrasearlas, omitirlas o inventar sinónimos. Usa exactamente sus palabras tal cual las escribió.\n"
+            f"2. Si el usuario pide corregir o reescribir solo un bloque o remate específico del guion previo, modifica ÚNICAMENTE lo que te pidió y mantén el resto del guion exactamente idéntico al guion previo.\n"
+            f"3. El feedback del usuario anula cualquier otra directiva estilística previa.\n"
+            f"{bloque_previo_str}"
+            f"================================================================================\n"
         )
 
     n_bloques_optimo = max(1, round(dur_redondeada / 5.0))

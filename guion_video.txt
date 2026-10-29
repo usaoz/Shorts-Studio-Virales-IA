@@ -1,6 +1,6 @@
-TITULO_SUPERIOR: El Misterio del Pez Dorado
-TITULO_YOUTUBE: ¡El gato que pescaba todas las mañanas! 😱🐟 #shorts
-DESCRIPCION_YOUTUBE: Una niña descubre que su tierno gato le trae una sorpresa cada mañana al estanque. ¿Tus mascotas también te traen regalos secretos? #shorts #cat #cutecat #catvideos #catshorts
+TITULO_SUPERIOR: cosas_raras_clase_shorts
+TITULO_YOUTUBE: ¡Llevaron cosas RIDÍCULAS a la clase y pasó ESTO! 😱 #shorts
+DESCRIPCION_YOUTUBE: Estos estudiantes rompieron todas las reglas al traer objetos totalmente absurdos y gigantescos al salón. ¿Y tú qué objeto extraño habrías llevado a clases? #shorts #viral #comedia #humor
 ESTADO_PUBLICACION: privado
 SCHEDULE: 2026-10-30 21:00
 PARA_NINOS: no
@@ -10,9 +10,8 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | kids_yeyy | sorprendido:derecha | ninguna | ninguno | ¡Mira cómo esta niña corre emocionada mostrando un nuevo pez dorado a su padre!
-00:05 - 00:09 | zoom_in | whoosh | risa:izquierda | ninguna | ninguno | ¡La pequeña lleva al hombre hasta el estanque exterior para mostrarle el gran misterio!
-00:09 - 00:14 | alerta_roja | good_idea | diablo:derecha | ninguna | box:[130,420,380,720]@14.0:gato_navideno | ¡El padre sospecha de la gata y le asigna una misión secreta nocturna!
-00:14 - 00:19 | temblor | click | sorprendido:izquierda | ninguna | ninguno | ¡Al día siguiente la niña regresa al estanque y encuentra otro pez nadando!
-00:19 - 00:23 | flash | crowd_shocked | risa:derecha | ninguna | ninguno | ¡El padre busca a la felina y descubre que estaba escondida bajo el puente!
-00:23 - 00:28 | brillo_epico | party_horn | fiesta:izquierda | ninguna | ninguno | ¡Atrapada con las patas en la masa! ¡Resulta que el minino era un maestro pescador clandestino!
+00:00 - 00:05 | zoom_impacto | whoosh | sorprendido:derecha | centro | box:[180,310,480,470]@01.2:objeto | ¡Nadie puede creer lo que este estudiante acaba de sacar en pleno salón, un gran objeto!
+00:05 - 00:09 | alerta_roja | crowd_shocked | risa:izquierda | izquierda | ninguno | ¡Pero mira el tamaño de esa enorme zapatilla amarilla que apareció de la nada misma!
+00:09 - 00:14 | temblor | good_idea | risa:centro | ninguna | ninguno | ¡Por si fuera poco, decidieron meter una bicicleta entera directo al pupitre de la clase!
+00:14 - 00:18 | brillo_epico | party_horn | fiesta:derecha | derecha | ninguno | ¡Y cuando creías que lo habías visto todo, abren una sombrilla gigante adentro del aula!
+00:18 - 00:23 | zoom_in | kids_yeyy | fiesta:centro | ninguna | ninguno | ¿Tú qué traerías a la escuela para sorprender a todos hoy? ¡Coméntalo ahora mismo aquí!

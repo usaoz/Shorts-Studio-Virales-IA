@@ -7,9 +7,17 @@ y conteo de palabras (3.7 pal/s), recorte de silencios TTS y micro-color grading
 
 import os
 import re
+import sys
 import subprocess
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+
+WIN_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+WIN_STARTUPINFO = None
+if sys.platform == "win32":
+    WIN_STARTUPINFO = subprocess.STARTUPINFO()
+    WIN_STARTUPINFO.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    WIN_STARTUPINFO.wShowWindow = subprocess.SW_HIDE
 
 # =====================================================================
 # 1. CACHÉ GLOBAL DE MÁSCARAS Y COLORES SEMÁNTICOS
@@ -135,7 +143,14 @@ def recortar_silencios_tts(input_audio: str, output_audio: str, ffmpeg_exe: str 
             "-af", filtro,
             output_audio
         ]
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        subprocess.run(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+            creationflags=WIN_NO_WINDOW,
+            startupinfo=WIN_STARTUPINFO,
+        )
         return os.path.exists(output_audio) and os.path.getsize(output_audio) > 512
     except Exception:
         return False
@@ -147,9 +162,9 @@ def recortar_silencios_tts(input_audio: str, output_audio: str, ffmpeg_exe: str 
 _LUT_CONTRASTE = np.clip((np.arange(256, dtype=np.float32) - 128.0) * 1.06 + 130.0, 0, 255).astype(np.uint8)
 
 def realzar_frame_viral(frame: np.ndarray) -> np.ndarray:
-    """Aplica una tabla LUT instantánea (+6% contraste y brillo sutil) en <0.6ms con SIMD."""
+    """Aplica una tabla LUT instantánea (+6% contraste y brillo sutil) en <0.6ms con SIMD in-place."""
     try:
         import cv2
-        return cv2.LUT(frame, _LUT_CONTRASTE)
+        return cv2.LUT(frame, _LUT_CONTRASTE, dst=frame)
     except Exception:
         return _LUT_CONTRASTE[frame]

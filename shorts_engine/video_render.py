@@ -360,6 +360,7 @@ class GestorEfectosYAssets:
         tamano_mod: str,
         t_seg: float,
         dur_seg: float,
+        t_inicio_callout: float = 0.04,
     ) -> float:
         """
         Dibuja el circulo rojo animado directamente in-place sobre `lienzo` (NumPy RGB)
@@ -368,8 +369,8 @@ class GestorEfectosYAssets:
         if not activo or self.circulo_base_np is None:
             return 0.0
 
-        dur_mostrar = max(0.8, min(dur_seg - 0.15, self.duracion_callouts))
-        if t_seg < 0.04 or t_seg > dur_mostrar:
+        dur_mostrar = min(dur_seg - 0.05, t_inicio_callout + self.duracion_callouts)
+        if t_seg < t_inicio_callout or t_seg > dur_mostrar:
             return 0.0
 
         mapa_diametro = {
@@ -379,8 +380,9 @@ class GestorEfectosYAssets:
         }
         diam_base = mapa_diametro.get(tamano_mod, 475)
 
-        if t_seg < 0.22:
-            p_in = (t_seg - 0.04) / 0.18
+        t_rel = t_seg - t_inicio_callout
+        if t_rel < 0.22:
+            p_in = max(0.0, min(1.0, t_rel / 0.18))
             escala = 0.25 + 0.88 * math.sin(p_in * math.pi * 0.65)
             alpha_f = min(1.0, p_in * 1.6)
         elif t_seg > dur_mostrar - 0.18:
@@ -388,7 +390,7 @@ class GestorEfectosYAssets:
             escala = 0.75 + 0.25 * p_out
             alpha_f = p_out
         else:
-            escala = 1.0 + 0.025 * math.sin(t_seg * 3.5)
+            escala = 1.0 + 0.025 * math.sin(t_rel * 3.5)
             alpha_f = 1.0
 
         diam_actual = max(48, int(round(diam_base * escala)))
@@ -407,6 +409,7 @@ class GestorEfectosYAssets:
         radio_circulo_activo: float,
         t_seg: float,
         dur_seg: float,
+        t_inicio_callout: float = 0.04,
     ) -> None:
         """
         Dibuja la flecha roja animada apuntando hacia `target_xy` directamente in-place sobre `lienzo`.
@@ -414,8 +417,8 @@ class GestorEfectosYAssets:
         if not activo or self.flecha_base_np is None:
             return
 
-        dur_mostrar = max(0.8, min(dur_seg - 0.15, self.duracion_callouts))
-        if t_seg < 0.04 or t_seg > dur_mostrar:
+        dur_mostrar = min(dur_seg - 0.05, t_inicio_callout + self.duracion_callouts)
+        if t_seg < t_inicio_callout or t_seg > dur_mostrar:
             return
 
         tx, ty = target_xy
@@ -1563,9 +1566,20 @@ async def editar_video_con_guion(
                             t_fin_seg=t_vid_fin,
                         )
 
+                # Calcular segundo relativo exacto para la aparición del círculo/flecha según t_ancla
+                t_ini_callout_circulo = 0.04
+                if seg.circulo:
+                    from .config import parsear_directiva_circulo
+                    info_c = parsear_directiva_circulo(seg.circulo, t_vid_ini, t_vid_fin)
+                    if info_c.activo and info_c.t_ancla is not None:
+                        t_ancla_rel = max(0.0, float(info_c.t_ancla) - t_vid_ini)
+                        t_ini_callout_circulo = max(0.04, min(dur_seg_exacta - 0.4, t_ancla_rel - 0.12))
+
+                t_ini_callout_flecha = t_ini_callout_circulo if mismo_objetivo else 0.04
+
                 print(
                     f"    -> Renderizando segmento {idx_seg + 1}/{len(datos_segmentos)} "
-                    f"({total_frames_seg} frames | video {t_vid_ini:.1f}s..{t_vid_fin:.1f}s)..."
+                    f"({total_frames_seg} frames | video {t_vid_ini:.1f}s..{t_vid_fin:.1f}s | callout desde {t_ini_callout_circulo:.2f}s)..."
                 )
 
                 for f_idx in range(total_frames_seg):
@@ -1580,9 +1594,9 @@ async def editar_video_con_guion(
                             f"Renderizando a 60 FPS (seg {idx_seg + 1}/{len(datos_segmentos)})...",
                         )
 
-                    pt_c_vid = trayectoria_circulo[f_idx] if trayectoria_circulo else (WIDTH / 2.0, HEIGHT * 0.44)
-                    pt_f_vid = trayectoria_flecha[f_idx] if trayectoria_flecha else pt_c_vid
-                    foco_camara = pt_c_vid if trayectoria_circulo else (pt_f_vid if trayectoria_flecha else (WIDTH / 2.0, HEIGHT * 0.46))
+                    pt_c_vid = trayectoria_circulo[f_idx] if (trayectoria_circulo and t_seg >= t_ini_callout_circulo) else (WIDTH / 2.0, HEIGHT * 0.44)
+                    pt_f_vid = trayectoria_flecha[f_idx] if (trayectoria_flecha and t_seg >= t_ini_callout_flecha) else pt_c_vid
+                    foco_camara = pt_c_vid if (trayectoria_circulo and t_seg >= t_ini_callout_circulo) else (pt_f_vid if (trayectoria_flecha and t_seg >= t_ini_callout_flecha) else (WIDTH / 2.0, HEIGHT * 0.46))
 
                     lienzo, pts_pantalla = gestor_assets.aplicar_efecto_camara_y_transformar_puntos(
                         frame_rgb=frame_rgb,
@@ -1594,7 +1608,7 @@ async def editar_video_con_guion(
                     )
                     pt_c_screen, pt_f_screen = pts_pantalla[0], pts_pantalla[1]
 
-                    # 1) Círculo Rojo siguiendo al objetivo
+                    # 1) Círculo Rojo siguiendo al objetivo (solo activo desde su tiempo ancla)
                     radio_circulo = gestor_assets.dibujar_circulo_rojo(
                         lienzo=lienzo,
                         activo=bool(seg.circulo),
@@ -1602,9 +1616,10 @@ async def editar_video_con_guion(
                         tamano_mod=seg.tamano_circulo,
                         t_seg=t_seg,
                         dur_seg=dur_seg_exacta,
+                        t_inicio_callout=t_ini_callout_circulo,
                     )
 
-                    # 2) Flecha Roja siguiendo al objetivo (si comparte objetivo con el círculo, apunta a su borde)
+                    # 2) Flecha Roja siguiendo al objetivo
                     radio_para_flecha = radio_circulo if mismo_objetivo else 0.0
                     gestor_assets.dibujar_flecha_roja(
                         lienzo=lienzo,
@@ -1613,6 +1628,7 @@ async def editar_video_con_guion(
                         radio_circulo_activo=radio_para_flecha,
                         t_seg=t_seg,
                         dur_seg=dur_seg_exacta,
+                        t_inicio_callout=t_ini_callout_flecha,
                     )
 
                     # 3) Emoji animado (evitando superponerse con el objetivo rastreado)
