@@ -2123,19 +2123,23 @@ def iniciar_aplicacion_gui() -> None:
     def abrir_selector_cuentas_popup() -> None:
         pop = ctk.CTkToplevel(root)
         pop.title("Elegir Cuenta o Grupo de Subida")
-        pop.geometry("500x620")
+        pop.geometry("490x560")
         pop.resizable(False, False)
         pop.configure(fg_color=BG_DARK)
         pop.transient(root)
         aplicar_icono_ventana(pop)
         pop.grab_set()
 
-        ctk.CTkLabel(
+        pop.grid_columnconfigure(0, weight=1)
+        pop.grid_rowconfigure(3, weight=1)
+
+        lbl_tit_pop = ctk.CTkLabel(
             pop,
             text="Elegir Cuenta de Subida",
             font=ctk.CTkFont(family="Segoe UI", size=20, weight="bold"),
             text_color=TEXT_MAIN,
-        ).pack(anchor="w", padx=22, pady=(16, 12))
+        )
+        lbl_tit_pop.grid(row=0, column=0, sticky="w", padx=22, pady=(16, 10))
 
         try:
             from subir_a_youtube import listar_cuentas_vinculadas
@@ -2217,26 +2221,28 @@ def iniciar_aplicacion_gui() -> None:
         seg_strat_widget.pack(fill="x", padx=12, pady=(0, 4))
         lbl_strat_desc.pack(anchor="w", padx=12, pady=(0, 8))
         _actualizar_desc_strat()
+        frame_strat.grid(row=2, column=0, sticky="ew", padx=22, pady=(0, 10))
 
         lista_scroll = ctk.CTkScrollableFrame(
             pop,
-            height=250,
             corner_radius=16,
             fg_color=CARD_BG,
             border_width=1,
             border_color=CARD_BORDER,
         )
+        lista_scroll.grid(row=3, column=0, sticky="nsew", padx=22, pady=(0, 10))
 
         vars_checks_grupo: Dict[str, tk.BooleanVar] = {}
 
         def _render_lista_popup(*_args: object) -> None:
             for w in lista_scroll.winfo_children():
                 w.destroy()
-            m_sel = mapa_modo_seg.get(seg_modo_var.get(), "una")
+            m_txt = _args[0] if _args and isinstance(_args[0], str) else seg_modo_var.get()
+            m_sel = mapa_modo_seg.get(m_txt, "una")
             if m_sel in ("todas", "grupo"):
-                frame_strat.pack(fill="x", padx=22, pady=(0, 10), before=lista_scroll)
+                frame_strat.grid()
             else:
-                frame_strat.pack_forget()
+                frame_strat.grid_remove()
 
             if m_sel == "todas":
                 ctk.CTkLabel(
@@ -2305,7 +2311,7 @@ def iniciar_aplicacion_gui() -> None:
                 if m_sel == "una":
                     def _marcar_esta(cid_x=c_id):
                         cid_temp.set(cid_x)
-                        _render_lista_popup()
+                        _render_lista_popup("1 Cuenta")
 
                     ctk.CTkButton(
                         item_f,
@@ -2335,6 +2341,13 @@ def iniciar_aplicacion_gui() -> None:
                         fg_color=PURPLE_MAIN,
                         hover_color=PURPLE_HOVER,
                     ).pack(side="right", padx=10)
+                elif m_sel == "todas":
+                    ctk.CTkLabel(
+                        item_f,
+                        text="Incluida",
+                        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+                        text_color=GREEN_ACCENT,
+                    ).pack(side="right", padx=14)
 
         seg_modo = ctk.CTkSegmentedButton(
             pop,
@@ -2346,13 +2359,10 @@ def iniciar_aplicacion_gui() -> None:
             selected_color=PURPLE_MAIN,
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         )
-        seg_modo.pack(fill="x", padx=22, pady=(0, 10))
-        lista_scroll.pack(fill="both", expand=True, padx=22, pady=(0, 10))
-
-        _render_lista_popup()
+        seg_modo.grid(row=1, column=0, sticky="ew", padx=22, pady=(0, 10))
 
         bot_bar = ctk.CTkFrame(pop, fg_color="transparent")
-        bot_bar.pack(fill="x", padx=22, pady=(0, 14))
+        bot_bar.grid(row=4, column=0, sticky="ew", padx=22, pady=(0, 14))
 
         ctk.CTkButton(
             bot_bar,
@@ -2407,6 +2417,8 @@ def iniciar_aplicacion_gui() -> None:
             text_color="#052e16",
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         ).pack(side="right", fill="x", expand=True, padx=(6, 0))
+
+        _render_lista_popup()
 
     _CACHE_SHORTS_PROGRAMADOS: List[Dict[str, Any]] = []
 
