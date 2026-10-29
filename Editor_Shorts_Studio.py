@@ -1832,13 +1832,12 @@ def iniciar_aplicacion_gui() -> None:
     # ==========================================================================
     def abrir_ventana_ajustes() -> None:
         win = ctk.CTkToplevel(root)
+        win.withdraw()
         win.title("Ajustes y Herramientas")
         win.geometry("600x820")
         win.resizable(False, False)
         win.configure(fg_color=BG_DARK)
         win.transient(root)
-        aplicar_icono_ventana(win)
-        win.grab_set()
 
         # 1. Tarjeta de Modo de Trabajo, Título/Guión (IA vs Manual), Acción Final y Selección de Canales
         card_modo = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
@@ -2082,6 +2081,12 @@ def iniciar_aplicacion_gui() -> None:
             hover_color="#2d354d",
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         ).pack(fill="x", padx=4)
+
+        aplicar_icono_ventana(win)
+        win.deiconify()
+        win.lift()
+        win.focus_force()
+        win.grab_set()
 
     def finalizar_app_completamente() -> None:
         try:
