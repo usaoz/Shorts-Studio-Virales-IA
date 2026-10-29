@@ -230,13 +230,22 @@ def _normalizar_objetivo(obj_raw: Optional[str]) -> Tuple[Optional[str], str]:
     """
     Normaliza la especificación de FLECHA o CIRCULO.
     Devuelve (objetivo_normalizado, tamano_modificador).
-    Ejemplo: 'centro:grande' -> ('centro', 'grande')
+    Ejemplo: 'box:[450,560,590,720]@02.4:objeto' -> ('box:[...]', 'chico')
+             'centro:grande' -> ('centro', 'grande')
              'izquierda'     -> ('izquierda', 'medio')
              'ninguno'       -> (None, 'medio')
     """
     if not obj_raw:
         return None, "medio"
-    raw = _quitar_acentos(str(obj_raw).strip().lower())
+    raw_str = str(obj_raw).strip()
+    if "box:" in raw_str.lower() or "box:[" in raw_str.lower():
+        from .config import parsear_directiva_circulo
+        info_c = parsear_directiva_circulo(raw_str)
+        if info_c.activo:
+            return raw_str, info_c.tamanoPreset
+        return None, "medio"
+
+    raw = _quitar_acentos(raw_str.lower())
     raw = raw.replace(".png", "").replace("circulo_rojo", "si").replace("flecha", "si")
 
     tamano = "medio"

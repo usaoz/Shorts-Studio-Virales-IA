@@ -167,6 +167,105 @@ class PalabraSubtitulo:
     fin_seg: float
     forzar_destaque: bool = False
 
+@dataclass
+class ObjetivoCirculoIA:
+    activo: bool
+    xc_pct: float = 50.0
+    yc_pct: float = 50.0
+    ancho_pct: float = 18.0
+    alto_pct: float = 18.0
+    tamanoPreset: str = "medio"
+    t_ancla: Optional[float] = None
+    etiqueta: str = ""
+    formato_legacy: str = "ninguno"
+
+def parsear_directiva_circulo(
+    texto_columna_circulo: str,
+    t_inicio_bloque: float = 0.0,
+    t_fin_bloque: float = 5.0,
+) -> ObjetivoCirculoIA:
+    import re
+    raw = str(texto_columna_circulo or "").strip()
+    if not raw or raw.lower() in ("ninguno", "none", "no", "false", "-", "0"):
+        return ObjetivoCirculoIA(activo=False)
+
+    patron_box = re.compile(
+        r"box:\[\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\]"
+        r"(?:@(\d+(?:\.\d+)?))?"
+        r"(?::([a-zA-Z0-9_\-]+))?",
+        re.IGNORECASE
+    )
+    match = patron_box.search(raw)
+    if match:
+        ymin, xmin, ymax, xmax = [int(match.group(i)) for i in range(1, 5)]
+        t_str = match.group(5)
+        etiqueta = match.group(6) or "objeto"
+
+        ymin_p = max(0.0, min(100.0, ymin / 10.0))
+        xmin_p = max(0.0, min(100.0, xmin / 10.0))
+        ymax_p = max(0.0, min(100.0, ymax / 10.0))
+        xmax_p = max(0.0, min(100.0, xmax / 10.0))
+
+        ancho_p = xmax_p - xmin_p
+        alto_p = ymax_p - ymin_p
+        area_p = (ancho_p * alto_p) / 100.0
+
+        if ancho_p < 1.5 or alto_p < 1.5 or area_p > 42.0 or ancho_p > 75.0 or alto_p > 75.0:
+            return ObjetivoCirculoIA(activo=False)
+
+        etiquetas_prohibidas = {"persona", "hombre", "mujer", "chico", "chica", "fondo", "pantalla", "rostro", "cara"}
+        if etiqueta.lower() in etiquetas_prohibidas:
+            return ObjetivoCirculoIA(activo=False)
+
+        dim_media = (ancho_p + alto_p) / 2.0
+        if dim_media < 14.0:
+            tamano = "chico"
+        elif dim_media < 28.0:
+            tamano = "medio"
+        else:
+            tamano = "grande"
+
+        if t_str is not None:
+            t_ancla = float(t_str)
+            t_ancla = max(t_inicio_bloque, min(t_fin_bloque, t_ancla))
+        else:
+            t_ancla = t_inicio_bloque + (t_fin_bloque - t_inicio_bloque) * 0.35
+
+        xc_p = xmin_p + (ancho_p / 2.0)
+        yc_p = ymin_p + (alto_p / 2.0)
+        return ObjetivoCirculoIA(
+            activo=True,
+            xc_pct=xc_p,
+            yc_pct=yc_p,
+            ancho_pct=ancho_p,
+            alto_pct=alto_p,
+            tamanoPreset=tamano,
+            t_ancla=t_ancla,
+            etiqueta=etiqueta,
+            formato_legacy=f"{xc_p:.1f},{yc_p:.1f}:{tamano}"
+        )
+
+    patron_legacy = re.compile(r"^(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)(?::(chico|medio|grande))?$", re.IGNORECASE)
+    match_leg = patron_legacy.match(raw)
+    if match_leg:
+        xc_p = float(match_leg.group(1))
+        yc_p = float(match_leg.group(2))
+        tamano = (match_leg.group(3) or "medio").lower()
+        t_ancla = t_inicio_bloque + (t_fin_bloque - t_inicio_bloque) * 0.35
+        return ObjetivoCirculoIA(
+            activo=True,
+            xc_pct=xc_p,
+            yc_pct=yc_p,
+            ancho_pct=18.0,
+            alto_pct=18.0,
+            tamanoPreset=tamano,
+            t_ancla=t_ancla,
+            etiqueta="legacy_coord",
+            formato_legacy=f"{xc_p:.1f},{yc_p:.1f}:{tamano}"
+        )
+
+    return ObjetivoCirculoIA(activo=False)
+
 # Horarios pico dinámicos según el día de la semana (0=Lunes, ..., 6=Domingo)
 HORARIOS_PICO_POR_DIA: Dict[str, Dict[int, List[str]]] = {
     # Lunes y Martes (Arranque semanal: almuerzo y desconexión tarde/noche)

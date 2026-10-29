@@ -92,12 +92,16 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
   - FRECUENCIA: usa la flecha solo en 1 o 2 momentos de mayor sorpresa del video. En los demás escribe 'ninguna'. NUNCA en el último bloque.
   - Aparece de forma ágil y breve (~1.8 segundos) para captar la atención inmediatamente y luego desaparecer sin tapar el video.
 
-6. CIRCULO (Círculo rojo `circulo_rojo.png` para enmarcar objetos importantes):
-  Enmarca y destaca un objeto, detalle o revelación visual clave que el espectador debe notar (ej. un objeto en la mano, comida, un juguete, una sorpresa):
-  - PROHIBIDO ENMARCAR ROPA, ESCOTES, REMERAS O TORSOS: El círculo debe apuntar ÚNICAMENTE a un objeto tangible (en manos, piso, mesa) o al rostro en un primer plano.
-  - Ubica dónde está ese objeto en la pantalla y escribe su coordenada porcentual 'X,Y' junto a su tamaño: ':chico' para objetos pequeños o en manos (ej. '65,58:chico'), ':medio' para caras u objetos medianos (ej. '35,45:medio'), o 'auto:chico' para que la visión artificial lo detecte automáticamente.
-  - Máximo 1 círculo en todo el video, en el momento más importante. En los demás bloques pon 'ninguno'.
-  - Dura poco tiempo (~1.8 segundos) y se desvanece suavemente para no saturar la pantalla.
+6. CIRCULO (Círculo rojo `circulo_rojo.png` con Grounding Espacial de Alta Precisión):
+  Enmarca y destaca un objeto, detalle o revelación visual clave que el espectador debe notar (ej. un objeto en la mano, comida, una herramienta, un juguete, una sorpresa, dinero, o suciedad en el piso):
+  - REGLAS ESTRICTAS:
+    * NUNCA enmarques el pecho, ropa, remera, torso o fondo vacío.
+    * NUNCA pongas círculos sobre personas enteras ni zonas genéricas ('auto', 'centro', 'derecha').
+    * Si no hay un objeto físico clave puntual, el campo CIRCULO DEBE SER exactamente 'ninguno'. (Máximo 1 círculo en todo el video).
+  - COORDENADAS NATIVAS (ESCALA 0 A 1000):
+    Localiza la caja delimitadora (bounding box) exacta del objeto en el segundo clave ('t_ancla') donde mejor se aprecia:
+    Formato obligatorio: 'box:[ymin,xmin,ymax,xmax]@t_ancla:etiqueta'
+    Ejemplos reales: 'box:[450,560,590,720]@02.4:herramienta', 'box:[510,320,680,540]@03.1:taza_cafe', '65,58:chico', o 'ninguno'.
 
 7. TEXTO (Narración de Voz IA + Subtítulos Luminosos):
   - Recuerda cumplir **18 a 20 palabras por cada bloque de 5 segundos (MÁXIMO 20 palabras)** para que la voz no deje silencios.

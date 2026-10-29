@@ -5,22 +5,31 @@ import numpy as np
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from PIL import Image
-from .config import WIDTH, HEIGHT, FPS, TEMP_DIR, ASSETS_DIR, _quitar_acentos
+from .config import (
+    WIDTH,
+    HEIGHT,
+    FPS,
+    TEMP_DIR,
+    ASSETS_DIR,
+    _quitar_acentos,
+    parsear_directiva_circulo,
+    ObjetivoCirculoIA,
+)
 
 # ==============================================================================
-# 6. SEGUIMIENTO INTELIGENTE DE OBJETIVOS (OPTICAL FLOW + SALIENCIA EN MOVIMIENTO)
+# SEGUIMIENTO INTELIGENTE DE OBJETIVOS (GROUNDED-ANCHOR + FORWARD-BACKWARD LK)
 # ==============================================================================
 class RastreadorObjetivosVideo:
     """
-    Motor de visión artificial (OpenCV) que permite que las flechas rojas (flecha.png)
-    y los círculos rojos (circulo_rojo.png) localicen y sigan suavemente al objetivo
-    real dentro del segmento de video:
-      1) Adquisición inteligente del objetivo en movimiento/saliencia dentro de la zona
-         solicitada ('izquierda', 'derecha', 'centro', 'arriba', 'abajo', 'auto' o 'X,Y').
-      2) Seguimiento cuadro a cuadro con Flujo Óptico Piramidal de Lucas-Kanade
-         (cv2.calcOpticalFlowPyrLK) con verificación forward-backward y respaldo
-         por Template Matching ante desenfoques rápidos.
-      3) Suavizado Gaussiano bidireccional sin retardo (zero-lag) a 60 FPS.
+    Motor híbrido de visión artificial de alta precisión para Shorts Studio:
+      1) Anclaje semántico por Bounding Box nativo de Gemini (box:[ymin,xmin,ymax,xmax]@t_ancla).
+      2) Adquisición morfológica de puntos Shi-Tomasi en el 85% central del núcleo del objeto,
+         ponderados con decaimiento Gaussiano para eliminar bordes del fondo.
+      3) Flujo Óptico Piramidal Bidireccional de Lucas-Kanade con verificación Forward-Backward
+         (fb_err < 1.5 px) y rechazo de outliers por desviación mediana (MAD).
+      4) Suavizado Gaussiano 1D cinemático sin dependencias pesadas (puro NumPy).
+      5) Fail-Safe automático: si no se detectan puntos consistentes en el núcleo, se aborta
+         el círculo para evitar enmarcar fondos vacíos o prendas estáticas.
     """
 
     ESC_TRACK = 3.0
@@ -28,7 +37,6 @@ class RastreadorObjetivosVideo:
     H_TR = int(HEIGHT // ESC_TRACK)  # 640
 
     ZONAS_NOMINALES: Dict[str, Tuple[float, float, float]] = {
-        # nombre_zona: (x_norm 0..1, y_norm 0..1, radio_busqueda_px_en_360x640)
         "centro": (0.50, 0.45, 78.0),
         "izquierda": (0.28, 0.45, 72.0),
         "derecha": (0.72, 0.45, 72.0),
@@ -42,13 +50,188 @@ class RastreadorObjetivosVideo:
     }
 
     @classmethod
+    def _preprocesar_gris(cls, frame_rgb: np.ndarray) -> np.ndarray:
+        """Redimensiona el cuadro a 360x640 y aplica CLAHE para destacar micro-texturas."""
+        pequeno = cv2.resize(frame_rgb, (cls.W_TR, cls.H_TR), interpolation=cv2.INTER_AREA)
+        gris = cv2.cvtColor(pequeno, cv2.COLOR_RGB2GRAY)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        return clahe.apply(gris)
+
+    @classmethod
+    def _adquirir_puntos_semilla_en_caja(
+        cls,
+        gris: np.ndarray,
+        xc_px: float,
+        yc_px: float,
+        w_caja_px: float,
+        h_caja_px: float,
+    ) -> Optional[np.ndarray]:
+        """
+        Extrae esquinas Shi-Tomasi concentradas en el 85% interno de la caja,
+        ponderando puntos cercanos al centroide para evitar bordes externos del fondo.
+        """
+        h_img, w_img = gris.shape[:2]
+        semi_w = max(8.0, (w_caja_px * 0.85) / 2.0)
+        semi_h = max(8.0, (h_caja_px * 0.85) / 2.0)
+
+        x1 = int(max(0, round(xc_px - semi_w)))
+        y1 = int(max(0, round(yc_px - semi_h)))
+        x2 = int(min(w_img, round(xc_px + semi_w)))
+        y2 = int(min(h_img, round(yc_px + semi_h)))
+
+        if (x2 - x1) < 6 or (y2 - y1) < 6:
+            return None
+
+        mascara = np.zeros_like(gris, dtype=np.uint8)
+        mascara[y1:y2, x1:x2] = 255
+
+        pts = cv2.goodFeaturesToTrack(
+            gris,
+            maxCorners=45,
+            qualityLevel=0.04,
+            minDistance=3,
+            mask=mascara,
+            blockSize=5,
+            useHarrisDetector=False,
+        )
+
+        if pts is None or len(pts) < 3:
+            pts = cv2.goodFeaturesToTrack(
+                gris,
+                maxCorners=30,
+                qualityLevel=0.015,
+                minDistance=3,
+                mask=mascara,
+                blockSize=5,
+            )
+
+        if pts is None or len(pts) < 3:
+            return None
+
+        coords = pts.reshape(-1, 2)
+        distancias = np.hypot(coords[:, 0] - xc_px, coords[:, 1] - yc_px)
+        radio_max = max(1.0, float(np.hypot(semi_w, semi_h)))
+        pesos = np.exp(-0.5 * (distancias / (radio_max * 0.65)) ** 2)
+
+        umbral_peso = np.percentile(pesos, 20)
+        coords_filtradas = coords[pesos >= umbral_peso]
+        if len(coords_filtradas) < 3:
+            coords_filtradas = coords
+
+        return coords_filtradas.reshape(-1, 1, 2).astype(np.float32)
+
+    @classmethod
+    def _paso_lk_forward_backward(
+        cls,
+        gris_prev: np.ndarray,
+        gris_curr: np.ndarray,
+        pts_prev: np.ndarray,
+        lk_params: dict,
+        umbral_fb: float = 1.5,
+    ) -> np.ndarray:
+        """
+        Lucas-Kanade de ida (A -> B) y vuelta (B -> A).
+        Filtra puntos con error de ciclo superior a umbral_fb y descarta outliers de movimiento.
+        """
+        if pts_prev is None or len(pts_prev) == 0:
+            return np.empty((0, 1, 2), dtype=np.float32)
+
+        pts_next, st1, _ = cv2.calcOpticalFlowPyrLK(gris_prev, gris_curr, pts_prev, None, **lk_params)
+        if pts_next is None:
+            return np.empty((0, 1, 2), dtype=np.float32)
+
+        pts_back, st2, _ = cv2.calcOpticalFlowPyrLK(gris_curr, gris_prev, pts_next, None, **lk_params)
+        if pts_back is None:
+            return np.empty((0, 1, 2), dtype=np.float32)
+
+        fb_err = np.linalg.norm(pts_prev.reshape(-1, 2) - pts_back.reshape(-1, 2), axis=1)
+        validos = (st1.flatten() == 1) & (st2.flatten() == 1) & (fb_err < umbral_fb)
+
+        pts_buenos = pts_next[validos]
+        if len(pts_buenos) < 4:
+            return pts_buenos
+
+        desplazamientos = pts_buenos.reshape(-1, 2) - pts_prev[validos].reshape(-1, 2)
+        mediana_dx_dy = np.median(desplazamientos, axis=0)
+        desviacion = np.linalg.norm(desplazamientos - mediana_dx_dy, axis=1)
+        mad = np.median(desviacion) + 1e-4
+
+        coherentes = desviacion <= max(2.2, 3.0 * mad)
+        return pts_buenos[coherentes]
+
+    @classmethod
+    def _propagar_secuencia_bidireccional(
+        cls,
+        frames_gris: List[np.ndarray],
+        idx_ancla: int,
+        pts_semilla: np.ndarray,
+        xc_init: float,
+        yc_init: float,
+        w_caja: float,
+        h_caja: float,
+        lk_params: dict,
+    ) -> List[Tuple[float, float]]:
+        n_frames = len(frames_gris)
+        trayectoria = [(xc_init, yc_init)] * n_frames
+
+        centro_ancla = np.median(pts_semilla.reshape(-1, 2), axis=0)
+        offset_x = xc_init - float(centro_ancla[0])
+        offset_y = yc_init - float(centro_ancla[1])
+
+        # 1. HACIA ADELANTE (idx_ancla -> final)
+        pts_actuales = pts_semilla.copy()
+        ultimo_cx, ultimo_cy = xc_init, yc_init
+
+        for i in range(idx_ancla + 1, n_frames):
+            pts_nuevos = cls._paso_lk_forward_backward(frames_gris[i - 1], frames_gris[i], pts_actuales, lk_params)
+            if len(pts_nuevos) >= 3:
+                mediana = np.median(pts_nuevos.reshape(-1, 2), axis=0)
+                ultimo_cx = float(mediana[0]) + offset_x
+                ultimo_cy = float(mediana[1]) + offset_y
+                pts_actuales = pts_nuevos
+                if len(pts_actuales) < 7:
+                    reseed = cls._adquirir_puntos_semilla_en_caja(
+                        frames_gris[i], ultimo_cx, ultimo_cy, w_caja * 0.85, h_caja * 0.85
+                    )
+                    if reseed is not None and len(reseed) >= 4:
+                        pts_actuales = reseed
+                        nueva_med = np.median(pts_actuales.reshape(-1, 2), axis=0)
+                        offset_x = ultimo_cx - float(nueva_med[0])
+                        offset_y = ultimo_cy - float(nueva_med[1])
+            trayectoria[i] = (ultimo_cx, ultimo_cy)
+
+        # 2. HACIA ATRÁS (idx_ancla -> 0)
+        pts_actuales = pts_semilla.copy()
+        centro_ancla = np.median(pts_semilla.reshape(-1, 2), axis=0)
+        offset_x = xc_init - float(centro_ancla[0])
+        offset_y = yc_init - float(centro_ancla[1])
+        ultimo_cx, ultimo_cy = xc_init, yc_init
+
+        for i in range(idx_ancla - 1, -1, -1):
+            pts_nuevos = cls._paso_lk_forward_backward(frames_gris[i + 1], frames_gris[i], pts_actuales, lk_params)
+            if len(pts_nuevos) >= 3:
+                mediana = np.median(pts_nuevos.reshape(-1, 2), axis=0)
+                ultimo_cx = float(mediana[0]) + offset_x
+                ultimo_cy = float(mediana[1]) + offset_y
+                pts_actuales = pts_nuevos
+            trayectoria[i] = (ultimo_cx, ultimo_cy)
+
+        return trayectoria
+
+    @classmethod
+    def _suavizar_serie_1d(cls, valores: np.ndarray, sigma: float = 2.5) -> np.ndarray:
+        """Suavizado Gaussiano 1D en NumPy puro (sin requerir scipy)."""
+        if len(valores) < 5:
+            return valores
+        rad = max(2, int(math.ceil(sigma * 2.5)))
+        k_x = np.arange(-rad, rad + 1, dtype=np.float32)
+        kernel = np.exp(-(k_x ** 2) / (2.0 * sigma * sigma))
+        kernel /= np.sum(kernel)
+        pad_v = np.pad(valores, (rad, rad), mode="edge")
+        return np.convolve(pad_v, kernel, mode="valid")
+
+    @classmethod
     def _parsear_punto_base(cls, spec: str) -> Tuple[float, float, float, bool]:
-        """
-        Devuelve (x_360, y_640, radio_busqueda_360, es_coordenada_exacta).
-        Si viene una coordenada porcentual `X,Y` de la IA (ej. `45,52`), la usa como centro
-        de búsqueda con un radio local de 42px en 360x640 para engancharse al contorno real
-        del objeto más cercano a ese punto exacto.
-        """
         s = _quitar_acentos(spec.strip().lower())
         for mod in (":grande", ":chico", ":medio", ":pequeno", ":big", ":small"):
             s = s.replace(mod, "")
@@ -89,7 +272,6 @@ class RastreadorObjetivosVideo:
         g0 = grises_iniciales[0].astype(np.float32)
         h, w = g0.shape
 
-        # 1. Mapa de energía de movimiento en los primeros cuadros del segmento
         mov_acum = np.zeros((h, w), dtype=np.float32)
         for i in range(1, len(grises_iniciales)):
             diff = cv2.absdiff(grises_iniciales[i], grises_iniciales[i - 1]).astype(np.float32)
@@ -98,10 +280,8 @@ class RastreadorObjetivosVideo:
             mov_acum /= float(len(grises_iniciales) - 1)
         mov_norm = mov_acum / (float(np.max(mov_acum)) + 1e-5)
 
-        # 2. Mapa de contraste de objetos y movimiento real (prioriza objetos manipulados, herramientas y manos)
         if rgb_inicial is not None:
             hsv = cv2.cvtColor(rgb_inicial, cv2.COLOR_RGB2HSV).astype(np.float32)
-            # Saturación muy atenuada (0.18): evita que ropa llamativa (remeras fucsias/amarillas) engañe al rastreador
             sat_norm = hsv[:, :, 1] / 255.0
         else:
             sat_norm = np.zeros((h, w), dtype=np.float32)
@@ -111,19 +291,14 @@ class RastreadorObjetivosVideo:
         grad_mag = cv2.magnitude(gx, gy)
         grad_norm = grad_mag / (float(np.max(grad_mag)) + 1e-5)
 
-        # Movimiento (3.20) y bordes definidos (0.95) dominan ampliamente sobre el color (0.18)
         saliencia = cv2.GaussianBlur(mov_norm * 3.20 + sat_norm * 0.18 + grad_norm * 0.95, (17, 17), 0)
 
-        # 3. Supresión de falsos positivos en el torso/pecho (remeras, escotes o ropa saturada estática):
-        # En videos verticales, el pecho suele ser ropa estática. Si no hay movimiento vigoroso allí,
-        # atenuar esa zona para forzar al rastreador a buscar en las manos (zona media-baja), piso o mesa.
         yy, xx = np.meshgrid(np.arange(h, dtype=np.float32), np.arange(w, dtype=np.float32), indexing="ij")
         zona_torso = (xx >= w * 0.35) & (xx <= w * 0.65) & (yy >= h * 0.33) & (yy <= h * 0.52)
         mov_torso = float(np.mean(mov_norm[zona_torso])) if np.any(zona_torso) else 0.0
         if mov_torso < 0.22:
             saliencia[zona_torso] *= 0.30
 
-        # 4. Ventana Gaussiana centrada en la coordenada o zona pedida
         peso_zona = np.exp(-(((xx - x_nom) ** 2 + (yy - y_nom) ** 2) / (2.0 * (radio_busq ** 2))))
 
         limite_y_inf = int(h * 0.76)
@@ -143,8 +318,6 @@ class RastreadorObjetivosVideo:
         cx_sal = float(np.sum(xs * pesos) / np.sum(pesos))
         cy_sal = float(np.sum(ys * pesos) / np.sum(pesos))
 
-        # Si la IA dio coordenada exacta X,Y, refinamos hacia el pico de saliencia real del objeto cercano;
-        # si dio una zona o auto, vamos directo al objeto más saliente y en movimiento (92%).
         peso_sal = 0.75 if es_exacta else 0.92
         tx = peso_sal * cx_sal + (1.0 - peso_sal) * x_nom
         ty = peso_sal * cy_sal + (1.0 - peso_sal) * y_nom
@@ -173,33 +346,59 @@ class RastreadorObjetivosVideo:
         return pts
 
     @classmethod
-    def _suavizar_serie_1d(cls, valores: np.ndarray, sigma: float = 4.2) -> np.ndarray:
-        if len(valores) < 5:
-            return valores
-        rad = max(2, int(math.ceil(sigma * 2.5)))
-        k_x = np.arange(-rad, rad + 1, dtype=np.float32)
-        kernel = np.exp(-(k_x ** 2) / (2.0 * sigma * sigma))
-        kernel /= np.sum(kernel)
-        pad_v = np.pad(valores, (rad, rad), mode="edge")
-        return np.convolve(pad_v, kernel, mode="valid")
-
-    @classmethod
     def calcular_trayectoria(
         cls,
         frames_rgb: List[np.ndarray],
         especificacion: Optional[str],
-    ) -> List[Tuple[float, float]]:
+        t_inicio_seg: float = 0.0,
+        t_fin_seg: float = 5.0,
+    ) -> Optional[List[Tuple[float, float]]]:
         """
-        Devuelve una lista de coordenadas [(vx, vy), ...] en espacio 1080x1920
-        para cada fotograma del segmento.
+        Calcula la trayectoria del objetivo a 60 FPS en coordenadas 1080x1920.
+        Soporta Grounding semántico nativo por bounding box, trayectorias continuas
+        o seguimiento por optical flow. Si el objetivo es inválido o no existe,
+        devuelve None activando el fail-safe para no dibujar círculos erróneos.
         """
         n_frames = len(frames_rgb)
         if n_frames == 0 or not especificacion:
-            return [(WIDTH / 2.0, HEIGHT * 0.44)] * max(1, n_frames)
+            return None
 
-        spec_clean = _quitar_acentos(especificacion.strip().lower())
+        spec_clean = _quitar_acentos(str(especificacion).strip().lower())
 
-        # Submuestreo cada 2 cuadros a resolución 360x640 para máxima velocidad y precisión
+        # Caso 0: Detección semántica de objeto (Grounding de Gemini)
+        if "box:" in spec_clean or "box:[" in spec_clean or ("," in spec_clean and "->" not in spec_clean):
+            info_c = parsear_directiva_circulo(especificacion, t_inicio_seg, t_fin_seg)
+            if info_c.activo:
+                return cls._rastrear_caja_grounding(
+                    frames_rgb=frames_rgb,
+                    info_c=info_c,
+                    t_inicio_seg=t_inicio_seg,
+                    t_fin_seg=t_fin_seg,
+                )
+            if "box:" in spec_clean or "box:[" in spec_clean:
+                # Si falló la validación semántica (ej. cayó en torso completo o etiqueta prohibida), descartar círculo
+                return None
+
+        # Si se pidió zona vaga para un círculo ("auto", "centro", "medio", etc.), bloquearlo deliberadamente
+        if spec_clean in ("auto", "centro", "center", "medio", "middle", "ninguno", "none", "false"):
+            return None
+
+        # Caso A: Trayectoria explícita "inicio->fin" (ideal para flechas)
+        if "->" in spec_clean:
+            p_ini_str, p_fin_str = spec_clean.split("->", 1)
+            x0_tr, y0_tr, _, _ = cls._parsear_punto_base(p_ini_str)
+            x1_tr, y1_tr, _, _ = cls._parsear_punto_base(p_fin_str)
+            xs_full = np.zeros(n_frames, dtype=np.float32)
+            ys_full = np.zeros(n_frames, dtype=np.float32)
+            for i in range(n_frames):
+                u = i / float(max(1, n_frames - 1))
+                u_s = u * u * (3.0 - 2.0 * u)
+                xs_full[i] = (x0_tr + (x1_tr - x0_tr) * u_s) * cls.ESC_TRACK
+                ys_full[i] = (y0_tr + (y1_tr - y0_tr) * u_s) * cls.ESC_TRACK
+            return list(zip(xs_full.tolist(), ys_full.tolist()))
+
+        # Caso B: Flecha apuntando a una zona con Optical Flow clásico
+        x_nom, y_nom, radio_busq, es_exacta = cls._parsear_punto_base(spec_clean)
         paso = 2 if n_frames > 12 else 1
         indices_muestra = list(range(0, n_frames, paso))
         if indices_muestra[-1] != n_frames - 1:
@@ -212,33 +411,12 @@ class RastreadorObjetivosVideo:
             rgbs_peq.append(peq)
             grises.append(cv2.cvtColor(peq, cv2.COLOR_RGB2GRAY))
 
-        # Caso A: Trayectoria explícita "inicio->fin" (ej. "izquierda->derecha" o "25,50->75,50")
-        if "->" in spec_clean:
-            p_ini_str, p_fin_str = spec_clean.split("->", 1)
-            x0_tr, y0_tr, _, _ = cls._parsear_punto_base(p_ini_str)
-            x1_tr, y1_tr, _, _ = cls._parsear_punto_base(p_fin_str)
-            xs_full = np.zeros(n_frames, dtype=np.float32)
-            ys_full = np.zeros(n_frames, dtype=np.float32)
-            for i in range(n_frames):
-                u = i / float(max(1, n_frames - 1))
-                # Curva ease-in-out suave
-                u_s = u * u * (3.0 - 2.0 * u)
-                xs_full[i] = (x0_tr + (x1_tr - x0_tr) * u_s) * cls.ESC_TRACK
-                ys_full[i] = (y0_tr + (y1_tr - y0_tr) * u_s) * cls.ESC_TRACK
-            return list(zip(xs_full.tolist(), ys_full.tolist()))
-
-        # Caso B: Seguimiento real de objetivo con Optical Flow + Saliencia
-        x_nom, y_nom, radio_busq, es_exacta = cls._parsear_punto_base(spec_clean)
         tx, ty = cls._adquirir_objetivo_saliente(
             grises[: min(8, len(grises))], rgbs_peq[0], x_nom, y_nom, radio_busq, es_exacta
         )
-
-        limite_y_inf = float(cls.H_TR * 0.68) if y_nom < cls.H_TR * 0.54 else float(cls.H_TR * 0.76)
         pts_activos = cls._extraer_puntos_locales(grises[0], tx, ty, radio=48)
-
         xs_m: List[float] = [tx]
         ys_m: List[float] = [ty]
-
         lk_params = dict(
             winSize=(23, 23),
             maxLevel=3,
@@ -248,8 +426,6 @@ class RastreadorObjetivosVideo:
         for k in range(1, len(grises)):
             g_prev = grises[k - 1]
             g_curr = grises[k]
-
-            # Detectar si hubo un corte brusco de escena dentro del segmento (transición suave)
             diff_medio = float(np.mean(cv2.absdiff(g_curr, g_prev)))
             if diff_medio > 26.0:
                 new_tx, new_ty = cls._adquirir_objetivo_saliente(
@@ -265,77 +441,102 @@ class RastreadorObjetivosVideo:
             if pts_activos is None or len(pts_activos) < 6:
                 pts_activos = cls._extraer_puntos_locales(g_prev, tx, ty, radio=48)
 
-            desplazado = False
             if pts_activos is not None and len(pts_activos) >= 4:
                 pts_next, st_f, _ = cv2.calcOpticalFlowPyrLK(g_prev, g_curr, pts_activos, None, **lk_params)
                 if pts_next is not None and st_f is not None:
-                    pts_back, st_b, _ = cv2.calcOpticalFlowPyrLK(g_curr, g_prev, pts_next, None, **lk_params)
-                    if pts_back is not None and st_b is not None:
-                        err_fb = np.linalg.norm(pts_activos - pts_back, axis=2).reshape(-1)
-                        validos = (st_f.reshape(-1) == 1) & (st_b.reshape(-1) == 1) & (err_fb < 2.4)
-                        if np.count_nonzero(validos) >= 3:
-                            p0_v = pts_activos[validos].reshape(-1, 2)
-                            p1_v = pts_next[validos].reshape(-1, 2)
-                            deltas = p1_v - p0_v
-                            mags = np.linalg.norm(deltas, axis=1)
-                            buenos = mags < 30.0
-                            if np.count_nonzero(buenos) >= 3:
-                                dx = float(np.median(deltas[buenos, 0]))
-                                dy = float(np.median(deltas[buenos, 1]))
-                                # Anclaje elástico firme al objetivo nominal para evitar derivas o pérdidas de rumbo
-                                tx = tx + dx * 0.50 + (x_nom - tx) * 0.15
-                                ty = ty + dy * 0.50 + (y_nom - ty) * 0.15
-                                # Limitar desviación máxima a 40px en 360x640 para mantener el objetivo siempre centrado
-                                tx = float(np.clip(tx, x_nom - 40.0, x_nom + 40.0))
-                                ty = float(np.clip(ty, y_nom - 40.0, y_nom + 40.0))
-                                pts_activos = p1_v[buenos].reshape(-1, 1, 2)
-                                desplazado = True
+                    p0_v = pts_activos[st_f.reshape(-1) == 1].reshape(-1, 2)
+                    p1_v = pts_next[st_f.reshape(-1) == 1].reshape(-1, 2)
+                    if len(p1_v) >= 3:
+                        deltas = p1_v - p0_v
+                        dx = float(np.median(deltas[:, 0]))
+                        dy = float(np.median(deltas[:, 1]))
+                        tx = float(np.clip(tx + dx * 0.50 + (x_nom - tx) * 0.15, x_nom - 45.0, x_nom + 45.0))
+                        ty = float(np.clip(ty + dy * 0.50 + (y_nom - ty) * 0.15, y_nom - 45.0, y_nom + 45.0))
+                        pts_activos = p1_v.reshape(-1, 1, 2)
 
-            # Respaldo por Template Matching si hay pocos vértices pero existe textura local
-            if not desplazado:
-                r_tpl = 22
-                r_search = 38
-                x0_t = max(0, int(round(tx - r_tpl)))
-                x1_t = min(cls.W_TR, int(round(tx + r_tpl)))
-                y0_t = max(0, int(round(ty - r_tpl)))
-                y1_t = min(cls.H_TR, int(round(ty + r_tpl)))
-
-                x0_s = max(0, int(round(tx - r_search)))
-                x1_s = min(cls.W_TR, int(round(tx + r_search)))
-                y0_s = max(0, int(round(ty - r_search)))
-                y1_s = min(cls.H_TR, int(round(ty + r_search)))
-
-                tpl = g_prev[y0_t:y1_t, x0_t:x1_t]
-                srch = g_curr[y0_s:y1_s, x0_s:x1_s]
-                if tpl.shape[0] >= 12 and tpl.shape[1] >= 12 and srch.shape[0] > tpl.shape[0] and srch.shape[1] > tpl.shape[1]:
-                    res_tm = cv2.matchTemplate(srch, tpl, cv2.TM_CCOEFF_NORMED)
-                    _, max_v, _, max_loc = cv2.minMaxLoc(res_tm)
-                    if max_v > 0.62:
-                        nuevo_x = x0_s + max_loc[0] + tpl.shape[1] * 0.5
-                        nuevo_y = y0_s + max_loc[1] + tpl.shape[0] * 0.5
-                        tx = 0.75 * tx + 0.25 * nuevo_x
-                        ty = 0.75 * ty + 0.25 * nuevo_y
-
-            tx = float(np.clip(tx, 38.0, cls.W_TR - 38.0))
-            ty = float(np.clip(ty, 46.0, limite_y_inf))
             xs_m.append(tx)
             ys_m.append(ty)
 
-            if k % 4 == 0:
-                nuevos = cls._extraer_puntos_locales(g_curr, tx, ty, radio=40)
-                if nuevos is not None and len(nuevos) >= 6:
-                    pts_activos = nuevos
-
-        # Interpolar a todos los fotogramas de 60 FPS y aplicar suavizado Gaussiano sin retardo
-        t_todos = np.arange(n_frames, dtype=np.float32)
         t_muestras = np.array(indices_muestra, dtype=np.float32)
-        xs_interp = np.interp(t_todos, t_muestras, np.array(xs_m, dtype=np.float32)) * cls.ESC_TRACK
-        ys_interp = np.interp(t_todos, t_muestras, np.array(ys_m, dtype=np.float32)) * cls.ESC_TRACK
+        t_todos = np.arange(n_frames, dtype=np.float32)
+        xs_interp = np.interp(t_todos, t_muestras, np.array(xs_m, dtype=np.float32))
+        ys_interp = np.interp(t_todos, t_muestras, np.array(ys_m, dtype=np.float32))
 
-        xs_suave = cls._suavizar_serie_1d(xs_interp, sigma=8.0)
-        ys_suave = cls._suavizar_serie_1d(ys_interp, sigma=8.0)
+        xs_smooth = cls._suavizar_serie_1d(xs_interp, sigma=3.2)
+        ys_smooth = cls._suavizar_serie_1d(ys_interp, sigma=3.2)
 
-        return list(zip(xs_suave.tolist(), ys_suave.tolist()))
+        xs_full = np.clip(xs_smooth * cls.ESC_TRACK, 55.0, WIDTH - 55.0)
+        ys_full = np.clip(ys_smooth * cls.ESC_TRACK, 65.0, HEIGHT - 180.0)
+        return list(zip(xs_full.tolist(), ys_full.tolist()))
 
+    @classmethod
+    def _rastrear_caja_grounding(
+        cls,
+        frames_rgb: List[np.ndarray],
+        info_c: ObjetivoCirculoIA,
+        t_inicio_seg: float,
+        t_fin_seg: float,
+    ) -> Optional[List[Tuple[float, float]]]:
+        """
+        Rastrea el objeto anclado semánticamente por la caja de Gemini con
+        Forward-Backward LK y cancelación de puntos de fondo.
+        """
+        n_frames = len(frames_rgb)
+        if n_frames == 0:
+            return None
 
+        # 1. Preprocesar cuadros a escala de gris mejorada con CLAHE
+        frames_gris = [cls._preprocesar_gris(f) for f in frames_rgb]
 
+        # 2. Coordenadas iniciales en espacio de trabajo (360x640)
+        xc_tr = (info_c.xc_pct / 100.0) * cls.W_TR
+        yc_tr = (info_c.yc_pct / 100.0) * cls.H_TR
+        w_caja_tr = (info_c.ancho_pct / 100.0) * cls.W_TR
+        h_caja_tr = (info_c.alto_pct / 100.0) * cls.H_TR
+
+        # 3. Índice del frame ancla
+        dur_seg = max(0.05, t_fin_seg - t_inicio_seg)
+        t_ancla_rel = (info_c.t_ancla - t_inicio_seg) if info_c.t_ancla is not None else (dur_seg * 0.35)
+        frac_ancla = max(0.0, min(1.0, t_ancla_rel / dur_seg))
+        idx_ancla = int(round(frac_ancla * (n_frames - 1)))
+
+        # 4. Semillas Shi-Tomasi en el núcleo del objeto
+        pts_semilla = cls._adquirir_puntos_semilla_en_caja(
+            frames_gris[idx_ancla], xc_tr, yc_tr, w_caja_tr, h_caja_tr
+        )
+
+        # FAIL-SAFE: Si el objeto no tiene esquinas/texturas suficientes, abortar círculo limpiamente
+        if pts_semilla is None or len(pts_semilla) < 3:
+            print(f"[*] Objeto no encontrado con claridad para '{info_c.etiqueta}' (círculo omitido por seguridad).")
+            return None
+
+        lk_params = dict(
+            winSize=(21, 21),
+            maxLevel=3,
+            criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01),
+        )
+
+        # 5. Propagación bidireccional desde el fotograma ancla
+        tray_tr = cls._propagar_secuencia_bidireccional(
+            frames_gris=frames_gris,
+            idx_ancla=idx_ancla,
+            pts_semilla=pts_semilla,
+            xc_init=xc_tr,
+            yc_init=yc_tr,
+            w_caja=w_caja_tr,
+            h_caja=h_caja_tr,
+            lk_params=lk_params,
+        )
+
+        # 6. Suavizado 1D cinemático
+        xs_tr = np.array([p[0] for p in tray_tr], dtype=np.float32)
+        ys_tr = np.array([p[1] for p in tray_tr], dtype=np.float32)
+        xs_smooth = cls._suavizar_serie_1d(xs_tr, sigma=2.5)
+        ys_smooth = cls._suavizar_serie_1d(ys_tr, sigma=2.5)
+
+        # 7. Escalar a espacio 1080x1920 con márgenes seguros
+        xs_full = np.clip(xs_smooth * cls.ESC_TRACK, 55.0, WIDTH - 55.0)
+        ys_full = np.clip(ys_smooth * cls.ESC_TRACK, 65.0, HEIGHT - 180.0)
+
+        print(f"[+] Círculo rojo anclado con éxito en '{info_c.etiqueta}' (ancla t={info_c.t_ancla:.1f}s, {len(pts_semilla)} puntos firmes).")
+        return list(zip(xs_full.tolist(), ys_full.tolist()))

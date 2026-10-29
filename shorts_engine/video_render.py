@@ -1046,16 +1046,13 @@ def _limitar_circulos_guion(
     Limita tanto los círculos rojos como las flechas rojas para que aparezcan de forma
     espaciada y menos frecuente, evitando saturar todos los segmentos del Short.
     """
-    # 0. Si el guion tiene un círculo con 'centro', convertirlo a 'auto' para que el rastreador de visión
-    # busque el objeto real en movimiento/contraste más importante del video y lo enmarque con precisión.
+    # 0. Bloquear zonas vagas ('centro', 'auto', etc.) para círculos:
+    # Solo se permiten círculos con detección de objeto real (box:[...] o coordenada validada)
     for s in segmentos:
         if s.circulo:
             c_norm = _quitar_acentos(str(s.circulo).strip().lower())
-            if c_norm in ("centro", "center", "medio", "middle") or c_norm.startswith("centro:"):
-                tam_s = s.tamano_circulo or "medio"
-                s.circulo = f"auto:{tam_s}"
-                s.tamano_circulo = tam_s
-                print(f"[*] Círculo en segmento {s.id_segmento} redirigido a detección inteligente del objeto clave ('auto:{tam_s}').")
+            if c_norm in ("centro", "center", "medio", "middle", "auto") or c_norm.startswith("centro:"):
+                s.circulo = None
 
     con_circulo = [i for i, s in enumerate(segmentos) if s.circulo]
     if len(con_circulo) > max_circulos:
@@ -1471,12 +1468,22 @@ async def editar_video_con_guion(
                 trayectoria_circulo: Optional[List[Tuple[float, float]]] = None
 
                 if seg.circulo:
-                    trayectoria_circulo = RastreadorObjetivosVideo.calcular_trayectoria(frames_seg_rgb, seg.circulo)
+                    trayectoria_circulo = RastreadorObjetivosVideo.calcular_trayectoria(
+                        frames_seg_rgb,
+                        seg.circulo,
+                        t_inicio_seg=t_vid_ini,
+                        t_fin_seg=t_vid_fin,
+                    )
                 if seg.flecha:
                     if mismo_objetivo and trayectoria_circulo is not None:
                         trayectoria_flecha = trayectoria_circulo
                     else:
-                        trayectoria_flecha = RastreadorObjetivosVideo.calcular_trayectoria(frames_seg_rgb, seg.flecha)
+                        trayectoria_flecha = RastreadorObjetivosVideo.calcular_trayectoria(
+                            frames_seg_rgb,
+                            seg.flecha,
+                            t_inicio_seg=t_vid_ini,
+                            t_fin_seg=t_vid_fin,
+                        )
 
                 print(
                     f"    -> Renderizando segmento {idx_seg + 1}/{len(datos_segmentos)} "
