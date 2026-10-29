@@ -638,6 +638,21 @@ Tu única misión es VER Y ANALIZAR segundo a segundo el video y redactar un gui
    - Narra hasta el último milisegundo. La última frase debe conectar rítmicamente con la primera para que el espectador repita el video.
 
 ================================================================================
+🎯 SINCRONIZACIÓN VISUAL REAL (PROHIBIDO ADELANTARSE A LOS HECHOS)
+================================================================================
+- La narración debe ir ESTRICTAMENTE SINCRONIZADA con lo que el espectador está viendo en pantalla en ese segundo exacto.
+- PROHIBIDO EL SPOILER TEMPRANO: Si la caída, susto, giro o error ocurre en el segundo 00:08, no lo digas en el bloque de 00:00-00:05.
+- En los bloques previos crea intriga, expectativa y describe la preparación ('Mira con atención lo que está a punto de pasar...').
+- Relata el impacto, revelación o desenlace ÚNICAMENTE en el bloque de tiempo en que físicamente ocurre en el video.
+- Los tramos MM:SS - MM:SS son DINÁMICOS: ajústalos a los cortes reales de acción del video (bloques de entre 3.0s y 6.0s según si la escena es rápida o lenta).
+
+================================================================================
+🎭 TOQUE DE HUMOR SARCÁSTICO Y HUMOR NEGRO (1 O 2 CHISTES POR VIDEO)
+================================================================================
+- Incluye 1 o 2 comentarios ingeniosos de ironía, sarcasmo o humor negro inteligente sobre la situación de los protagonistas (ej: ironizar sobre el karma, la falta de sentido común, burlas ácidas al desenlace o 'selección natural').
+- REGLA DE ORO DE DOSIFICACIÓN: Máximo 1 o 2 remates de este estilo en todo el Short. NO satures cada línea con chistes; deben sentirse como un golpe de efecto cómico/mordaz en el momento justo sin romper el dinamismo de la historia.
+
+================================================================================
 ⏱️ MATEMÁTICA EXACTA DE TIEMPOS (1x) Y CONTEO DE PALABRAS (3.0 - 3.7 pal/seg)
 ================================================================================
 - Bloque de 3s -> EXACTAMENTE entre 9 y 11 palabras.
@@ -754,20 +769,18 @@ def generar_guion_con_gemini_flash(
             f"Usa exactamente sus palabras tal cual las escribió sin inventar sinónimos.\n{bloque_previo_str}"
         )
 
-    n_bloques_optimo = max(1, round(dur_redondeada / 5.0))
-    limites_sugeridos = [int(round(i * (dur_redondeada / n_bloques_optimo))) for i in range(n_bloques_optimo + 1)]
-    ejemplo_tramos = " | ".join(f"00:{limites_sugeridos[i]:02d} - 00:{limites_sugeridos[i+1]:02d}" for i in range(n_bloques_optimo))
-
     instruccion_extra = (
         f"{bloque_contexto_real}\n{bloque_feedback}\n"
-        f"DATOS TÉCNICOS DEL VIDEO:\n"
+        f"DATOS TÉCNICOS Y DIRECTIVAS DE EDICIÓN:\n"
         f"- Duración total exacta: {dur_redondeada} segundos (00:00 a 00:{dur_redondeada:02d}).\n"
-        f"- Divide la narración en exactamente {n_bloques_optimo} bloques continuos ({ejemplo_tramos}).\n"
+        f"- TIMING DINÁMICO POR ACCIÓN REAL: No uses bloques rígidos idénticos. Ajusta los tramos MM:SS - MM:SS al ritmo real del video (bloques entre 3.0s y 6.0s según si la escena es pausada o acelerada), cubriendo desde 00:00 hasta 00:{dur_redondeada:02d}.\n"
+        f"- PROHIBIDO ADELANTARSE (CERO SPOILERS): Narra en tiempo real lo que está en pantalla. Si algo ocurre en el segundo 8, narra la preparación antes y el impacto recién en el segundo 8.\n"
+        f"- HUMOR SARCÁSTICO / NEGRO (1 O 2 VECES): Incorpora 1 o 2 comentarios irónicos, ácidos o de humor negro sobre lo que pasa, dosificados para dar impacto sin cansar.\n"
         f"- En ESTADO_PUBLICACION escribe: {modo_privacidad}\n"
         f"- En SCHEDULE escribe: {schedule_str.strip() if schedule_str.strip() else 'no'}\n"
         f"- En PARA_NINOS escribe: no\n"
         f"- En TONO_VIDEO escribe 'triste', 'inspiracional' o 'fondo'.\n"
-        f"- En TITULO_YOUTUBE incluye 1 o 2 emojis y #shorts al final.\n"
+        f"- En TITULO_YOUTUBE incluye 1 o 2 emojis llamativos y #shorts al final.\n"
     )
 
     prompt_maestro = (

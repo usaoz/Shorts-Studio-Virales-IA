@@ -35,6 +35,15 @@ LINK DEL VIDEO A EDITAR: [PEGA AQUÍ EL LINK DEL VIDEO DE YOUTUBE]
    - El video NUNCA debe sonar a que "ya terminó" antes de tiempo. Narra el clímax hasta el último milisegundo.
    - TÉCNICA DE LOOP PERFECTO: La última frase del último bloque debe quedar conectada temática o rítmicamente con la primera frase del bloque 00:00 (por ejemplo, cerrando en el instante máximo de impacto o con una frase puente como "¡Y todo fue culpa de cómo empezó esta locura cuando...!" para que al reiniciarse el Short el espectador vuelva a ver los primeros segundos sin darse cuenta).
 
+4. SINCRONIZACIÓN VISUAL REAL Y REGLA ANTI-ADELANTO (CERO SPOILERS):
+   - La narración debe relatar ESTRICTAMENTE lo que ocurre en pantalla en ese segundo exacto.
+   - PROHIBIDO ADELANTARSE: Si la caída, susto, giro o error ocurre físicamente en el segundo 00:08, no lo digas en 00:00 - 00:05. En los bloques previos crea tensión y anticipación ('Mira con atención lo que está a punto de pasar...'), y relata el impacto en el bloque donde el espectador lo ve.
+   - TRAMOS DINÁMICOS: Ajusta los tramos MM:SS - MM:SS a la velocidad real de la escena (bloques de 3s a 6s según el ritmo del video).
+
+5. TOQUE DE HUMOR SARCÁSTICO Y HUMOR NEGRO (1 O 2 VECES POR VIDEO):
+   - Incluye 1 o 2 comentarios ingeniosos de ironía, sarcasmo o humor negro inteligente sobre la situación de los protagonistas (ej: ironizar sobre el karma, la falta de sentido común, burlas ácidas al desenlace o 'selección natural').
+   - REGLA DE DOSIFICACIÓN: Máximo 1 o 2 remates de este estilo en todo el Short. Deben sentirse espontáneos y funcionar como remate de bloque o del clímax, NUNCA como un monólogo constante.
+
 ================================================================================
 ⏱️ PASO 3: MATEMÁTICA EXACTA DE TIEMPOS (1x) Y CONTEO DE PALABRAS (3.7 pal/seg)
 El motor reproduce el video a velocidad original (1x) y la voz IA habla a 3.7 palabras por segundo de corrido.
