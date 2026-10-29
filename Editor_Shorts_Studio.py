@@ -4836,11 +4836,10 @@ def iniciar_aplicacion_gui() -> None:
                                     ),
                                 ),
                             )
-                            res_viral = buscar_short_viral_en_canal(c_cand, min_views=min_v, estricto_min_views=True)
+                            res_viral = buscar_short_viral_en_canal(c_cand, min_views=min_v, estricto_min_views=True, cuenta_id=cid_reel)
                             if res_viral:
                                 elegido_info = res_viral
                                 canal_usado = c_cand
-                                registrar_video_usado(res_viral[0])
                                 ids_reservados_sesion.append(res_viral[0])
                                 if es_rotacion and c_cand in lista_canales:
                                     estado_rotacion["idx"] = (lista_canales.index(c_cand) + 1) % len(lista_canales)
@@ -4991,7 +4990,6 @@ def iniciar_aplicacion_gui() -> None:
                             else f"{pref_lote}Descargando video de YouTube en máxima calidad...",
                         )
                         ruta_video_usar = descargar_video_youtube(url_descargar)
-                        registrar_video_usado(url_descargar)
                         if ULTIMA_INFO_YTDLP.get("titulo"):
                             titulo_orig = ULTIMA_INFO_YTDLP["titulo"]
 
@@ -5190,10 +5188,9 @@ def iniciar_aplicacion_gui() -> None:
                                                 raise InterruptedError("Operación detenida por el usuario.")
                                             c_lbl = etiqueta_corta_canal(c_cand)
                                             _set_subprogreso(0.06, f"{pref_lote}Buscando en {c_lbl}...", "#facc15")
-                                            res_viral = buscar_short_viral_en_canal(c_cand, min_views=min_v, estricto_min_views=True)
+                                            res_viral = buscar_short_viral_en_canal(c_cand, min_views=min_v, estricto_min_views=True, cuenta_id=cid_actual)
                                             if res_viral:
                                                 nuevo_elegido = res_viral
-                                                registrar_video_usado(res_viral[0])
                                                 ids_reservados_sesion.append(res_viral[0])
                                                 break
                                     elif es_modo_editado:
@@ -5234,7 +5231,6 @@ def iniciar_aplicacion_gui() -> None:
                                         _set_subprogreso(0.10, f"{pref_lote}Descargando nuevo Short: '{titulo_orig[:36]}...'")
                                         root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}DESCARGANDO NUEVO SHORT..."))
                                         ruta_video_usar = descargar_video_youtube(url_descargar)
-                                        registrar_video_usado(url_descargar)
                                         if ULTIMA_INFO_YTDLP.get("titulo"):
                                             titulo_orig = ULTIMA_INFO_YTDLP["titulo"]
 
@@ -5361,6 +5357,7 @@ def iniciar_aplicacion_gui() -> None:
                             cuenta_id=id_cuenta_usar,
                             callback_cancelar=lambda: evento_cancelar.is_set(),
                         )
+                        registrar_video_usado(url_descargar, cuenta_id=id_cuenta_usar)
                         shorts_subidos.append({
                             "titulo": (c_tit if (es_custom_activo and c_tit) else titulo_orig) or ruta_final.stem,
                             "url": f"https://youtube.com/shorts/{vid_id}",

@@ -177,27 +177,54 @@ def etiqueta_corta_canal(url_canal: str) -> str:
     return partes[-1] if partes else url_canal
 
 
-def cargar_videos_usados() -> Set[str]:
+def cargar_videos_usados(cuenta_id: Optional[str] = None) -> Set[str]:
     if HISTORIAL_USADOS_FILE.exists():
         try:
             datos = json.loads(HISTORIAL_USADOS_FILE.read_text(encoding="utf-8"))
-            if isinstance(datos, list):
+            if isinstance(datos, dict):
+                if cuenta_id:
+                    c_usados = datos.get(cuenta_id, [])
+                    return set(str(x) for x in c_usados)
+                else:
+                    todos = set()
+                    for c_lista in datos.values():
+                        if isinstance(c_lista, (list, set)):
+                            todos.update(str(x) for x in c_lista)
+                    return todos
+            elif isinstance(datos, list):
                 return set(str(x) for x in datos)
         except Exception:
             pass
     return set()
 
 
-def registrar_video_usado(video_id_o_url: str) -> None:
-    usados = cargar_videos_usados()
+def registrar_video_usado(video_id_o_url: str, cuenta_id: Optional[str] = None) -> None:
     vid = video_id_o_url.strip()
     m = re.search(r"(?:shorts/|v=|youtu\.be/)([A-Za-z0-9_-]{11})", vid)
-    if m:
-        usados.add(m.group(1))
-    else:
-        usados.add(vid)
+    v_clean = m.group(1) if m else vid
+    if not v_clean:
+        return
+
+    c_id = (cuenta_id or "default").strip()
+    datos: Dict[str, List[str]] = {}
+    if HISTORIAL_USADOS_FILE.exists():
+        try:
+            raw = json.loads(HISTORIAL_USADOS_FILE.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                datos = {k: list(v) for k, v in raw.items() if isinstance(v, list)}
+            elif isinstance(raw, list):
+                datos = {"default": list(raw)}
+        except Exception:
+            datos = {}
+
+    if c_id not in datos:
+        datos[c_id] = []
+    if v_clean not in datos[c_id]:
+        datos[c_id].append(v_clean)
+        datos[c_id].sort()
+
     try:
-        HISTORIAL_USADOS_FILE.write_text(json.dumps(sorted(usados), indent=2), encoding="utf-8")
+        HISTORIAL_USADOS_FILE.write_text(json.dumps(datos, indent=2), encoding="utf-8")
     except Exception:
         pass
 
@@ -396,6 +423,7 @@ def buscar_short_viral_en_canal(
     min_views: int = 1_000_000,
     max_escanear: int = 45,
     estricto_min_views: bool = True,
+    cuenta_id: Optional[str] = None,
 ) -> Optional[Tuple[str, str, int]]:
     """
     Escanea rápidamente la pestaña /shorts de un canal con yt-dlp (--flat-playlist)
@@ -408,7 +436,7 @@ def buscar_short_viral_en_canal(
     if not url_shorts:
         return None
 
-    usados = cargar_videos_usados()
+    usados = cargar_videos_usados(cuenta_id=cuenta_id)
     ejecutable_ytdlp = shutil.which("yt-dlp")
     cmd_base = [ejecutable_ytdlp] if ejecutable_ytdlp else [sys.executable, "-m", "yt_dlp"]
 
