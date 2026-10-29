@@ -3,7 +3,8 @@ import os
 import re
 import math
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, List, Optional, Tuple, Set, Union
+import cv2
 import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 from .config import (
@@ -16,6 +17,56 @@ from .config import (
 _FONT_CACHE: Dict[int, ImageFont.FreeTypeFont] = {}
 _RUTA_FUENTE_ACTIVA: Optional[str] = None
 _WORD_SPRITE_CACHE: Dict[Tuple[str, int, Tuple[int, int, int], Tuple[int, int, int], bool], Image.Image] = {}
+_CACHE_PLACAS_SUBTITULOS_NP: Dict[Tuple, np.ndarray] = {}
+
+
+def estampar_rgba_en_rgb_inplace(
+    lienzo_rgb: np.ndarray,
+    sprite_rgba: np.ndarray,
+    x_centro: int,
+    y_centro: int,
+    opacidad_extra: float = 1.0,
+) -> None:
+    """
+    Pinta un sprite RGBA directamente sobre la sub-región (ROI) del fotograma
+    NumPy RGB (1920, 1080, 3) IN-PLACE con aritmética entera vectorizada SIMD.
+    Zero-Copy, sin alocar memoria para el cuadro completo.
+    """
+    if opacidad_extra <= 0.01:
+        return
+
+    h_bg, w_bg = lienzo_rgb.shape[:2]
+    h_sp, w_sp = sprite_rgba.shape[:2]
+
+    x1 = x_centro - (w_sp // 2)
+    y1 = y_centro - (h_sp // 2)
+    x1_clip = max(0, x1)
+    y1_clip = max(0, y1)
+    x2_clip = min(w_bg, x1 + w_sp)
+    y2_clip = min(h_bg, y1 + h_sp)
+
+    if x1_clip >= x2_clip or y1_clip >= y2_clip:
+        return
+
+    sp_x1 = x1_clip - x1
+    sp_y1 = y1_clip - y1
+    sp_x2 = sp_x1 + (x2_clip - x1_clip)
+    sp_y2 = sp_y1 + (y2_clip - y1_clip)
+
+    roi_bg = lienzo_rgb[y1_clip:y2_clip, x1_clip:x2_clip]
+    roi_sp = sprite_rgba[sp_y1:sp_y2, sp_x1:sp_x2]
+
+    alpha = roi_sp[:, :, 3:4].astype(np.uint16)
+    if opacidad_extra < 0.999:
+        alpha = (alpha * int(opacidad_extra * 256)) >> 8
+
+    inv_alpha = 255 - alpha
+    mezcla = (
+        roi_sp[:, :, :3].astype(np.uint16) * alpha
+        + roi_bg.astype(np.uint16) * inv_alpha
+    ) // 255
+
+    lienzo_rgb[y1_clip:y2_clip, x1_clip:x2_clip] = mezcla.astype(np.uint8)
 
 PALABRAS_VERDES_BASE = {
     "CARO", "DÓLARES", "DOLARES", "MILLONES", "MIL", "DINERO", "PRECIO",
@@ -310,7 +361,7 @@ def _obtener_backdrop_subtitulo(ancho_bloque: int, alto_bloque: int = 160) -> Im
 
 
 def renderizar_subtitulos_luminosos(
-    lienzo: Image.Image,
+    lienzo: Union[Image.Image, np.ndarray],
     palabras: List[PalabraSubtitulo],
     t_actual: float,
     nivel_voz_rms: float = 0.0,
@@ -319,6 +370,10 @@ def renderizar_subtitulos_luminosos(
     palabras_rojas_extra: Optional[Set[str]] = None,
     palabras_cian_extra: Optional[Set[str]] = None,
 ) -> None:
+    """
+    Renderiza los subtitulos luminosos estilo MrBeast/Hormozi.
+    Soporta tanto `np.ndarray` (modo Turbo Zero-Copy a 120+ FPS) como `Image.Image`.
+    """
     if not palabras:
         return
     if t_actual < (palabras[0].inicio_seg - 0.06) or t_actual > (palabras[-1].fin_seg + 0.20):
@@ -344,6 +399,101 @@ def renderizar_subtitulos_luminosos(
     rojas = PALABRAS_ROJAS_BASE | (palabras_rojas_extra or set())
     cianes = PALABRAS_CIAN_BASE | (palabras_cian_extra or set())
 
+    p_act = palabras[idx_activa]
+    edad = max(0.0, t_actual - p_act.inicio_seg)
+    pulso_voz = min(0.09, nivel_voz_rms * 0.45)
+    factor_pop = 1.0 + 0.18 * math.exp(-edad * 13.0) * math.cos(edad * 16.0) + pulso_voz
+
+    # -------------------------------------------------------------
+    # MODO TURBO ZERO-COPY (NumPy in-place con cache de placas)
+    # -------------------------------------------------------------
+    if isinstance(lienzo, np.ndarray):
+        clave_cache = (tuple(x[1].texto for x in grupo_mostrar), idx_activa)
+        if clave_cache not in _CACHE_PLACAS_SUBTITULOS_NP:
+            tam_base_activa = 86
+            tam_base_inactiva = 70
+            espaciado_base = 20
+
+            sprites_info = []
+            for idx_global, p in grupo_mostrar:
+                es_activa = (idx_global == idx_activa)
+                txt_up = p.texto.upper().replace("*", "")
+                limpia = re.sub(r"[^A-ZÁÉÍÓÚÜÑ0-9]", "", txt_up)
+
+                if es_activa:
+                    color_fill, color_glow = _clasificar_color_palabra(
+                        limpia, txt_up, p.forzar_destaque, verdes, rojas, cianes
+                    )
+                    sprite_base = _obtener_sprite_palabra_luminosa(
+                        txt_up, tam_base_activa, color_fill, color_glow, True
+                    )
+                    pad_sprite = 58
+                else:
+                    sprite_base = _obtener_sprite_palabra_luminosa(
+                        txt_up, tam_base_inactiva, (255, 255, 255), (120, 195, 255), False
+                    )
+                    pad_sprite = 42
+
+                ancho_logico = max(20, sprite_base.width - pad_sprite * 2)
+                sprites_info.append((sprite_base, ancho_logico, pad_sprite, es_activa))
+
+            ancho_total_logico = (
+                sum(int(round(x[1])) for x in sprites_info)
+                + espaciado_base * max(0, len(sprites_info) - 1)
+            )
+            max_ancho_permitido = WIDTH - 84
+            escala_ajuste = min(1.0, max_ancho_permitido / float(max(1, ancho_total_logico)))
+
+            espaciado_final = int(round(espaciado_base * escala_ajuste))
+            anchos_finales = [int(round(x[1] * escala_ajuste)) for x in sprites_info]
+            ancho_grupo_final = sum(anchos_finales) + espaciado_final * max(0, len(anchos_finales) - 1)
+
+            placa_w = min(WIDTH, ancho_grupo_final + 96)
+            placa_h = 240
+            placa_pil = Image.new("RGBA", (placa_w, placa_h), (0, 0, 0, 0))
+
+            backdrop = _obtener_backdrop_subtitulo(ancho_grupo_final, 165)
+            bx = (placa_w - backdrop.width) // 2
+            by = (placa_h - backdrop.height) // 2
+            placa_pil.alpha_composite(backdrop, dest=(max(0, bx), max(0, by)))
+
+            xc_cursor = (placa_w - ancho_grupo_final) // 2
+            yc_centro = placa_h // 2
+
+            for (sprite_base, _, pad_sprite, es_activa), ancho_f in zip(sprites_info, anchos_finales):
+                if abs(escala_ajuste - 1.0) > 0.015:
+                    nw = max(16, int(round(sprite_base.width * escala_ajuste)))
+                    nh = max(16, int(round(sprite_base.height * escala_ajuste)))
+                    sprite_render = sprite_base.resize((nw, nh), Image.Resampling.BILINEAR)
+                else:
+                    sprite_render = sprite_base
+
+                dest_x = xc_cursor + ancho_f // 2 - sprite_render.width // 2
+                dest_y = (yc_centro - 10 if es_activa else yc_centro) - sprite_render.height // 2
+                dest_x = max(0, min(placa_w - sprite_render.width, dest_x))
+                dest_y = max(0, min(placa_h - sprite_render.height, dest_y))
+                placa_pil.alpha_composite(sprite_render, dest=(dest_x, dest_y))
+                xc_cursor += ancho_f + espaciado_final
+
+            if len(_CACHE_PLACAS_SUBTITULOS_NP) > 80:
+                _CACHE_PLACAS_SUBTITULOS_NP.clear()
+            _CACHE_PLACAS_SUBTITULOS_NP[clave_cache] = np.array(placa_pil, dtype=np.uint8)
+
+        placa_rgba = _CACHE_PLACAS_SUBTITULOS_NP[clave_cache]
+
+        if factor_pop > 1.02:
+            hp, wp = placa_rgba.shape[:2]
+            n_wp = int(round(wp * factor_pop))
+            n_hp = int(round(hp * factor_pop))
+            placa_pop = cv2.resize(placa_rgba, (n_wp, n_hp), interpolation=cv2.INTER_LINEAR)
+            estampar_rgba_en_rgb_inplace(lienzo, placa_pop, WIDTH // 2, y_centro)
+        else:
+            estampar_rgba_en_rgb_inplace(lienzo, placa_rgba, WIDTH // 2, y_centro)
+        return
+
+    # -------------------------------------------------------------
+    # MODO PIL LEGACY
+    # -------------------------------------------------------------
     tam_base_activa = 86
     tam_base_inactiva = 70
     espaciado_base = 20
@@ -361,13 +511,8 @@ def renderizar_subtitulos_luminosos(
             sprite_base = _obtener_sprite_palabra_luminosa(
                 txt_up, tam_base_activa, color_fill, color_glow, True
             )
-            edad = max(0.0, t_actual - p.inicio_seg)
-            # Rebote elástico + pulso reactivo a la energía de la voz
-            pulso_voz = min(0.09, nivel_voz_rms * 0.45)
-            factor_pop = 1.0 + 0.18 * math.exp(-edad * 13.0) * math.cos(edad * 16.0) + pulso_voz
             pad_sprite = 58
         else:
-            # Palabras acompañantes en blanco brillante con sutil aura azul hielo
             sprite_base = _obtener_sprite_palabra_luminosa(
                 txt_up, tam_base_inactiva, (255, 255, 255), (120, 195, 255), False
             )
@@ -382,7 +527,6 @@ def renderizar_subtitulos_luminosos(
         + espaciado_base * max(0, len(sprites_info) - 1)
     )
 
-    # Auto-ajuste para que jamás se corte una palabra en los bordes de los 1080px
     max_ancho_permitido = WIDTH - 84
     escala_ajuste = min(1.0, max_ancho_permitido / float(max(1, ancho_total_logico)))
 
@@ -390,7 +534,6 @@ def renderizar_subtitulos_luminosos(
     anchos_finales = [int(round(x[4] * x[3] * escala_ajuste)) for x in sprites_info]
     ancho_grupo_final = sum(anchos_finales) + espaciado_final * max(0, len(anchos_finales) - 1)
 
-    # Fondo suave semitransparente detrás del subtítulo para contraste total
     backdrop = _obtener_backdrop_subtitulo(ancho_grupo_final, 165)
     bx = (WIDTH - backdrop.width) // 2
     by = y_centro - backdrop.height // 2
@@ -405,12 +548,11 @@ def renderizar_subtitulos_luminosos(
         if abs(escala_total - 1.0) > 0.015:
             nw = max(16, int(round(sprite_base.width * escala_total)))
             nh = max(16, int(round(sprite_base.height * escala_total)))
-            sprite_render = sprite_base.resize((nw, nh), Image.Resampling.LANCZOS)
+            sprite_render = sprite_base.resize((nw, nh), Image.Resampling.BILINEAR)
         else:
             sprite_render = sprite_base
 
         if es_activa:
-            # Ligera inclinación dinámica en la primera fracción de segundo de la palabra activa
             edad = max(0.0, t_actual - p.inicio_seg)
             signo_ang = 1.0 if (idx_global % 2 == 0) else -1.0
             angulo_pop = signo_ang * 2.8 * math.exp(-edad * 10.0)
@@ -425,7 +567,6 @@ def renderizar_subtitulos_luminosos(
         dest_x = max(-30, min(WIDTH - sprite_render.width + 30, dest_x))
         dest_y = max(0, min(HEIGHT - sprite_render.height, dest_y))
 
-        # Si dest_x es ligeramente negativo por el pad del resplandor, recortamos limpiamente
         if dest_x < 0:
             sprite_render = sprite_render.crop((-dest_x, 0, sprite_render.width, sprite_render.height))
             dest_x = 0

@@ -1,8 +1,8 @@
-TITULO_SUPERIOR: Truco Viral Dibujo Flotante
-TITULO_YOUTUBE: ¡El secreto definitivo para hacer flotar tus dibujos! 🎨✨ #shorts
-DESCRIPCION_YOUTUBE: Aprende el truco definitivo para hacer flotar cualquier dibujo en el agua sin fallar. ¿Sabías que el secreto estaba en secar la cuchara? Descúbrelo ahora mismo. #shorts #manualidades #trucos #viral #experimentos
+TITULO_SUPERIOR: Travesuras Extremas De Niños Locos
+TITULO_YOUTUBE: ¡Las travesuras más locas de estos niños! 🤣💥 #shorts
+DESCRIPCION_YOUTUBE: Estos pequeños traviesos hacen los desastres más divertidos que hayas visto jamás en casa. ¿Cuál de todas las travesuras te pareció la más graciosa? #shorts #humor #travesuras #niños #viral
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-30 20:30
+SCHEDULE: 2026-10-30 21:00
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
@@ -10,9 +10,20 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | error | enojo:izquierda | ninguna | ninguno | ¡Intenta una y otra vez transferir el dibujo al agua pero siempre se arruina por completo!
-00:05 - 00:10 | zoom_in | whoosh | sorprendido:derecha | ninguna | ninguno | ¡Su hermana mayor interviene de inmediato para explicarle que su técnica es completamente incorrecta y fallida!
-00:10 - 00:15 | alerta_roja | good_idea | ninguno | ninguna | ninguno | ¡El primer paso secreto consiste en secar perfectamente la cuchara para que no quede nada de humedad!
-00:15 - 00:20 | flash | click | ninguno | ninguna | ninguno | ¡Dibuja un divertido león con los rotuladores especiales sobre la superficie totalmente seca de la cuchara blanca!
-00:20 - 00:25 | brillo_epico | riser_suction | sorprendido:derecha | ninguna | box:[280,240,690,520]@22.2:leon_flotando | ¡Al sumergirla muy suavemente el dibujo se desliza por el agua como una película flotante perfecta!
-00:25 - 00:30 | temblor | kids_yeyy | fiesta:izquierda | ninguna | ninguno | ¡Mira la magia en acción cuando la hermosa flor cobra vida propia flotando felizmente sobre el agua!
+00:00 - 00:05 | zoom_impacto | good_idea | risa:derecha | centro | ninguno | ¡Mira este bebé travieso que convirtió un inodoro en su propia bañera personal! ¡Empieza el caos!
+00:05 - 00:10 | zoom_in | pop | sorprendido:izquierda | ninguna | ninguno | ¡El pequeño chapotea felizmente mientras salpica agua por todos lados sin ninguna vergüenza!
+00:10 - 00:15 | ninguno | whoosh | ninguno | ninguna | ninguno | ¡Ahora cambiamos de escenario mientras una niña camina sobre miles de pequeñas piedras!
+00:15 - 00:20 | zoom_out | ninguno | ninguna | ninguna | ninguno | ¡Sus pequeños pies avanzan con cuidado sobre ese piso completamente lleno de gravilla y canicas!
+00:20 - 00:25 | zoom_in | ding | risa:derecha | ninguna | ninguno | ¡Cada rincón de esta casa se convierte rápidamente en un divertido parque de juegos improvisado!
+00:25 - 00:30 | ninguno | none | ninguna | ninguna | ninguno | ¡Y la diversión continúa sin parar con nuevas ocurrencias totalmente locas y muy inesperadas!
+00:30 - 00:35 | zoom_impacto | whoosh | ninguno | ninguna | ninguno | ¡Prepárate para ver cómo los niños desatan toda su energía en cada habitación disponible!
+00:35 - 00:40 | flash | crowd_shocked | sorprendido:izquierda | ninguna | ninguno | ¡El desorden aumenta por segundos y nadie puede detener esta ola de travesuras infantiles!
+00:40 - 00:45 | ninguno | none | ninguna | ninguna | ninguno | ¡Los pequeños protagonistas disfrutan al máximo haciendo de las suyas sin importar las consecuencias!
+00:45 - 00:50 | zoom_in | party_horn | fiesta:derecha | ninguna | ninguno | ¡Llegamos al momento más divertido cuando este bebé aparece cubierto de fideos largos!
+00:50 - 00:55 | zoom_impacto | good_idea | risa:izquierda | ninguna | box:[180,780,480,980]@00:52:bebe_fideos | ¡Tiene spaghetti por todo el cuerpo mientras está sentado muy tranquilo sobre la alfombra!
+00:55 - 01:00 | ninguno | none | ninguna | ninguna | ninguno | ¡Nadie entiende cómo llegó a terminar en ese estado tan increíblemente gracioso y extraño!
+01:00 - 01:05 | zoom_in | cartoon_laugh | risa:derecha | ninguna | ninguno | ¡Pero la diversión no se detiene ahí porque todavía hay muchas más sorpresas preparadas!
+01:05 - 01:10 | alerta_roja | error | sorprendido:izquierda | izquierda | ninguno | ¡Mira estos niños disfrazados de ovejas junto a su adorable perrito en el suelo!
+01:10 - 01:15 | ninguno | whoosh | ninguna | ninguna | ninguno | ¡Todo está cubierto de algodón blanco simulando una granja improvisada dentro de la casa!
+01:15 - 01:20 | temblor | kids_yeyy | risa:derecha | ninguna | ninguno | ¡Y para coronar el día, este niño termina completamente bañado en barro y lodo fresco!
+01:20 - 01:23 | brillo_epico | cash_ting | fiesta:derecha | ninguna | ninguno | ¡Un final totalmente épico para los reyes indiscutibles de las travesuras caseras!
