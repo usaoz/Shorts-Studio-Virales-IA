@@ -1,6 +1,6 @@
-TITULO_SUPERIOR: Travesuras Extremas De Niños Locos
-TITULO_YOUTUBE: ¡Las travesuras más locas de estos niños! 🤣💥 #shorts
-DESCRIPCION_YOUTUBE: Estos pequeños traviesos hacen los desastres más divertidos que hayas visto jamás en casa. ¿Cuál de todas las travesuras te pareció la más graciosa? #shorts #humor #travesuras #niños #viral
+TITULO_SUPERIOR: El Misterio del Pez Dorado
+TITULO_YOUTUBE: ¡El gato que pescaba todas las mañanas! 😱🐟 #shorts
+DESCRIPCION_YOUTUBE: Una niña descubre que su tierno gato le trae una sorpresa cada mañana al estanque. ¿Tus mascotas también te traen regalos secretos? #shorts #cat #cutecat #catvideos #catshorts
 ESTADO_PUBLICACION: privado
 SCHEDULE: 2026-10-30 21:00
 PARA_NINOS: no
@@ -10,20 +10,9 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | good_idea | risa:derecha | centro | ninguno | ¡Mira este bebé travieso que convirtió un inodoro en su propia bañera personal! ¡Empieza el caos!
-00:05 - 00:10 | zoom_in | pop | sorprendido:izquierda | ninguna | ninguno | ¡El pequeño chapotea felizmente mientras salpica agua por todos lados sin ninguna vergüenza!
-00:10 - 00:15 | ninguno | whoosh | ninguno | ninguna | ninguno | ¡Ahora cambiamos de escenario mientras una niña camina sobre miles de pequeñas piedras!
-00:15 - 00:20 | zoom_out | ninguno | ninguna | ninguna | ninguno | ¡Sus pequeños pies avanzan con cuidado sobre ese piso completamente lleno de gravilla y canicas!
-00:20 - 00:25 | zoom_in | ding | risa:derecha | ninguna | ninguno | ¡Cada rincón de esta casa se convierte rápidamente en un divertido parque de juegos improvisado!
-00:25 - 00:30 | ninguno | none | ninguna | ninguna | ninguno | ¡Y la diversión continúa sin parar con nuevas ocurrencias totalmente locas y muy inesperadas!
-00:30 - 00:35 | zoom_impacto | whoosh | ninguno | ninguna | ninguno | ¡Prepárate para ver cómo los niños desatan toda su energía en cada habitación disponible!
-00:35 - 00:40 | flash | crowd_shocked | sorprendido:izquierda | ninguna | ninguno | ¡El desorden aumenta por segundos y nadie puede detener esta ola de travesuras infantiles!
-00:40 - 00:45 | ninguno | none | ninguna | ninguna | ninguno | ¡Los pequeños protagonistas disfrutan al máximo haciendo de las suyas sin importar las consecuencias!
-00:45 - 00:50 | zoom_in | party_horn | fiesta:derecha | ninguna | ninguno | ¡Llegamos al momento más divertido cuando este bebé aparece cubierto de fideos largos!
-00:50 - 00:55 | zoom_impacto | good_idea | risa:izquierda | ninguna | box:[180,780,480,980]@00:52:bebe_fideos | ¡Tiene spaghetti por todo el cuerpo mientras está sentado muy tranquilo sobre la alfombra!
-00:55 - 01:00 | ninguno | none | ninguna | ninguna | ninguno | ¡Nadie entiende cómo llegó a terminar en ese estado tan increíblemente gracioso y extraño!
-01:00 - 01:05 | zoom_in | cartoon_laugh | risa:derecha | ninguna | ninguno | ¡Pero la diversión no se detiene ahí porque todavía hay muchas más sorpresas preparadas!
-01:05 - 01:10 | alerta_roja | error | sorprendido:izquierda | izquierda | ninguno | ¡Mira estos niños disfrazados de ovejas junto a su adorable perrito en el suelo!
-01:10 - 01:15 | ninguno | whoosh | ninguna | ninguna | ninguno | ¡Todo está cubierto de algodón blanco simulando una granja improvisada dentro de la casa!
-01:15 - 01:20 | temblor | kids_yeyy | risa:derecha | ninguna | ninguno | ¡Y para coronar el día, este niño termina completamente bañado en barro y lodo fresco!
-01:20 - 01:23 | brillo_epico | cash_ting | fiesta:derecha | ninguna | ninguno | ¡Un final totalmente épico para los reyes indiscutibles de las travesuras caseras!
+00:00 - 00:05 | zoom_impacto | kids_yeyy | sorprendido:derecha | ninguna | ninguno | ¡Mira cómo esta niña corre emocionada mostrando un nuevo pez dorado a su padre!
+00:05 - 00:09 | zoom_in | whoosh | risa:izquierda | ninguna | ninguno | ¡La pequeña lleva al hombre hasta el estanque exterior para mostrarle el gran misterio!
+00:09 - 00:14 | alerta_roja | good_idea | diablo:derecha | ninguna | box:[130,420,380,720]@14.0:gato_navideno | ¡El padre sospecha de la gata y le asigna una misión secreta nocturna!
+00:14 - 00:19 | temblor | click | sorprendido:izquierda | ninguna | ninguno | ¡Al día siguiente la niña regresa al estanque y encuentra otro pez nadando!
+00:19 - 00:23 | flash | crowd_shocked | risa:derecha | ninguna | ninguno | ¡El padre busca a la felina y descubre que estaba escondida bajo el puente!
+00:23 - 00:28 | brillo_epico | party_horn | fiesta:izquierda | ninguna | ninguno | ¡Atrapada con las patas en la masa! ¡Resulta que el minino era un maestro pescador clandestino!

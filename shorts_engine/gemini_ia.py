@@ -130,79 +130,57 @@ def generar_mosaico_video(ruta_video: Path, cols: int = 4, rows: int = 2) -> Tup
     return jpeg_bytes, dur_seg
 
 
-PROMPT_COMPACTO_INTERNO = """Actúa como un Director de Edición y Guionista experto en retención viral para YouTube Shorts (estilo MrBeast / Reacciones / Bromas / Gaming / Curiosidades).
+PROMPT_COMPACTO_INTERNO = """Actúa como el mejor Director de Retención Viral y Guionista de YouTube Shorts del mundo (especialista en psicología de la atención estilo MrBeast, Reacciones, Bromas, Curiosidades y Gaming).
 
-Tu tarea es **ANALIZAR el mosaico del video** y redactar un guion altamente dinámico basado exactamente en lo que ocurre en el video, con gancho explosivo en los primeros segundos y ritmo constante, narrando lo que sucede DE CORRIDO SIN SILENCIOS hasta el último segundo.
+Tu única misión es VER Y ANALIZAR segundo a segundo el video y redactar un guion adictivo, milimétricamente sincronizado y diseñado para destruir las dos métricas clave del algoritmo de YouTube:
+1. Superar el 85% de "Viewed vs. Swiped Away" (Gancho hipnótico en los primeros 2 segundos).
+2. Superar el 110% de Retención Promedio (APV) mediante tensión creciente y un LOOP INFINITO PERFECTO entre el final y el principio.
 
-PROHIBIDO INCLUIR LLAMADAS A LA ACCIÓN (CTA): la voz NUNCA debe pedir "like", "me gusta", "suscríbete", "comenta", "comparte", "sígueme", "activa la campanita" ni nada parecido. El último bloque también debe ser pura narración de lo que ocurre en pantalla (el desenlace o la reacción final), sin despedidas ni pedidos al espectador.
-PROHIBIDO PONER `[SIGUE_SONIDO_ORIGINAL]` O DEJAR BLOQUES SIN NARRACIÓN: La voz en español debe hablar SIEMPRE en TODOS los bloques de principio a fin (para tapar cualquier idioma extranjero o silencio del video original).
-
-Debes entregarme el resultado EXCLUSIVAMENTE en el formato exacto de bloque de texto que se muestra al final, sin explicaciones adicionales ni bloques ```.
-
-================================================================================
-REGLA CRÍTICA DE TIEMPOS (1x) Y LÍMITE DE PALABRAS POR BLOQUE
-================================================================================
-El editor reproduce el video de fondo a su **velocidad real original (1x)** y el Short final dura **EXACTAMENTE lo mismo que el video original**.
-
-1. **Tiempos exactos (`TIEMPO`)**:
-   - Los bloques `MM:SS - MM:SS` deben empezar en `00:00` y terminar exactamente en el **segundo final real del video**, divididos en tramos de 4 o 5 segundos.
-
-2. **Cantidad EXACTA de palabras por bloque (`TEXTO`)**:
-   - La voz IA habla a un ritmo ágil de **3.7 palabras por segundo** y debe sonar **de corrido, sin silencios**: cada bloque tiene que quedar lleno de narración expresiva de principio a fin.
-   - Cumple **ESTRICTAMENTE** este rango de palabras en cada línea según la duración de ese bloque:
-     * Bloque de **3 segundos** -> Entre **11 y 12 palabras** (máximo 13 palabras).
-     * Bloque de **4 segundos** -> Entre **14 y 16 palabras** (máximo 16 palabras).
-     * Bloque de **5 segundos** -> Entre **18 y 20 palabras** (**MÁXIMO ESTRICTO: 20 palabras**).
-     * Bloque de **6 segundos** -> Entre **21 y 23 palabras** (máximo 24 palabras).
-   - **PROHIBIDO escribir más de 20 palabras en un bloque de 5 segundos**, y tampoco menos de 17. Redacta **2 oraciones fluidas, enérgicas y muy expresivas** (con signos `¡!` o `¿?`) por línea que cuenten exactamente lo que está pasando en pantalla en ese instante.
+🚫 REGLAS DE ORO INQUEBRANTABLES:
+- PROHIBIDO INCLUIR LLAMADAS A LA ACCIÓN (CTA): Jamás digas "suscríbete", "dale like", "comenta", "comparte" ni despedidas.
+- PROHIBIDO INVENTAR ASSETS: Solo puedes usar los EFECTOS, SFX, EMOJIS, FLECHAS y CÍRCULOS listados estrictamente abajo.
+- PROHIBIDO DEJAR BLOQUES SIN NARRACIÓN: La voz en español debe hablar de corrido en todos los bloques sin silencios.
 
 ================================================================================
-REGLAS DE LAS 7 COLUMNAS DEL GUION (SEPARADAS POR '|'):
+🔥 FÓRMULA ALGORÍTMICA DE RETENCIÓN Y LOOP PERFECTO
 ================================================================================
-Formato obligatorio de cada línea debajo de `[GUION]`:
+1. GANCHO DEMOLEDOR (00:00 - 00:04):
+   - Abre INMEDIATAMENTE en medio de la acción planteando un peligro, trampa o pregunta visual urgente.
+   - El primer bloque SIEMPRE usa `zoom_impacto` + SFX (`crowd_shocked` o `boxing_bell`) + FLECHA al foco de atención.
+2. ESCALADA DE CURIOSIDAD (Bloques intermedios):
+   - Conectores de tensión: "¡Pero mira con atención lo que hace!", "¡Lo que no imagina es que...", "¡Cuidado porque el plan recién empieza!".
+3. FINAL ABRUPTO + LOOP INFINITO:
+   - Narra hasta el último milisegundo. La última frase debe conectar rítmicamente con la primera para que el espectador repita el video.
+
+================================================================================
+⏱️ MATEMÁTICA EXACTA DE TIEMPOS (1x) Y CONTEO DE PALABRAS (3.7 pal/seg)
+================================================================================
+- Bloque de 3s -> EXACTAMENTE entre 11 y 12 palabras (Máx 13).
+- Bloque de 4s -> EXACTAMENTE entre 14 y 16 palabras (Máx 16).
+- Bloque de 5s -> EXACTAMENTE entre 18 y 20 palabras (MÁXIMO ESTRICTO: 20 palabras).
+- Bloque de 6s -> EXACTAMENTE entre 21 y 23 palabras (Máx 24).
+Redacta 1 o 2 oraciones continuas, ultra expresivas con signos ¡! y ¿?.
+
+================================================================================
+🛠️ CATÁLOGO ESTRICTO DE LAS 7 COLUMNAS:
+================================================================================
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
 
-1. TIEMPO: `MM:SS - MM:SS` cubriendo desde `00:00` hasta el segundo final exacto del video.
-2. EFECTO (Elige UNO por línea):
-   - `zoom_impacto` (golpe de zoom rápido + vibración, ideal para el gancho inicial)
-   - `zoom_in` (acercamiento progresivo hacia el objetivo)
-   - `zoom_out` (alejamiento suave de cámara)
-   - `flash` (destello luminoso de cámara)
-   - `temblor` (sacudida intensa de pantalla + impacto)
-   - `alerta_roja` (viñeta roja pulsante de peligro, trampa o error)
-   - `brillo_epico` (resplandor vibrante para victorias o desenlaces épicos)
-   - `blanco_negro` (desaturación dramática para fails)
-   - `ninguno`
-3. SFX (Elige UNO o combina dos con `+`, ej. `whoosh+xp_Error`):
-   - `crowd_shocked`, `whoosh`, `riser_suction`, `ding`, `good_idea`, `cash_ting`, `punch`, `boxing_bell`, `camera_flash`, `camera_shooter`, `cartoon_laugh`, `kids_yeyy`, `party_horn`, `awww`, `error`, `xp_Error`, `fart`, `click`, `pop`, `ninguno`.
-4. EMOJI (Elige UNO con posición opcional `:derecha` o `:izquierda`):
-   - `sorprendido`, `risa`, `fiesta`, `diablo`, `enojo`, `lloro`, `sueno`, o `ninguno`.
-5. FLECHA (`flecha.png` con seguimiento inteligente por visión artificial):
-   - Apunta a la acción, sujeto o reacción CLAVE de ese momento del video (ej. la persona que hace la broma, el gesto gracioso, el objeto que se mueve).
-   - DIRECTIVA DE LOCALIZACIÓN REAL: Observa en qué parte de la pantalla (de 0 a 100) ocurre la acción en ese segundo y escribe la coordenada porcentual `X,Y` (ej: `68,55` para algo a la derecha, `30,40` a la izquierda, `50,65` abajo) o la zona (`derecha`, `izquierda`, `abajo`, `arriba`, `auto`).
-   - Usa la flecha solo en 1 o 2 momentos de mayor impacto del video. En los demás escribe `ninguna`. NUNCA en el último bloque.
-6. CIRCULO (`circulo_rojo.png` con Grounding Espacial de Alta Precisión):
-   - REGLAS DE APARICIÓN (CERO HUMO): Solo activa un círculo rojo si en ese bloque hay un OBJETO FÍSICO CONCRETO, PEQUEÑO/MEDIANO Y RELEVANTE que el espectador debe mirar (ej: lo que sostiene la mano, una herramienta, comida, juguete, dinero, detalle oculto, suciedad o falla en piso/mesa).
-   - ESTRICTAMENTE PROHIBIDO:
-     * NUNCA enmarques el pecho, ropa, remera, torso o fondo vacío.
-     * NUNCA pongas círculos sobre personas enteras ni zonas genéricas ('auto', 'centro', 'derecha').
-     * Si no hay un objeto físico clave puntual, el campo CIRCULO DEBE SER exactamente `ninguno`. (Máximo 1 círculo en todo el video).
-   - REGLA DE PUNTO DE CONTACTO (NO ENMARCAR HERRAMIENTAS NI BRAZOS):
-     * Si una mano, cuchillo, cúter, pinza o herramienta está tocando o cortando un objeto (ej. un pastel, una fruta, una pieza), el `box:[ymin,xmin,ymax,xmax]` debe enmarcar EXCLUSIVAMENTE EL OBJETO QUE RECIBE LA ACCIÓN (el pastel/pieza), NUNCA el mango de la herramienta ni la mano/brazo que entra en escena.
-     * Prohibido redondear coordenadas a múltiplos de 50 (como [100,50,450,400]). Calcula los bordes ajustados al objeto real.
-   - COORDENADAS NATIVAS (ESCALA 0 A 1000):
-     Localiza la caja delimitadora (bounding box) exacta del objeto en el segundo clave (`t_ancla`) donde mejor se aprecia:
-     Formato obligatorio: `box:[ymin,xmin,ymax,xmax]@t_ancla:etiqueta`
-     Ejemplos reales: `box:[450,560,590,720]@02.4:herramienta`, `box:[510,320,680,540]@03.1:taza_cafe`, `65,58:chico`, o `ninguno`.
-7. TEXTO (Narración de Voz IA Rápida y Enérgica estilo Shorts):
-   - Entre **15 y 17 palabras por cada bloque de 5 segundos** (~3.1 a 3.3 palabras/segundo) con máxima emoción (`¡!`). Esta cadencia es rápida, enérgica y atrapante (estilo viral de YouTube Shorts), manteniendo una dicción fluida y continua sin silencios muertos. Narra siempre lo que pasa en el video sin pedir likes ni suscripciones.
+1. TIEMPO: MM:SS - MM:SS continuo cubriendo de 00:00 al segundo final real.
+2. EFECTO: zoom_impacto, zoom_in, zoom_out, flash, temblor, alerta_roja, brillo_epico, blanco_negro, ninguno.
+3. SFX: crowd_shocked, whoosh, riser_suction, ding, good_idea, cash_ting, punch, boxing_bell, camera_flash, camera_shooter, cartoon_laugh, kids_yeyy, party_horn, awww, error, xp_Error, fart, click, pop, ninguno (máx 2 combinados con +).
+4. EMOJI: sorprendido, risa, fiesta, diablo, enojo, lloro, sueno, ninguno (opcional :derecha, :izquierda, :arriba_der, :arriba_izq, :centro, :abajo).
+5. FLECHA: centro, izquierda, derecha, arriba, abajo, auto, X,Y porcentual (ej: 45,60) o ninguna. Máx 1 o 2 en el video, nunca al final.
+6. CIRCULO: 'box:[ymin,xmin,ymax,xmax]@t_ancla:etiqueta' o 'ninguno'. Máx 1 en todo el video.
+   - REGLA DE CONTACTO: Enmarcar solo el objeto que recibe la acción, NUNCA herramientas ni brazos. Sin redondear a múltiplos de 50.
+7. TEXTO: Narración continua cumpliendo la tabla exacta de palabras sin CTA.
 
 ================================================================================
 PLANTILLA DE ENTREGA OBLIGATORIA:
 ================================================================================
-TITULO_SUPERIOR: [Nombre corto de 4-5 palabras para el archivo MP4, ej: Abuela Venganza Epica Troleo]
-TITULO_YOUTUBE: [Título viral llamativo con 1 o 2 emojis llamativos obligatorios y #shorts, ej: ¡La mejor venganza de la abuela! 🤣💥 #shorts]
-DESCRIPCION_YOUTUBE: [Descripción atrapante de 2 oraciones + pregunta a la audiencia + 4 o 5 hashtags hiper-específicos del nicho real del video (ej: si es de perros #shorts #perros #mascotas #viral; si es de autos #shorts #autos #carreras #viral; etc.)]
+TITULO_SUPERIOR: [Nombre corto para el archivo MP4]
+TITULO_YOUTUBE: [Título viral con emoji y #shorts]
+DESCRIPCION_YOUTUBE: [Descripción intrigante de 2 oraciones + pregunta + hashtags #shorts #viral]
 ESTADO_PUBLICACION: privado
 SCHEDULE: auto
 PARA_NINOS: no
@@ -212,11 +190,10 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | izquierda | ninguno | ¡Mira cómo esta nieta traviesa engaña a su abuela escondiendo la pelota de tenis! ¡La pobre no entiende absolutamente nada!
-00:05 - 00:10 | zoom_in | whoosh+xp_Error | enojo:izquierda | ninguna | ninguno | ¡La broma sigue cuando hace desaparecer otro objeto frente a su cara! ¡Su abuela busca confundida por toda la mesa!
-00:10 - 00:15 | alerta_roja | riser_suction | diablo:derecha | ninguna | box:[490,280,680,480]@12.4:trampa_secreta | ¡Pero cuidado porque la abuela ya tenía preparada una trampa secreta! ¡Prepárate para ver la venganza más épica de todas!
-00:15 - 00:20 | temblor | punch+cartoon_laugh | risa:izquierda | derecha | ninguno | ¡Toma esto por tramposa! ¡La nieta termina con toda la cara completamente llena de harina blanca en un segundo!
-00:20 - 00:25 | brillo_epico | cash_ting+party_horn | fiesta:derecha | ninguna | ninguno | ¡La abuela celebra su victoria mientras la nieta no puede creer lo que acaba de pasar! ¡Una venganza perfecta!"""
+00:00 - 00:04 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | [14 a 16 palabras exactas con gancho explosivo]
+00:04 - 00:08 | alerta_roja | riser_suction | diablo:izquierda | izquierda | box:[420,310,680,560]@05.2:objeto | [14 a 16 palabras aumentando intriga]
+00:08 - 00:13 | temblor | punch+xp_Error | risa:derecha | derecha | ninguno | [18 a 20 palabras narrando el clímax con máxima energía]
+00:13 - 00:17 | brillo_epico | cash_ting+party_horn | fiesta:derecha | centro | ninguno | [14 a 16 palabras conectando en loop con el inicio]"""
 
 
 def generar_video_compacto_ia(ruta_video: Path) -> Tuple[Optional[bytes], float]:
