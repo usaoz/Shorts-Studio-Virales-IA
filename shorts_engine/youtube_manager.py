@@ -494,10 +494,9 @@ def buscar_short_viral_en_canal(
             continue
 
     if candidatos:
-        # Priorizar SIEMPRE el Short con mayor cantidad de vistas reales
-        candidatos.sort(key=lambda x: x[2], reverse=True)
-        elegido = candidatos[0]
-        print(f"[+] Short más viral encontrado en {etiqueta_corta_canal(url_shorts)}: '{elegido[1]}' ({elegido[2]:,} vistas de {len(candidatos)} candidatos) -> {elegido[0]}")
+        # Seleccionar aleatoriamente entre todas las opciones que cumplen el filtro mínimo
+        elegido = random.choice(candidatos)
+        print(f"[+] Short viral elegido aleatoriamente en {etiqueta_corta_canal(url_shorts)}: '{elegido[1]}' ({elegido[2]:,} vistas de {len(candidatos)} opciones con >= {min_views:,}) -> {elegido[0]}")
         return elegido
 
     if estricto_min_views:
