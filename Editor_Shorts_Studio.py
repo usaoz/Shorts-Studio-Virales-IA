@@ -319,6 +319,7 @@ def iniciar_aplicacion_gui() -> None:
             "modo_cuentas": "una",
             "cuenta_activa_id": "",
             "grupo_cuentas_ids": [],
+            "estrategia_multicuenta": "cross_posting",
             "canales_por_cuenta": {},
             "canales": [],
             "indice_rotacion": 0,
@@ -364,6 +365,7 @@ def iniciar_aplicacion_gui() -> None:
                     "modo_cuentas": str(leido.get("modo_cuentas", "una")),
                     "cuenta_activa_id": str(leido.get("cuenta_activa_id", "")),
                     "grupo_cuentas_ids": list(leido.get("grupo_cuentas_ids", [])),
+                    "estrategia_multicuenta": str(leido.get("estrategia_multicuenta", "cross_posting")),
                     "canales_por_cuenta": dict(leido.get("canales_por_cuenta") or {}),
                     "canales": list(leido.get("canales", [])),
                     "indice_rotacion": int(leido.get("indice_rotacion", 0)),
@@ -430,6 +432,7 @@ def iniciar_aplicacion_gui() -> None:
         "modo": str(mem.get("modo_cuentas") or "una"),  # "una" | "todas" | "grupo"
         "cuenta_id": cid_mem,
         "grupo_ids": [str(x) for x in (mem.get("grupo_cuentas_ids") or []) if str(x).strip()],
+        "estrategia": str(mem.get("estrategia_multicuenta") or "cross_posting"),  # "cross_posting" | "rotacion"
     }
     cache_avatares_ctk: Dict[str, ctk.CTkImage] = {}
     row_botones_accion: Optional[ctk.CTkFrame] = None
@@ -529,6 +532,7 @@ def iniciar_aplicacion_gui() -> None:
                         "modo_cuentas": estado_seleccion_cuentas.get("modo", "una"),
                         "cuenta_activa_id": estado_seleccion_cuentas.get("cuenta_id", ""),
                         "grupo_cuentas_ids": estado_seleccion_cuentas.get("grupo_ids", []),
+                        "estrategia_multicuenta": estado_seleccion_cuentas.get("estrategia", "cross_posting"),
                         "canales_por_cuenta": canales_por_cuenta,
                         "canales": lista_canales,
                         "indice_rotacion": estado_rotacion["idx"],
@@ -1424,12 +1428,14 @@ def iniciar_aplicacion_gui() -> None:
         estado_seleccion_cuentas["grupo_ids"] = grupo_ids
 
         # Actualizar botón superior de Cuenta y etiqueta de Canales Fuente
+        strat_ui = str(estado_seleccion_cuentas.get("estrategia") or "cross_posting")
+        tag_strat = " · Cross-post" if strat_ui == "cross_posting" else " · Rotación"
         if modo_act == "todas" and len(cuentas) > 1:
-            txt_btn = f"Todas ({len(cuentas)} cuentas) ▾"
+            txt_btn = f"Todas ({len(cuentas)} cuentas{tag_strat}) ▾"
             img_btn = None
             lbl_titulo_canales.configure(text="Canales Fuente")
         elif modo_act == "grupo" and len(grupo_ids) >= 1:
-            txt_btn = f"Grupo ({len(grupo_ids)} cuentas) ▾"
+            txt_btn = f"Grupo ({len(grupo_ids)} cuentas{tag_strat}) ▾"
             img_btn = None
             lbl_titulo_canales.configure(text="Canales Fuente")
         else:
@@ -1604,6 +1610,25 @@ def iniciar_aplicacion_gui() -> None:
 
         slots = calcular_lista_horarios_actual()
         partes_prev: List[str] = []
+        modo_c_act = str(estado_seleccion_cuentas.get("modo") or "una")
+        strat_c_act = str(estado_seleccion_cuentas.get("estrategia") or "cross_posting")
+
+        from subir_a_youtube import listar_cuentas_vinculadas
+        try:
+            cuentas_v_plan = listar_cuentas_vinculadas() or [{"id": "principal", "nombre": "Canal Principal"}]
+        except Exception:
+            cuentas_v_plan = [{"id": "principal", "nombre": "Canal Principal"}]
+        dict_cv = {str(c.get("id") or "principal"): c for c in cuentas_v_plan}
+
+        if modo_c_act == "todas":
+            c_plan_obj = list(cuentas_v_plan)
+        elif modo_c_act == "grupo":
+            g_ids_p = [g for g in (estado_seleccion_cuentas.get("grupo_ids") or []) if g in dict_cv]
+            c_plan_obj = [dict_cv[g] for g in g_ids_p] if g_ids_p else [cuentas_v_plan[0]]
+        else:
+            cid_u = str(estado_seleccion_cuentas.get("cuenta_id") or cuentas_v_plan[0].get("id") or "principal")
+            c_plan_obj = [dict_cv.get(cid_u, cuentas_v_plan[0])]
+
         for idx_s, s_str in enumerate(slots):
             if not s_str:
                 continue
@@ -1611,11 +1636,24 @@ def iniciar_aplicacion_gui() -> None:
                 f_part, h_part = s_str.split(" ")
                 d_obj = _dt.date.fromisoformat(f_part)
                 d_txt = f"{d_obj.day:02d}/{d_obj.month:02d}"
-                partes_prev.append(f"#{idx_s + 1} {d_txt} {h_part}")
+                tiempo_txt = f"{d_txt} {h_part}"
             except Exception:
-                partes_prev.append(f"#{idx_s + 1} {s_str}")
+                tiempo_txt = str(s_str)
+
+            if modo_c_act in ("todas", "grupo") and len(c_plan_obj) > 1:
+                if strat_c_act == "cross_posting":
+                    nom_cuentas_corta = " + ".join(str(c.get("nombre") or c.get("id"))[:10] for c in c_plan_obj)
+                    partes_prev.append(f"#{idx_s + 1} [{nom_cuentas_corta}] {tiempo_txt}")
+                else:
+                    c_asig = c_plan_obj[idx_s % len(c_plan_obj)]
+                    nom_a = str(c_asig.get("nombre") or c_asig.get("id"))[:12]
+                    partes_prev.append(f"#{idx_s + 1} [{nom_a}] {tiempo_txt}")
+            else:
+                partes_prev.append(f"#{idx_s + 1} {tiempo_txt}")
 
         resumen_str = "  ·  ".join(partes_prev)
+        if modo_c_act in ("todas", "grupo") and strat_c_act == "rotacion" and len(c_plan_obj) > 1 and len(slots) < len(c_plan_obj):
+            resumen_str += f"  (Rotando: {len(c_plan_obj) - len(slots)} cuenta(s) sin video en este lote)"
         lbl_preview_horarios.configure(
             text=resumen_str,
             text_color="#ffffff",
@@ -2085,7 +2123,7 @@ def iniciar_aplicacion_gui() -> None:
     def abrir_selector_cuentas_popup() -> None:
         pop = ctk.CTkToplevel(root)
         pop.title("Elegir Cuenta o Grupo de Subida")
-        pop.geometry("490x520")
+        pop.geometry("500x620")
         pop.resizable(False, False)
         pop.configure(fg_color=BG_DARK)
         pop.transient(root)
@@ -2125,9 +2163,64 @@ def iniciar_aplicacion_gui() -> None:
         inv_modo_seg = {v: k for k, v in mapa_modo_seg.items()}
         seg_modo_var = tk.StringVar(value=inv_modo_seg.get(modo_actual, "1 Cuenta"))
 
+        strat_actual = str(estado_seleccion_cuentas.get("estrategia") or "cross_posting")
+        mapa_strat_seg = {
+            "Mismo Video (Cross-posting)": "cross_posting",
+            "Rotar Videos (1 por cuenta)": "rotacion",
+        }
+        inv_strat_seg = {v: k for k, v in mapa_strat_seg.items()}
+        seg_strat_var = tk.StringVar(value=inv_strat_seg.get(strat_actual, "Mismo Video (Cross-posting)"))
+
+        frame_strat = ctk.CTkFrame(
+            pop,
+            corner_radius=12,
+            fg_color="#182032",
+            border_width=1,
+            border_color="#26334d",
+        )
+        ctk.CTkLabel(
+            frame_strat,
+            text="Estrategia al publicar en varias cuentas:",
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            text_color=CYAN_ACCENT,
+        ).pack(anchor="w", padx=12, pady=(8, 4))
+
+        lbl_strat_desc = ctk.CTkLabel(
+            frame_strat,
+            text="",
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color=TEXT_MUTED,
+            justify="left",
+            wraplength=440,
+        )
+
+        def _actualizar_desc_strat(*_args: object) -> None:
+            if "Cross-posting" in seg_strat_var.get():
+                lbl_strat_desc.configure(
+                    text="El mismo Short se subirá a todas las cuentas marcadas simultáneamente."
+                )
+            else:
+                lbl_strat_desc.configure(
+                    text="Cada Short se asignará a una cuenta distinta por turno (1 video diferente por cuenta)."
+                )
+
+        seg_strat_widget = ctk.CTkSegmentedButton(
+            frame_strat,
+            values=["Mismo Video (Cross-posting)", "Rotar Videos (1 por cuenta)"],
+            variable=seg_strat_var,
+            command=_actualizar_desc_strat,
+            corner_radius=10,
+            height=30,
+            selected_color="#2563eb",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        )
+        seg_strat_widget.pack(fill="x", padx=12, pady=(0, 4))
+        lbl_strat_desc.pack(anchor="w", padx=12, pady=(0, 8))
+        _actualizar_desc_strat()
+
         lista_scroll = ctk.CTkScrollableFrame(
             pop,
-            height=300,
+            height=250,
             corner_radius=16,
             fg_color=CARD_BG,
             border_width=1,
@@ -2140,11 +2233,15 @@ def iniciar_aplicacion_gui() -> None:
             for w in lista_scroll.winfo_children():
                 w.destroy()
             m_sel = mapa_modo_seg.get(seg_modo_var.get(), "una")
+            if m_sel in ("todas", "grupo"):
+                frame_strat.pack(fill="x", padx=22, pady=(0, 10), before=lista_scroll)
+            else:
+                frame_strat.pack_forget()
 
             if m_sel == "todas":
                 ctk.CTkLabel(
                     lista_scroll,
-                    text=f"Se subirán los Shorts rotando entre TODAS tus cuentas ({len(cuentas_disp)}).\nCada Reel usará los Canales Fuente guardados de la cuenta que le toque.",
+                    text=f"Se incluirán TODAS tus cuentas vinculadas ({len(cuentas_disp)}):",
                     font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
                     text_color=CYAN_ACCENT,
                     justify="left",
@@ -2271,6 +2368,8 @@ def iniciar_aplicacion_gui() -> None:
 
         def _aplicar_cierre_popup() -> None:
             m_f = mapa_modo_seg.get(seg_modo_var.get(), "una")
+            estr_f = mapa_strat_seg.get(seg_strat_var.get(), "cross_posting")
+            estado_seleccion_cuentas["estrategia"] = estr_f
             if m_f == "todas":
                 # Guardar canales de la cuenta que estaba activa
                 cid_prev = str(estado_seleccion_cuentas.get("cuenta_id") or "")
@@ -2293,6 +2392,7 @@ def iniciar_aplicacion_gui() -> None:
                 estado_seleccion_cuentas["modo"] = "una"
 
             refrescar_selector_cuentas_ui()
+            refrescar_plan_ui()
             _guardar_memoria()
             pop.destroy()
 
@@ -4733,6 +4833,9 @@ def iniciar_aplicacion_gui() -> None:
                 else:
                     cuentas_objetivo_lote = [dict_cuentas_v.get(cid_unica, todas_cuentas_v[0])]
 
+                strat_lote = str(estado_seleccion_cuentas.get("estrategia") or "cross_posting")
+                es_cross_post_lote = (modo_c_lote in ("todas", "grupo") and strat_lote == "cross_posting" and len(cuentas_objetivo_lote) > 1)
+
                 videos_seleccionados: List[Dict[str, object]] = []
                 ids_reservados_sesion: List[str] = []
 
@@ -4741,14 +4844,27 @@ def iniciar_aplicacion_gui() -> None:
                     for idx_sel in range(cant_cola):
                         num_s = idx_sel + 1
                         pref_s = f"[Reel {num_s}/{cant_cola}] " if cant_cola > 1 else ""
-                        cuenta_reel_info = cuentas_objetivo_lote[idx_sel % len(cuentas_objetivo_lote)]
-                        cid_reel = str(cuenta_reel_info.get("id") or "principal")
-                        cnom_reel = str(cuenta_reel_info.get("nombre") or cid_reel)
-
-                        # Usar los canales guardados específicos de esa cuenta (o lista_canales actual como respaldo)
-                        canales_de_esta_cuenta = list(canales_por_cuenta.get(cid_reel) or lista_canales)
-                        if not canales_de_esta_cuenta:
-                            canales_de_esta_cuenta = list(lista_canales)
+                        if es_cross_post_lote:
+                            cuenta_reel_info = cuentas_objetivo_lote[0]
+                            cid_reel = str(cuenta_reel_info.get("id") or "principal")
+                            cnom_reel = " + ".join(str(c.get("nombre") or c.get("id"))[:10] for c in cuentas_objetivo_lote)
+                            cuentas_este_reel = list(cuentas_objetivo_lote)
+                            canales_de_esta_cuenta = []
+                            for c_o in cuentas_objetivo_lote:
+                                c_o_id = str(c_o.get("id") or "")
+                                for can in (canales_por_cuenta.get(c_o_id) or []):
+                                    if can not in canales_de_esta_cuenta:
+                                        canales_de_esta_cuenta.append(can)
+                            if not canales_de_esta_cuenta:
+                                canales_de_esta_cuenta = list(lista_canales)
+                        else:
+                            cuenta_reel_info = cuentas_objetivo_lote[idx_sel % len(cuentas_objetivo_lote)]
+                            cid_reel = str(cuenta_reel_info.get("id") or "principal")
+                            cnom_reel = str(cuenta_reel_info.get("nombre") or cid_reel)
+                            cuentas_este_reel = [cuenta_reel_info]
+                            canales_de_esta_cuenta = list(canales_por_cuenta.get(cid_reel) or lista_canales)
+                            if not canales_de_esta_cuenta:
+                                canales_de_esta_cuenta = list(lista_canales)
 
                         estados_milestones[idx_sel] = {"tipo": "activo", "texto": f"Reel {num_s}: Eligiendo video..."}
                         copia_ms = [dict(x) for x in estados_milestones]
@@ -4823,6 +4939,7 @@ def iniciar_aplicacion_gui() -> None:
                                 "canal": etiqueta_corta_canal(canal_usado),
                                 "cuenta_id": cid_reel,
                                 "cuenta_nombre": cnom_reel,
+                                "cuentas_destino": list(cuentas_este_reel),
                             }
                         )
                         estados_milestones[idx_sel] = {"tipo": "pendiente", "texto": f"Reel {num_s}: Elegido"}
@@ -4830,10 +4947,17 @@ def iniciar_aplicacion_gui() -> None:
                         root.after(0, lambda cm=copia_ms2: _renderizar_milestones_ui(cm))
                 elif es_modo_editado:
                     for idx_ed, p_ed in enumerate(lista_videos_editados_locales):
-                        c_idx = idx_ed % len(cuentas_objetivo_lote)
-                        c_reel = cuentas_objetivo_lote[c_idx]
-                        cid_reel = str(c_reel.get("id") or "principal")
-                        cnom_reel = str(c_reel.get("nombre") or cid_reel)
+                        if es_cross_post_lote:
+                            c_reel = cuentas_objetivo_lote[0]
+                            cid_reel = str(c_reel.get("id") or "principal")
+                            cnom_reel = " + ".join(str(c.get("nombre") or c.get("id"))[:10] for c in cuentas_objetivo_lote)
+                            cuentas_este_reel = list(cuentas_objetivo_lote)
+                        else:
+                            c_idx = idx_ed % len(cuentas_objetivo_lote)
+                            c_reel = cuentas_objetivo_lote[c_idx]
+                            cid_reel = str(c_reel.get("id") or "principal")
+                            cnom_reel = str(c_reel.get("nombre") or cid_reel)
+                            cuentas_este_reel = [c_reel]
                         nombre_limpio = p_ed.stem.replace("_", " ").replace("-", " ").title()
                         videos_seleccionados.append(
                             {
@@ -4844,6 +4968,7 @@ def iniciar_aplicacion_gui() -> None:
                                 "canal": "Video Editado Local",
                                 "cuenta_id": cid_reel,
                                 "cuenta_nombre": cnom_reel,
+                                "cuentas_destino": list(cuentas_este_reel),
                             }
                         )
                         estados_milestones[idx_ed] = {"tipo": "pendiente", "texto": f"Reel {idx_ed + 1}: Video Listo"}
@@ -4851,10 +4976,17 @@ def iniciar_aplicacion_gui() -> None:
                     root.after(0, lambda cm=copia_ms2: _renderizar_milestones_ui(cm))
                 else:
                     for idx_u, u_link in enumerate(links_a_procesar):
-                        c_idx = idx_u % len(cuentas_objetivo_lote)
-                        c_reel = cuentas_objetivo_lote[c_idx]
-                        cid_reel = str(c_reel.get("id") or "principal")
-                        cnom_reel = str(c_reel.get("nombre") or cid_reel)
+                        if es_cross_post_lote:
+                            c_reel = cuentas_objetivo_lote[0]
+                            cid_reel = str(c_reel.get("id") or "principal")
+                            cnom_reel = " + ".join(str(c.get("nombre") or c.get("id"))[:10] for c in cuentas_objetivo_lote)
+                            cuentas_este_reel = list(cuentas_objetivo_lote)
+                        else:
+                            c_idx = idx_u % len(cuentas_objetivo_lote)
+                            c_reel = cuentas_objetivo_lote[c_idx]
+                            cid_reel = str(c_reel.get("id") or "principal")
+                            cnom_reel = str(c_reel.get("nombre") or cid_reel)
+                            cuentas_este_reel = [c_reel]
                         videos_seleccionados.append(
                             {
                                 "url": u_link,
@@ -4863,6 +4995,7 @@ def iniciar_aplicacion_gui() -> None:
                                 "canal": "Link de Video",
                                 "cuenta_id": cid_reel,
                                 "cuenta_nombre": cnom_reel,
+                                "cuentas_destino": list(cuentas_este_reel),
                             }
                         )
                         estados_milestones[idx_u] = {"tipo": "pendiente", "texto": f"Reel {idx_u + 1}: Listo"}
@@ -5283,50 +5416,63 @@ def iniciar_aplicacion_gui() -> None:
                                             pass
                                     break
 
-                        # Cuenta de YouTube asignada a este Reel en el lote
-                        id_cuenta_usar = str(info_sel.get("cuenta_id") or estado_seleccion_cuentas.get("cuenta_id") or "principal")
-                        nombre_cuenta_subida = str(info_sel.get("cuenta_nombre") or id_cuenta_usar)
+                        # Cuentas de YouTube asignadas a este Reel (una o varias si es cross-posting)
+                        cuentas_dest_video: List[Dict[str, Any]] = list(info_sel.get("cuentas_destino") or [])
+                        if not cuentas_dest_video:
+                            id_c_def = str(info_sel.get("cuenta_id") or estado_seleccion_cuentas.get("cuenta_id") or "principal")
+                            nom_c_def = str(info_sel.get("cuenta_nombre") or id_c_def)
+                            cuentas_dest_video = [{"id": id_c_def, "nombre": nom_c_def}]
 
-                        _actualizar_milestone_actual("activo", f"Reel {num_actual}: Subiendo a {nombre_cuenta_subida[:16]}...")
-                        root.after(
-                            0,
-                            lambda p=pref_lote, nc=nombre_cuenta_subida[:18]: btn_auto_1clic.configure(
-                                text=f"{p}SUBIENDO A {nc.upper()}..."
-                            ),
-                        )
-                        _set_subprogreso(
-                            0.92,
-                            f"{pref_lote}Subiendo y programando Short en '{nombre_cuenta_subida}'...",
-                            "#c084fc",
-                        )
+                        total_cdest = len(cuentas_dest_video)
+                        for idx_cd, c_dest in enumerate(cuentas_dest_video):
+                            if evento_cancelar.is_set():
+                                raise InterruptedError("Operación detenida por el usuario antes de completar las subidas.")
 
-                        vid_id = subir_video(
-                            ruta_video=ruta_final,
-                            titulo=c_tit if (es_custom_activo and c_tit) else None,
-                            descripcion=c_desc if (es_custom_activo and c_desc) else None,
-                            estado_privacidad=modo_priv,
-                            publish_at=sched_actual,
-                            ruta_guion=DEFAULT_GUION_TXT,
-                            cuenta_id=id_cuenta_usar,
-                            callback_cancelar=lambda: evento_cancelar.is_set(),
-                        )
-                        registrar_video_usado(url_descargar, cuenta_id=id_cuenta_usar)
-                        shorts_subidos.append({
-                            "titulo": (c_tit if (es_custom_activo and c_tit) else titulo_orig) or ruta_final.stem,
-                            "url": f"https://youtube.com/shorts/{vid_id}",
-                            "cuenta": nombre_cuenta_subida,
-                            "reel_num": num_actual,
-                        })
-                        incrementar_cuota_diaria(video_id=vid_id)
+                            id_cuenta_usar = str(c_dest.get("id") or "principal")
+                            nombre_cuenta_subida = str(c_dest.get("nombre") or id_cuenta_usar)
+                            tag_multi = f" ({idx_cd + 1}/{total_cdest})" if total_cdest > 1 else ""
+
+                            _actualizar_milestone_actual("activo", f"Reel {num_actual}: Subiendo a {nombre_cuenta_subida[:14]}{tag_multi}...")
+                            root.after(
+                                0,
+                                lambda p=pref_lote, nc=nombre_cuenta_subida[:16], tm=tag_multi: btn_auto_1clic.configure(
+                                    text=f"{p}SUBIENDO A {nc.upper()}{tm}..."
+                                ),
+                            )
+                            _set_subprogreso(
+                                0.92 + (idx_cd / max(1, total_cdest)) * 0.06,
+                                f"{pref_lote}Subiendo Short a '{nombre_cuenta_subida}'{tag_multi}...",
+                                "#c084fc",
+                            )
+
+                            vid_id = subir_video(
+                                ruta_video=ruta_final,
+                                titulo=c_tit if (es_custom_activo and c_tit) else None,
+                                descripcion=c_desc if (es_custom_activo and c_desc) else None,
+                                estado_privacidad=modo_priv,
+                                publish_at=sched_actual,
+                                ruta_guion=DEFAULT_GUION_TXT,
+                                cuenta_id=id_cuenta_usar,
+                                callback_cancelar=lambda: evento_cancelar.is_set(),
+                            )
+                            registrar_video_usado(url_descargar, cuenta_id=id_cuenta_usar)
+                            shorts_subidos.append({
+                                "titulo": (c_tit if (es_custom_activo and c_tit) else titulo_orig) or ruta_final.stem,
+                                "url": f"https://youtube.com/shorts/{vid_id}",
+                                "cuenta": nombre_cuenta_subida,
+                                "reel_num": num_actual,
+                            })
+                            incrementar_cuota_diaria(video_id=vid_id)
+                            links_subidos.append(f"https://youtube.com/shorts/{vid_id}")
+
                         root.after(0, refrescar_barra_cuota)
                         root.after(1500, sincronizar_cola_programados_async)
-                        url_short = f"https://youtube.com/shorts/{vid_id}"
-                        links_subidos.append(url_short)
 
-                        _actualizar_milestone_actual("subido", f"Reel {num_actual}: ✓ Subido")
+                        txt_milestone_fin = f"Reel {num_actual}: ✓ Subido" + (f" ({total_cdest} cuentas)" if total_cdest > 1 else "")
+                        _actualizar_milestone_actual("subido", txt_milestone_fin)
                         _set_subprogreso(
                             1.0,
-                            f"{pref_lote}Reel {num_actual} subido con éxito ({sched_actual or modo_priv.upper()})",
+                            f"{pref_lote}Reel {num_actual} subido con éxito a {total_cdest} cuenta(s) ({sched_actual or modo_priv.upper()})",
                             GREEN_ACCENT,
                         )
 
@@ -5358,11 +5504,14 @@ def iniciar_aplicacion_gui() -> None:
                         _actualizar_progreso_ui(100.0, txt_fin, GREEN_ACCENT, GREEN_ACCENT)
                     else:
                         if len(links_subidos) > 0:
-                            txt_fin = (
-                                f"100% — ¡Se subieron todos los Reels ({len(links_subidos)}/{cant_cola}) con éxito!"
-                                if cant_cola > 1
-                                else "100% — ¡Se subió el Reel a YouTube con éxito!"
-                            )
+                            if es_cross_post_lote and len(cuentas_objetivo_lote) > 1:
+                                txt_fin = f"100% — ¡Se publicaron {len(links_subidos)} Shorts en {len(cuentas_objetivo_lote)} cuentas con éxito!"
+                            else:
+                                txt_fin = (
+                                    f"100% — ¡Se subieron todos los Reels ({len(links_subidos)}/{cant_cola}) con éxito!"
+                                    if cant_cola > 1
+                                    else "100% — ¡Se subió el Reel a YouTube con éxito!"
+                                )
                             _actualizar_progreso_ui(100.0, txt_fin, GREEN_ACCENT, GREEN_ACCENT)
                         else:
                             txt_fin = "Proceso finalizado. No se subió ningún video."
