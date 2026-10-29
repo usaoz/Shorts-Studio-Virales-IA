@@ -249,6 +249,9 @@ class GestorEfectosYAssets:
             zoom = 1.0 + 0.10 * progreso
         elif efecto == "blanco_negro":
             zoom = 1.02 + 0.08 * progreso
+        elif efecto == "spotlight":
+            curva = progreso * progreso * (3.0 - 2.0 * progreso)
+            zoom = 1.05 + 0.06 * curva
         else:
             zoom = 1.0 + 0.05 * progreso
 
@@ -324,6 +327,21 @@ class GestorEfectosYAssets:
                 alpha_flash = float(np.clip(220.0 * ((1.0 - t_seg / 0.32) ** 1.8) / 255.0, 0.0, 1.0))
                 capa_blanca = np.full_like(frame_zoomed, 255)
                 cv2.addWeighted(capa_blanca, alpha_flash, frame_zoomed, 1.0 - alpha_flash, 0.0, frame_zoomed)
+
+        elif efecto == "spotlight":
+            if puntos_pantalla:
+                foco_pt_x, foco_pt_y = puntos_pantalla[0]
+            else:
+                foco_pt_x, foco_pt_y = float(WIDTH // 2), float(HEIGHT // 2)
+
+            sx = int(foco_pt_x * 270.0 / WIDTH)
+            sy = int(foco_pt_y * 480.0 / HEIGHT)
+            mascara_spot = np.full((480, 270), 102, dtype=np.uint8)
+            cv2.circle(mascara_spot, (sx, sy), 65, 255, -1)
+            mascara_suave = cv2.GaussianBlur(mascara_spot, (45, 45), 0)
+            full_mask_1ch = cv2.resize(mascara_suave, (WIDTH, HEIGHT), interpolation=cv2.INTER_LINEAR)
+            full_mask_3ch = cv2.merge([full_mask_1ch, full_mask_1ch, full_mask_1ch])
+            cv2.multiply(frame_zoomed, full_mask_3ch, frame_zoomed, scale=1.0 / 255.0)
 
         if t_seg < 0.06 and efecto != "flash":
             alpha_tr = float(np.clip(55.0 * (1.0 - t_seg / 0.06) / 255.0, 0.0, 1.0))
@@ -1368,9 +1386,27 @@ async def editar_video_con_guion(
         elif "fondo 1" in nom_pista or "fondo_1" in nom_pista:
             vol_bgm = 0.05
         fade_start = max(0.5, dur_total_audio - 0.4)
+        # Ducking dramático de BGM en risers y frenazos de disco (corte a silencio de fondo)
+        filtros_duck_dramatico = []
+        t_acum_bgm = 0.0
+        for seg_item in datos_segmentos:
+            s_obj, _, dur_s = seg_item[0], seg_item[1], seg_item[2]
+            sfx_nombres = [str(s).lower() for s in (s_obj.sfx_lista or [])]
+            if any("record_scratch" in s or "riser_suction" in s for s in sfx_nombres):
+                t_ini_d = t_acum_bgm
+                t_fin_d = min(t_acum_bgm + 0.85, t_acum_bgm + dur_s)
+                filtros_duck_dramatico.append(f"between(t,{t_ini_d:.2f},{t_fin_d:.2f})")
+            t_acum_bgm += dur_s
+
+        filtro_dramatico_str = ""
+        if filtros_duck_dramatico:
+            cond_duck = "+".join(filtros_duck_dramatico)
+            filtro_dramatico_str = f",volume=0.20:enable='{cond_duck}'"
+            print(f"[*] Ducking dramático de música activo en {len(filtros_duck_dramatico)} momentos de tensión/corte.")
+
         print(f"[*] Música de fondo con ducking sutil: '{pista_musica.name}' (tono: '{tono_efectivo}', volumen: {vol_bgm:.2f}).")
         filter_str = (
-            f"[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume={vol_bgm:.2f},afade=t=out:st={fade_start:.2f}:d=0.4,highpass=f=60,equalizer=f=2500:t=q:w=1.5:g=-3.0[bgm];"
+            f"[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume={vol_bgm:.2f}{filtro_dramatico_str},afade=t=out:st={fade_start:.2f}:d=0.4,highpass=f=60,equalizer=f=2500:t=q:w=1.5:g=-3.0[bgm];"
             f"[0:a]aformat=sample_rates=48000:channel_layouts=stereo,asplit=2[voz_mix][voz_sc];"
             f"[bgm][voz_sc]sidechaincompress=threshold=0.08:ratio=3.5:attack=50:release=300[bgm_duck];"
             f"[voz_mix][bgm_duck]amix=inputs=2:duration=first:dropout_transition=0:weights='1 1':normalize=0[pre_master];"

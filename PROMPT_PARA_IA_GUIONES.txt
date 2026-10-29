@@ -64,12 +64,18 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
    - alerta_roja  -> Viñeta roja pulsante (para peligro inminente, trampa, engaño o sospecha).
    - brillo_epico -> Resplandor dorado/vibrante (para victorias, karma instantáneo o clímax triunfal).
    - blanco_negro -> Filtro dramático desaturado (para traiciones, decepciones o fails tristes).
+   - spotlight    -> Foco de luz sobre el objetivo clave, oscureciendo el fondo 60% (ideal para revelar un detalle o sospechoso).
    - ninguno      -> Sin filtro adicional.
 
-3. SFX (Elige SOLO UNO de estos 19 nombres exactos, o combina máximo dos con '+', ej: whoosh+xp_Error):
+3. SFX (Elige SOLO UNO de estos 24 nombres exactos, o combina máximo dos con '+', ej: whoosh+xp_Error):
    - crowd_shocked  -> Multitud sorprendida (ideal en 00:00 o revelación).
    - whoosh         -> Corte de aire rápido para transiciones dinámicas.
    - riser_suction  -> Subida de tensión absorbente (justo antes del impacto o broma).
+   - vine_boom      -> Golpe sordo de comedia viral / impacto seco de meme.
+   - metal_pipe     -> Caída estrepitosa de tubo metálico (fail / golpe absurdo).
+   - heartbeat_fast -> Latido cardíaco acelerado de tensión extrema.
+   - record_scratch -> Frenazo de disco de vinilo (corte abrupto / giro cómico con silencio de fondo).
+   - suspense_hit   -> Impacto orquestal dramático de suspenso / misterio.
    - ding           -> Campana aguda de detalle clave o acierto.
    - good_idea      -> Sonido de idea genial / plan secreto activado.
    - cash_ting      -> Caja registradora (valor, apuesta, premio o jugada maestra).
@@ -88,8 +94,8 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
    - pop            -> Burbuja explosiva rápida.
    - ninguno        -> Sin SFX.
 
-4. EMOJI (Elige SOLO UNO de estos 7 nombres exactos):
-   - sorprendido, risa, fiesta, diablo, enojo, lloro, sueno, o ninguno.
+4. EMOJI (Elige SOLO UNO de estos 11 nombres exactos):
+   - sorprendido, risa, fiesta, diablo, enojo, lloro, sueno, calavera, cerebro, fuego, ojos, o ninguno.
    - Opcional: añade posición con dos puntos (:derecha, :izquierda, :arriba_der, :arriba_izq, :centro, :abajo). Ejemplo: diablo:derecha.
 
 5. FLECHA (Señalador dinámico flecha.png con tracking por visión artificial - dura ~1.8s):

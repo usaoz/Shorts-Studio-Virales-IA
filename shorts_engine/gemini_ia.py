@@ -167,9 +167,9 @@ Redacta 1 o 2 oraciones continuas, ultra expresivas con signos ¡! y ¿?.
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
 
 1. TIEMPO: MM:SS - MM:SS continuo cubriendo de 00:00 al segundo final real.
-2. EFECTO: zoom_impacto, zoom_in, zoom_out, flash, temblor, alerta_roja, brillo_epico, blanco_negro, ninguno.
-3. SFX: crowd_shocked, whoosh, riser_suction, ding, good_idea, cash_ting, punch, boxing_bell, camera_flash, camera_shooter, cartoon_laugh, kids_yeyy, party_horn, awww, error, xp_Error, fart, click, pop, ninguno (máx 2 combinados con +).
-4. EMOJI: sorprendido, risa, fiesta, diablo, enojo, lloro, sueno, ninguno (opcional :derecha, :izquierda, :arriba_der, :arriba_izq, :centro, :abajo).
+2. EFECTO: zoom_impacto, zoom_in, zoom_out, flash, temblor, alerta_roja, brillo_epico, blanco_negro, spotlight, ninguno.
+3. SFX: crowd_shocked, whoosh, riser_suction, vine_boom, metal_pipe, heartbeat_fast, record_scratch, suspense_hit, ding, good_idea, cash_ting, punch, boxing_bell, camera_flash, camera_shooter, cartoon_laugh, kids_yeyy, party_horn, awww, error, xp_Error, fart, click, pop, ninguno (máx 2 combinados con +).
+4. EMOJI: sorprendido, risa, fiesta, diablo, enojo, lloro, sueno, calavera, cerebro, fuego, ojos, ninguno (opcional :derecha, :izquierda, :arriba_der, :arriba_izq, :centro, :abajo).
 5. FLECHA: centro, izquierda, derecha, arriba, abajo, auto, X,Y porcentual (ej: 45,60) o ninguna. Máx 1 o 2 en el video, nunca al final.
 6. CIRCULO: 'box:[ymin,xmin,ymax,xmax]@t_ancla:etiqueta' o 'ninguno'. Máx 1 en todo el video.
    - REGLA DE CONTACTO: Enmarcar solo el objeto que recibe la acción, NUNCA herramientas ni brazos. Sin redondear a múltiplos de 50.
