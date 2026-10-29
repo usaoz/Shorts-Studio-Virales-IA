@@ -299,9 +299,16 @@ def generar_guion_con_gemini_flash(
     from google import genai
     from google.genai import types
 
-    keys_pool = extraer_gemini_api_keys(api_key)
-    if not keys_pool:
-        keys_pool = obtener_gemini_api_keys()
+    keys_pool: List[str] = []
+    # 1. Cargar todas las llaves guardadas en disco / entorno (pool multi-cuenta)
+    for k in obtener_gemini_api_keys():
+        if k not in keys_pool:
+            keys_pool.append(k)
+    # 2. Agregar cualquier clave adicional pasada por parámetro
+    if api_key:
+        for k in extraer_gemini_api_keys(api_key):
+            if k not in keys_pool:
+                keys_pool.append(k)
     if not keys_pool:
         raise ValueError("No ingresaste tu GEMINI_API_KEY gratuita de Google AI Studio.")
 
@@ -427,9 +434,12 @@ def generar_guion_con_gemini_flash(
             "gemini-3.1-flash-lite",
             "gemini-flash-lite-latest",
         ]
-        if modelo_preferido and modelo_preferido.strip():
+        # Argon 4 siempre es la prioridad absoluta inicial en todas las cuentas vinculadas.
+        # Luego se continúa con el modelo preferido (si es distinto) y el resto en orden descendente.
+        if modelo_preferido and modelo_preferido.strip() and modelo_preferido.strip() != "gemini-4-argon":
             mod_p = modelo_preferido.strip()
-            jerarquia_modelos = [mod_p] + [m for m in base_jerarquia if m != mod_p]
+            resto = [m for m in base_jerarquia if m != "gemini-4-argon" and m != mod_p]
+            jerarquia_modelos = ["gemini-4-argon", mod_p] + resto
         else:
             jerarquia_modelos = list(base_jerarquia)
 
@@ -449,14 +459,22 @@ def generar_guion_con_gemini_flash(
             r = cli.models.generate_content(model=m, contents=cnt)
             return (r.text or "").strip()
 
-        for mod in jerarquia_modelos:
+        for idx_m, mod in enumerate(jerarquia_modelos):
             nom_mod = nombres_ui.get(mod, mod)
+            nom_sig_mod = nombres_ui.get(jerarquia_modelos[idx_m + 1], jerarquia_modelos[idx_m + 1]) if (idx_m + 1 < len(jerarquia_modelos)) else "ninguno"
             for idx_k, k_act in enumerate(keys_pool):
+                etiqueta_cuenta = f"Cuenta API {idx_k + 1}" + (f" de {len(keys_pool)}" if len(keys_pool) > 1 else "")
+                hay_siguiente_cuenta = (idx_k + 1 < len(keys_pool))
+                etiqueta_sig_cuenta = f"Cuenta API {idx_k + 2} de {len(keys_pool)}" if hay_siguiente_cuenta else ""
+
                 if (k_act, mod) in pares_saturados_sesion:
+                    _notificar_estado_ia(
+                        paso_frac,
+                        f"Saltando {nom_mod} en {etiqueta_cuenta} (cuota ya agotada en esta sesión)..."
+                    )
                     continue
 
-                etiqueta_cuenta = f"Cuenta API {idx_k + 1}" + (f" de {len(keys_pool)}" if len(keys_pool) > 1 else "")
-                _notificar_estado_ia(paso_frac, f"{paso_nombre}: Consultando {nom_mod} ({etiqueta_cuenta})...")
+                _notificar_estado_ia(paso_frac, f"{paso_nombre}: Probando {nom_mod} ({etiqueta_cuenta})...")
 
                 # 1. Intento con video directo (si está disponible)
                 t_video = min(40.0, timeout_max)
@@ -473,27 +491,29 @@ def generar_guion_con_gemini_flash(
                     ex_pool.shutdown(wait=False, cancel_futures=True)
                     err_msg_corto = str(e) or repr(e)
 
-                    # Caso A: Cuota agotada (429) -> Rotar a siguiente cuenta para este modelo
+                    # Caso A: Cuota agotada (429 / RESOURCE_EXHAUSTED) -> Marcar saturado y rotar a la siguiente cuenta para este mismo modelo
                     if "429" in err_msg_corto or "RESOURCE_EXHAUSTED" in err_msg_corto:
                         pares_saturados_sesion.add((k_act, mod))
-                        if mod == "gemini-4-argon":
-                            _notificar_estado_ia(paso_frac, f"Argon 4 requiere facturación en {etiqueta_cuenta}. Pasando a Gemini 3.8 Flash...")
-                            break
-                        elif len(keys_pool) > 1 and idx_k + 1 < len(keys_pool):
-                            _notificar_estado_ia(paso_frac, f"⚠ {etiqueta_cuenta} sin cuota (429). Rotando automáticamente a Cuenta API {idx_k + 2} para {nom_mod}...")
-                            continue
+                        if hay_siguiente_cuenta:
+                            _notificar_estado_ia(
+                                paso_frac,
+                                f"⚠ {nom_mod} sin cuota (429) en {etiqueta_cuenta}. Probando {nom_mod} en {etiqueta_sig_cuenta}..."
+                            )
                         else:
-                            _notificar_estado_ia(paso_frac, f"⚠ Cuota de {nom_mod} agotada en todas tus cuentas (429). Pasando al modelo siguiente...")
-                            continue
+                            _notificar_estado_ia(
+                                paso_frac,
+                                f"⚠ Cuota de {nom_mod} agotada en las {len(keys_pool)} cuentas. Pasando a {nom_sig_mod}..."
+                            )
+                        continue
 
-                    # Caso B: Video ocupado o timeout (503, 504, UNAVAILABLE, Timeout) -> Reintentar con Mosaico liviano
+                    # Caso B: Video ocupado o timeout (503, 504, UNAVAILABLE, Timeout) -> Reintentar con Mosaico liviano en la MISMA cuenta
                     es_reintento_mosaico = (
                         video_bytes is not None
                         and ("503" in err_msg_corto or "504" in err_msg_corto or "UNAVAILABLE" in err_msg_corto
                              or "DEADLINE" in err_msg_corto or "TimeoutError" in type(e).__name__ or "timeout" in err_msg_corto.lower())
                     )
                     if es_reintento_mosaico:
-                        _notificar_estado_ia(paso_frac, f"{nom_mod} saturó con video. Analizando con Mosaico de fotogramas ({etiqueta_cuenta})...")
+                        _notificar_estado_ia(paso_frac, f"{nom_mod} demoró con video en {etiqueta_cuenta}. Reintentando con Mosaico ({etiqueta_cuenta})...")
                         t_mosaico = max(48.0, timeout_max)
                         ex_pool_m = concurrent.futures.ThreadPoolExecutor(max_workers=1)
                         fut_m = ex_pool_m.submit(_intentar_llamada, mod, partes_m, t_mosaico, k_act)
@@ -509,18 +529,39 @@ def generar_guion_con_gemini_flash(
                             err_m_str = str(e_m) or repr(e_m)
                             if "429" in err_m_str or "RESOURCE_EXHAUSTED" in err_m_str:
                                 pares_saturados_sesion.add((k_act, mod))
-                            print(f"[!] Mosaico en '{mod}' falló ({err_m_str[:60]}).")
+                            print(f"[!] Mosaico en '{mod}' falló en {etiqueta_cuenta} ({err_m_str[:60]}).")
+                            if hay_siguiente_cuenta:
+                                _notificar_estado_ia(
+                                    paso_frac,
+                                    f"⚠ {nom_mod} (Mosaico) no respondió en {etiqueta_cuenta}. Probando {nom_mod} en {etiqueta_sig_cuenta}..."
+                                )
+                            else:
+                                _notificar_estado_ia(
+                                    paso_frac,
+                                    f"⚠ {nom_mod} (Mosaico) no respondió en ninguna de las {len(keys_pool)} cuentas. Pasando a {nom_sig_mod}..."
+                                )
+                            continue
 
-                    elif mod == "gemini-4-argon":
-                        _notificar_estado_ia(paso_frac, f"Argon 4 no disponible en {etiqueta_cuenta}. Pasando al modelo siguiente...")
-                        break
+                    # Caso C: Modelo no disponible (404 NOT_FOUND, facturación, permiso, etc.) -> Rotar a siguiente cuenta para este mismo modelo
+                    if "404" in err_msg_corto or "NOT_FOUND" in err_msg_corto:
+                        pares_saturados_sesion.add((k_act, mod))
+
+                    if hay_siguiente_cuenta:
+                        _notificar_estado_ia(
+                            paso_frac,
+                            f"⚠ {nom_mod} no disponible en {etiqueta_cuenta}. Probando {nom_mod} en {etiqueta_sig_cuenta}..."
+                        )
                     else:
-                        print(f"[!] '{mod}' no respondió ({err_msg_corto[:60]}), pasando al siguiente...")
+                        _notificar_estado_ia(
+                            paso_frac,
+                            f"⚠ {nom_mod} no disponible en ninguna de las {len(keys_pool)} cuentas. Pasando a {nom_sig_mod}..."
+                        )
+                    continue
 
         det_err = str(ultimo_err) if (ultimo_err and str(ultimo_err).strip()) else "Sin respuesta"
         total_k = len(keys_pool)
         raise RuntimeError(
-            f"Todos los modelos de Gemini y Argon 4 consultados en {total_k} cuenta{'s' if total_k != 1 else ''} "
+            f"Todos los modelos de Gemini y Argon 4 consultados en las {total_k} cuenta{'s' if total_k != 1 else ''} "
             f"están sin cuota o no responden (429/503/timeout).\n"
             f"Por favor verifica tus API Keys o cuota en Google AI Studio (aistudio.google.com/apikey). Detalle: {det_err}"
         )

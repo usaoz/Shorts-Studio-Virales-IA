@@ -4671,7 +4671,7 @@ def iniciar_aplicacion_gui() -> None:
         ).pack(side="right")
 
     def ejecutar_flujo_1_clic(solo_guardar_override: Optional[bool] = None) -> None:
-        api_k = obtener_gemini_api_key()
+        api_k = "\n".join(obtener_gemini_api_keys()) or obtener_gemini_api_key()
         if not api_k:
             messagebox.showinfo(
                 "Configura tu API Key Gratuita (1 vez)",
@@ -5018,6 +5018,9 @@ def iniciar_aplicacion_gui() -> None:
                             root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}GENERANDO TÍTULO CON IA..."))
                             _set_subprogreso(0.45, f"{pref_lote}Analizando video para título viral con IA...", CYAN_ACCENT)
                             try:
+                                def _cb_tit_solo(sub_frac: float, msg_ia: str) -> None:
+                                    _set_subprogreso(0.45 + max(0.0, min(1.0, sub_frac)) * 0.20, f"{pref_lote}{msg_ia}", CYAN_ACCENT)
+
                                 generar_guion_con_gemini_flash(
                                     ruta_video=ruta_final,
                                     api_key=api_k,
@@ -5025,6 +5028,7 @@ def iniciar_aplicacion_gui() -> None:
                                     modo_privacidad="privado" if modo_priv == "private" else modo_priv,
                                     contexto_titulo_orig=titulo_orig,
                                     modelo_preferido=pref_modelo_ia,
+                                    progreso_cb=_cb_tit_solo,
                                 )
                             except Exception as e_ia:
                                 print(f"[!] Aviso al generar título IA: {e_ia}. Usando nombre de archivo.")
