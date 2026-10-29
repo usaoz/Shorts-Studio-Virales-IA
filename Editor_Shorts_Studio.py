@@ -4904,7 +4904,9 @@ def iniciar_aplicacion_gui() -> None:
                                 if "Auto-Auditoría" in msg_ia or "Auditoría" in msg_ia:
                                     root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}AUDITANDO COHERENCIA CON IA..."))
 
-                            es_auto_subida = not es_modo_editado and ("Revisión" not in modo_subida_var.get() and "Revision" not in modo_subida_var.get())
+                            # Auto-auditoría retrospectiva de 3 rondas SIEMPRE activa al generar guion nuevo
+                            # (tanto en Subida Automática como en Revisión Previa manual)
+                            es_auto_auditoria = not es_modo_editado
 
                             generar_guion_con_gemini_flash(
                                 ruta_video=ruta_video_usar,
@@ -4914,7 +4916,7 @@ def iniciar_aplicacion_gui() -> None:
                                 contexto_titulo_orig=titulo_orig,
                                 modelo_preferido=pref_modelo_ia,
                                 progreso_cb=_cb_guion,
-                                auto_auditoria_retrospectiva=es_auto_subida,
+                                auto_auditoria_retrospectiva=es_auto_auditoria,
                             )
                             if es_custom_activo and (c_tit or c_desc):
                                 _sobreescribir_campos_custom_en_guion_txt(c_tit, c_desc)
@@ -5084,6 +5086,7 @@ def iniciar_aplicacion_gui() -> None:
                                             contexto_titulo_orig=titulo_orig,
                                             modelo_preferido=pref_modelo_ia,
                                             progreso_cb=_cb_guion_otro,
+                                            auto_auditoria_retrospectiva=True,
                                         )
 
                                         _actualizar_milestone_actual("activo", f"Reel {num_actual}: Editando 60 FPS...")

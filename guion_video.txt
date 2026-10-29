@@ -1,8 +1,8 @@
-TITULO_SUPERIOR: Maestra Cae en Broma Epica de Alumna
-TITULO_YOUTUBE: ¡La profesora cayó en la mejor broma escolar! 🤣🍟 #shorts
-DESCRIPCION_YOUTUBE: Una alumna finge dibujar un paquete de papas fritas y engaña por completo a su profesora. ¿Alguna vez le hiciste una broma pesada a tu profesor en clase? #shorts #comedy #funny #viral #school
+TITULO_SUPERIOR: Perro come todo y dejan a la hija
+TITULO_YOUTUBE: ¡El perro se comió toda la comida! 😱🐶 #shorts
+DESCRIPCION_YOUTUBE: Este padre intentó dejar suficiente comida a sus mascotas antes de viajar, pero olvidó algo imperdonable. ¿Quién crees que comió más rápido? #shorts #perros #mascotas #comedia #viral
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-29 20:00
+SCHEDULE: 2026-10-30 21:00
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
@@ -10,7 +10,8 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:06 | zoom_impacto | whoosh | ninguno | ninguna | ninguna | ¡Mira atentamente a esta astuta alumna que finge dibujar un increíble paquete de papas fritas! ¡Todo parece un trabajo escolar perfecto!
-00:06 - 00:11 | zoom_in | good_idea | sorprendido:derecha | ninguna | ninguna | ¡La profesora se acerca con enorme curiosidad para observar de cerca el supuesto dibujo hiperrealista de la talentosa joven!
-00:11 - 00:16 | flash | ding | risa:izquierda | ninguna | centro:chico | ¡Pero la sorpresa es total cuando la maestra descubre que la bolsa es completamente real y está pegada!
-00:16 - 00:22 | brillo_epico | cartoon_laugh | lloro:derecha | ninguna | ninguna | ¡La profesora no lo puede creer y la alumna sale corriendo de risa tras completar su épica broma escolar!
+00:00 - 00:05 | zoom_impacto | whoosh | sorprendido:derecha | ninguna | ninguno | ¡Mira todos los interminables cuencos de comida que este padre prepara para sus adorables mascotas hoy!
+00:05 - 00:10 | zoom_in | click | ninguna | ninguna | ninguno | ¡El padre y su pequeña hija se despiden felices para emprender un largo viaje juntos muy alegres!
+00:10 - 00:16 | alerta_roja | riser_suction | risa:derecha | ninguna | ninguno | ¡Pero espera! El voraz perro devoró absolutamente toda la comida dejando al pobre gato sin nada para desayunar hoy.
+00:16 - 00:21 | temblor | error | enojo:izquierda | ninguna | ninguno | ¡El dueño regresa corriendo a casa y llena tres filas enteras con tazones para calmar tanta hambre acumulada!
+00:21 - 00:26 | brillo_epico | crowd_shocked | risa:derecha | ninguna | ninguno | ¡Lo peor de todo es que el distraído padre se olvidó a su propia hija sola en el campo!
