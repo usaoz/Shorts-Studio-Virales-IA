@@ -1834,13 +1834,17 @@ def iniciar_aplicacion_gui() -> None:
         win = ctk.CTkToplevel(root)
         win.withdraw()
         win.title("Ajustes y Herramientas")
-        win.geometry("600x820")
-        win.resizable(False, False)
+        win.geometry("600x720")
+        win.resizable(False, True)
         win.configure(fg_color=BG_DARK)
         win.transient(root)
 
+        # Scroll para evitar placeholders negros en pantallas pequeñas
+        _sc = ctk.CTkScrollableFrame(win, fg_color=BG_DARK, scrollbar_button_color="#2a3147", scrollbar_button_hover_color="#3b4a6b")
+        _sc.pack(fill="both", expand=True)
+
         # 1. Tarjeta de Modo de Trabajo, Título/Guión (IA vs Manual), Acción Final y Selección de Canales
-        card_modo = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
+        card_modo = ctk.CTkFrame(_sc, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
         card_modo.pack(fill="x", padx=24, pady=(18, 8))
 
         ctk.CTkLabel(
@@ -1898,7 +1902,7 @@ def iniciar_aplicacion_gui() -> None:
         ).pack(fill="x", padx=18, pady=(0, 14))
 
         # 2. Cerebro IA, Voz del Narrador y Encuadre
-        card_cfg = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
+        card_cfg = ctk.CTkFrame(_sc, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
         card_cfg.pack(fill="x", padx=24, pady=(0, 8))
 
         ctk.CTkLabel(
@@ -1959,7 +1963,7 @@ def iniciar_aplicacion_gui() -> None:
         ).pack(fill="x", padx=18, pady=(0, 12))
 
         # 3. Tarjeta de API Key Gemini / Argon 4 Multi-Cuenta
-        card_api = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
+        card_api = ctk.CTkFrame(_sc, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
         card_api.pack(fill="x", padx=24, pady=(0, 10))
 
         top_api = ctk.CTkFrame(card_api, fg_color="transparent")
@@ -2054,7 +2058,7 @@ def iniciar_aplicacion_gui() -> None:
         ).pack(side="right")
 
         # 4. Carpeta Output
-        card_tools = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
+        card_tools = ctk.CTkFrame(_sc, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
         card_tools.pack(fill="x", padx=24, pady=(0, 12))
 
         grid_t = ctk.CTkFrame(card_tools, fg_color="transparent")
@@ -2083,10 +2087,15 @@ def iniciar_aplicacion_gui() -> None:
         ).pack(fill="x", padx=4)
 
         aplicar_icono_ventana(win)
-        win.deiconify()
-        win.lift()
-        win.focus_force()
-        win.grab_set()
+
+        def _mostrar_ajustes():
+            win.update_idletasks()
+            win.deiconify()
+            win.lift()
+            win.focus_force()
+            win.grab_set()
+
+        win.after(1, _mostrar_ajustes)
 
     def finalizar_app_completamente() -> None:
         try:
