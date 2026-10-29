@@ -338,9 +338,9 @@ class GestorEfectosYAssets:
             return 0.0
 
         mapa_diametro = {
-            "chico": 370,
-            "medio": 475,
-            "grande": 580,
+            "chico": 240,
+            "medio": 350,
+            "grande": 460,
         }
         diam_base = mapa_diametro.get(tamano_mod, 475)
 
@@ -1027,14 +1027,16 @@ def _limitar_circulos_guion(
     Limita tanto los círculos rojos como las flechas rojas para que aparezcan de forma
     espaciada y menos frecuente, evitando saturar todos los segmentos del Short.
     """
-    # 0. El círculo rojo NUNCA debe colocarse en el centro de la pantalla ni en 'auto' genérico,
-    # ya que tapa la acción principal del video y no recuadra ningún detalle útil.
+    # 0. Si el guion tiene un círculo con 'centro', convertirlo a 'auto' para que el rastreador de visión
+    # busque el objeto real en movimiento/contraste más importante del video y lo enmarque con precisión.
     for s in segmentos:
         if s.circulo:
             c_norm = _quitar_acentos(str(s.circulo).strip().lower())
-            if c_norm in ("centro", "center", "medio", "middle", "auto") or c_norm.startswith("centro"):
-                print(f"[*] Omitiendo círculo rojo '{s.circulo}' en segmento {s.id_segmento}: el centro es el plano principal y no recuadra un detalle útil.")
-                s.circulo = None
+            if c_norm in ("centro", "center", "medio", "middle") or c_norm.startswith("centro:"):
+                tam_s = s.tamano_circulo or "medio"
+                s.circulo = f"auto:{tam_s}"
+                s.tamano_circulo = tam_s
+                print(f"[*] Círculo en segmento {s.id_segmento} redirigido a detección inteligente del objeto clave ('auto:{tam_s}').")
 
     con_circulo = [i for i, s in enumerate(segmentos) if s.circulo]
     if len(con_circulo) > max_circulos:

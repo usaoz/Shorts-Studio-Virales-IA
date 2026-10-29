@@ -177,14 +177,15 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
    - `crowd_shocked`, `whoosh`, `riser_suction`, `ding`, `good_idea`, `cash_ting`, `punch`, `boxing_bell`, `camera_flash`, `camera_shooter`, `cartoon_laugh`, `kids_yeyy`, `party_horn`, `awww`, `error`, `xp_Error`, `fart`, `click`, `pop`, `ninguno`.
 4. EMOJI (Elige UNO con posición opcional `:derecha` o `:izquierda`):
    - `sorprendido`, `risa`, `fiesta`, `diablo`, `enojo`, `lloro`, `sueno`, o `ninguno`.
-5. FLECHA (`flecha.png` con seguimiento por visión artificial):
-   - Apunta y persigue automáticamente al objeto, persona o acción clave en esa zona del video.
-   - Opciones: `auto` (para que la visión artificial detecte y siga el sujeto/objeto principal en movimiento), `izquierda`, `derecha`, `centro`, `arriba`, `abajo`, o bien la coordenada porcentual exacta `X,Y` (ej: `28,45` si el sujeto está a la izquierda, `72,50` a la derecha), o `ninguna`.
-   - **FRECUENCIA MODERADA**: usa la flecha solo en **1 o 2 bloques clave del guion como máximo**, dejando el resto en `ninguna`. No pongas flechas en bloques seguidos.
-   - **NUNCA uses flecha en el último bloque**: El último bloque debe concluir el video con su acción y desenlace real de forma limpia, sin flechas.
-6. CIRCULO (`circulo_rojo.png`):
-   - Rodea un objeto o detalle pequeño específico y oculto (ej. un objeto en la mano, un detalle en el piso o a un costado).
-   - REGLA CRÍTICA: Escribe SIEMPRE `ninguno` a menos que haya un detalle o elemento secundario pequeño que recuadrar con coordenadas X,Y (ej: `25,60`, `70,40`) o lateral (`izquierda`, `derecha`). NUNCA uses `centro` ni `centro:grande` porque tapar el centro de la pantalla cubre al sujeto principal y no recuadra nada útil. Si no hay un detalle oculto específico, escribe `ninguno`.
+5. FLECHA (`flecha.png` con seguimiento inteligente por visión artificial):
+   - Apunta a la acción, sujeto o reacción CLAVE de ese momento del video (ej. la persona que hace la broma, el gesto gracioso, el objeto que se mueve).
+   - DIRECTIVA DE LOCALIZACIÓN REAL: Observa en qué parte de la pantalla (de 0 a 100) ocurre la acción en ese segundo y escribe la coordenada porcentual `X,Y` (ej: `68,55` para algo a la derecha, `30,40` a la izquierda, `50,65` abajo) o la zona (`derecha`, `izquierda`, `abajo`, `arriba`, `auto`).
+   - Usa la flecha solo en 1 o 2 momentos de mayor impacto del video. En los demás escribe `ninguna`. NUNCA en el último bloque.
+6. CIRCULO (`circulo_rojo.png` para enmarcar objetos y detalles importantes):
+   - Rodea y ENMARCA un objeto, detalle o revelación visual clave que el espectador debe notar (ej. un objeto en la mano, la comida o ingrediente, un regalo o juguete, un detalle oculto).
+   - DIRECTIVA DE ENCUADRE: Escribe la coordenada `X,Y` donde está ese objeto junto a su tamaño (`:chico` para objetos en manos/detalles pequeños, `:medio` para caras/objetos medianos):
+     * Ejemplos: `65,58:chico` (objeto en mano derecha), `35,45:medio` (reacción a la izquierda), `50,68:chico` (objeto en la mesa), o `auto:chico` / `auto:medio` (para que la visión artificial detecte automáticamente el objeto en movimiento).
+     * Si no hay un objeto particular que enmarcar en ese bloque, escribe `ninguno`. (Máximo 1 círculo en todo el video).
 7. TEXTO (Narración de Voz IA Rápida y Enérgica estilo Shorts):
    - Entre **15 y 17 palabras por cada bloque de 5 segundos** (~3.1 a 3.3 palabras/segundo) con máxima emoción (`¡!`). Esta cadencia es rápida, enérgica y atrapante (estilo viral de YouTube Shorts), manteniendo una dicción fluida y continua sin silencios muertos. Narra siempre lo que pasa en el video sin pedir likes ni suscripciones.
 
@@ -335,7 +336,7 @@ def generar_guion_con_gemini_flash(
         f"- En SCHEDULE escribe: {schedule_str.strip() if schedule_str.strip() else 'no'}\n"
         f"- En PARA_NINOS escribe: no\n"
         f"- En TONO_VIDEO escribe 'triste' si el video es triste o dramático, 'inspiracional' si es emotivo, heroico o de superación, o 'fondo' para humor, curiosidad, acción y entretenimiento general.\n"
-        f"- Recuerda usar FLECHA como máximo en 2 bloques clave y CIRCULO SIEMPRE en 'ninguno' a menos que haya un detalle pequeño que señalar con coordenadas X,Y (NUNCA 'centro').\n"
+        f"- FLECHA y CIRCULO: úsalos para destacar elementos IMPORTANTES del video (ej. el objeto en la mano, la reacción, el detalle clave). Especifica su coordenada X,Y o zona (ej. '65,55' o 'auto:chico') para que el encuadre caiga exactamente sobre el objeto real.\n"
     )
 
     modelos_saturados_sesion: Set[str] = set()

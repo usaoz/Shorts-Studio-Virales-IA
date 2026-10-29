@@ -38,7 +38,7 @@ class RastreadorObjetivosVideo:
         "arriba_der": (0.72, 0.27, 68.0),
         "abajo_izq": (0.28, 0.60, 68.0),
         "abajo_der": (0.72, 0.60, 68.0),
-        "auto": (0.50, 0.45, 145.0),
+        "auto": (0.50, 0.45, 240.0),
     }
 
     @classmethod
@@ -135,8 +135,8 @@ class RastreadorObjetivosVideo:
         cy_sal = float(np.sum(ys * pesos) / np.sum(pesos))
 
         # Si la IA dio coordenada exacta X,Y, refinamos hacia el pico de saliencia real del objeto cercano;
-        # si dio una zona ("izquierda", "derecha", "centro"), vamos directo al objeto más saliente (86%).
-        peso_sal = 0.72 if es_exacta else 0.86
+        # si dio una zona o auto, vamos directo al objeto más saliente y en movimiento (92%).
+        peso_sal = 0.75 if es_exacta else 0.92
         tx = peso_sal * cx_sal + (1.0 - peso_sal) * x_nom
         ty = peso_sal * cy_sal + (1.0 - peso_sal) * y_nom
         return float(np.clip(tx, 36.0, w - 36.0)), float(np.clip(ty, 44.0, limite_y_inf))

@@ -86,17 +86,16 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
   - `sorprendido`, `risa`, `fiesta`, `diablo`, `enojo`, `lloro`, `sueno`, o `ninguno`.
   (Opcional: agrega `:derecha`, `:izquierda`, `:arriba_der` o `:arriba_izq` para fijar su posición, ej. `sorprendido:derecha`).
 
-5. FLECHA (Flecha roja grande `flecha.png` con seguimiento inteligente de objetivos):
-  Apunta y persigue automáticamente a la persona u objeto dentro de la zona que indiques según lo que viste en el video:
-  - `centro`, `izquierda`, `derecha`, `arriba`, `abajo`, `auto`, `X,Y` (ej. `45,60`), o `ninguna`.
-  - **FRECUENCIA MODERADA: usa la flecha solo en 2 bloques clave del guion como máximo**, dejando el resto en `ninguna` para no saturar el video. No pongas flechas en bloques seguidos ni junto al círculo.
-  - **NUNCA uses flecha en el último bloque**: El editor añade automáticamente al final un outro freeze-frame de 1 segundo con la flecha animada apuntando al botón de Like.
+5. FLECHA (Flecha roja `flecha.png` con seguimiento inteligente por visión artificial):
+  Apunta y persigue automáticamente a la persona, acción o reacción clave en esa zona del video:
+  - Mira el video y ubica dónde está la acción en ese segundo: escribe la coordenada porcentual 'X,Y' (ej. '68,55' para la derecha, '30,40' para la izquierda, '50,65' para abajo) o la zona ('derecha', 'izquierda', 'abajo', 'arriba', 'auto').
+  - FRECUENCIA: usa la flecha solo en 1 o 2 momentos de mayor sorpresa del video. En los demás escribe 'ninguna'. NUNCA en el último bloque.
   - Aparece de forma ágil y breve (~1.8 segundos) para captar la atención inmediatamente y luego desaparecer sin tapar el video.
 
-6. CIRCULO (Círculo rojo `circulo_rojo.png` con seguimiento inteligente de objetivos):
-  Rodea un detalle o elemento pequeño y oculto en pantalla (ej. un objeto en la mano, algo en el piso o a un costado):
-  - Escribe SIEMPRE 'ninguno' salvo que exista un detalle u objeto específico fuera del centro para recuadrar con coordenadas 'X,Y' (ej. '30,45') o lateral ('izquierda', 'derecha').
-  - NUNCA uses 'centro' ni 'centro:grande' porque tapar el centro de la pantalla cubre al protagonista principal y no recuadra ningún detalle útil. Si no hay un detalle oculto específico, pon 'ninguno'.
+6. CIRCULO (Círculo rojo `circulo_rojo.png` para enmarcar objetos importantes):
+  Enmarca y destaca un objeto, detalle o revelación visual clave que el espectador debe notar (ej. un objeto en la mano, comida, un juguete, una sorpresa):
+  - Ubica dónde está ese objeto en la pantalla y escribe su coordenada porcentual 'X,Y' junto a su tamaño: ':chico' para objetos pequeños o en manos (ej. '65,58:chico'), ':medio' para caras u objetos medianos (ej. '35,45:medio'), o 'auto:chico' para que la visión artificial lo detecte automáticamente.
+  - Máximo 1 círculo en todo el video, en el momento más importante. En los demás bloques pon 'ninguno'.
   - Dura poco tiempo (~1.8 segundos) y se desvanece suavemente para no saturar la pantalla.
 
 7. TEXTO (Narración de Voz IA + Subtítulos Luminosos):
