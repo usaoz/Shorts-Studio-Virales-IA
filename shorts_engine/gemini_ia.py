@@ -597,6 +597,25 @@ def generar_guion_con_gemini_flash(
                 break
 
     DEFAULT_GUION_TXT.write_text(texto_respuesta + "\n", encoding="utf-8")
+    try:
+        from motor_optimizado import evaluar_ritmo_bloque
+        en_bloques = False
+        resumen_ritmo = []
+        for ln in texto_respuesta.splitlines():
+            if "[GUION]" in ln:
+                en_bloques = True
+                continue
+            if en_bloques and "|" in ln:
+                partes = [p.strip() for p in ln.split("|")]
+                if len(partes) >= 7 and "-" in partes[0] and ":" in partes[0]:
+                    resumen_ritmo.append(evaluar_ritmo_bloque(partes[0], partes[6]))
+        if resumen_ritmo:
+            ok_cnt = sum(1 for r in resumen_ritmo if r["estado"] == "OK")
+            print(f"[*] Auditoria de ritmo (3.7 pal/s): {ok_cnt}/{len(resumen_ritmo)} bloques calibrados.")
+            for i_r, r in enumerate(resumen_ritmo, 1):
+                print(f"    -> Bloque {i_r}: {r['etiqueta']}")
+    except Exception:
+        pass
     print(f"[+] ¡Guión final perfeccionado y guardado en {DEFAULT_GUION_TXT.name}!")
     if callable(progreso_cb):
         try:

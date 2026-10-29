@@ -509,6 +509,17 @@ async def generar_voz_y_timestamps_segmento(
                     wf_raw.setsampwidth(2)
                     wf_raw.setframerate(sr)
                     wf_raw.writeframes((audio_crudo * 32767).astype(np.int16).tobytes())
+
+                # Limpieza de silencios muertos al inicio y final con silenceremove
+                try:
+                    from motor_optimizado import recortar_silencios_tts
+                    ruta_trim = ruta_audio_salida.parent / f"{ruta_audio_salida.stem}_trim.wav"
+                    if recortar_silencios_tts(str(ruta_crudo_wav), str(ruta_trim)):
+                        ruta_crudo_wav.unlink(missing_ok=True)
+                        ruta_crudo_wav = ruta_trim
+                except Exception:
+                    pass
+
                 masterizar_voz_estudio_ffmpeg(ruta_crudo_wav, ruta_wav, factor_atempo=factor_atempo)
                 if ruta_crudo_wav.exists():
                     try:

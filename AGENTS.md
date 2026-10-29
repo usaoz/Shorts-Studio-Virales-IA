@@ -1,6 +1,12 @@
-﻿# Guia rapida para IAs que editan Shorts Studio
+# Guia rapida para IAs que editan Shorts Studio
 
 Leer esto ANTES de tocar codigo. Objetivo: aplicar cambios en pocos pasos y sin romper la app.
+
+## ⚡ REGLAS DE VELOCIDAD PARA EL AGENTE (GEMINI 3.8 FLASH HIGH)
+1. **Prohibido leer archivos completos > 500 líneas:** `Editor_Shorts_Studio.py` supera las 2000 líneas. SIEMPRE usa búsqueda por regex/símbolo (`def `) y lee ventanas de máximo 80 líneas alrededor de la función objetivo.
+2. **Modularización:** Toda nueva función matemática, de procesamiento de imagen (PIL/OpenCV), caché o validación de guiones debe ir en `motor_optimizado.py` e importarse en `Editor_Shorts_Studio.py`.
+3. **Ediciones quirúrgicas:** Aplica parches pequeños por función individual. No reescribas bloques que no fueron solicitados.
+4. **Catálogo cerrado de Assets:** Nunca inventes nombres de SFX, Emojis ni Efectos fuera de los declarados en `assets/` y `PROMPT_PARA_IA_GUIONES.txt`.
 
 ## 1. Flujo estandar (4 pasos)
 1. **Ubicar**: `python tools/mapa.py` (indice de funciones/widgets con linea) o

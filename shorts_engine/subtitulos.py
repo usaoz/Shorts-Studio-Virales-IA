@@ -73,12 +73,19 @@ PALABRAS_VERDES_BASE = {
     "VALE", "PRO", "PROS", "VICTORIA", "GANAR", "GANÉ", "GRATIS", "ORO",
     "ROBUX", "MUCHÍSIMO", "MUCHISIMO", "MEJOR", "FAVORITA", "FAVORITO",
     "PREMIO", "SORTEO", "100", "99", "NOVENTA", "NUEVE",
+    "GANADOR", "ÉPICA", "EPICA", "ÉPICO", "EPICO", "GENIAL", "INCREÍBLE",
+    "INCREIBLE", "FORTUNA", "PERFECTA", "PERFECTO", "LOGRA", "TRIUNFO",
+    "MAESTRO", "CAMPEÓN", "CAMPEON", "RÉCORD", "RECORD", "INTELIGENTE",
+    "ASTUTA", "ASTUTO",
 }
 PALABRAS_ROJAS_BASE = {
     "IMPOSIBLE", "LOCURA", "DIFÍCIL", "DIFICIL", "NUNCA", "SECRETO",
     "SUSCRÍBETE", "SUSCRIBETE", "SUSCRIBITE", "LIKE", "PELIGRO", "PROHIBIDO",
     "MUERTE", "ERROR", "ESTAFA", "POCO", "NADA", "PEOR", "OCULTO", "FALLA",
-    "CORTA", "CUIDADO", "JAMÁS", "JAMAS",
+    "CORTA", "CUIDADO", "JAMÁS", "JAMAS", "TRAMPA", "VENGANZA", "GOLPE",
+    "CAÍDA", "CAIDA", "FALSO", "ENGAÑO", "ENGANO", "ENGAÑA", "ENGANA",
+    "DESTROZA", "EXPLOSIÓN", "EXPLOSION", "ROBO", "CULPA", "MIEDO",
+    "TERROR", "ATAQUE",
 }
 PALABRAS_CIAN_BASE = {
     "2050", "2026", "2000", "CINCUENTA", "VEINTISÉIS", "VEINTISEIS",
@@ -295,19 +302,19 @@ def _clasificar_color_palabra(
     Devuelve (color_relleno_rgb, color_glow_neon_rgb) para la palabra activa.
     """
     if palabra_limpia in verdes:
-        # Verde Esmeralda Luminoso
-        return (65, 255, 120), (0, 240, 85)
+        # Verde Vibrante / Éxito
+        return (0, 255, 102), (0, 240, 85)
     if palabra_limpia in rojas:
-        # Rojo / Magenta Neón Intenso
-        return (255, 72, 88), (255, 15, 55)
+        # Rojo Neón Intenso / Peligro / Tensión
+        return (255, 45, 45), (255, 15, 55)
     if palabra_limpia in cianes or "?" in texto_original or "¿" in texto_original or palabra_limpia.isdigit():
         # Cian Eléctrico Luminoso
         return (75, 242, 255), (0, 185, 255)
     if forzar_destaque:
         # Dorado Solar Brillante
         return (255, 248, 90), (255, 165, 0)
-    # Amarillo Ciber / Dorado Luminoso por defecto para la palabra activa
-    return (255, 238, 25), (255, 175, 0)
+    # Amarillo MrBeast Luminoso por defecto para la palabra activa
+    return (255, 230, 0), (255, 175, 0)
 
 
 def _agrupar_palabras_subtitulos(palabras: List[PalabraSubtitulo]) -> List[List[Tuple[int, PalabraSubtitulo]]]:

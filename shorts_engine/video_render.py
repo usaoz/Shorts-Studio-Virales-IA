@@ -37,6 +37,7 @@ from .smart_camara import (
 )
 from .scene_cuts import DetectorCortesEscena
 from .thumbnail_picker import SelectorPortadaViral
+from motor_optimizado import realzar_frame_viral
 
 # ==============================================================================
 # 7. MOTOR DE ASSETS VISUALES (FLECHA, CÍRCULO ROJO, EMOJIS) Y EFECTOS DE CÁMARA
@@ -1673,7 +1674,8 @@ async def editar_video_con_guion(
                     if proceso_ffmpeg.stdin:
                         try:
                             if isinstance(lienzo, np.ndarray):
-                                proceso_ffmpeg.stdin.write(memoryview(lienzo))
+                                frame_salida = realzar_frame_viral(lienzo)
+                                proceso_ffmpeg.stdin.write(memoryview(frame_salida))
                             else:
                                 proceso_ffmpeg.stdin.write(lienzo.convert("RGB").tobytes())
                         except OSError as e:
@@ -1752,7 +1754,8 @@ async def editar_video_con_guion(
                     if proceso_ffmpeg.stdin:
                         try:
                             if isinstance(lienzo_out, np.ndarray):
-                                proceso_ffmpeg.stdin.write(memoryview(lienzo_out))
+                                frame_out_salida = realzar_frame_viral(lienzo_out)
+                                proceso_ffmpeg.stdin.write(memoryview(frame_out_salida))
                             else:
                                 proceso_ffmpeg.stdin.write(lienzo_out.convert("RGB").tobytes())
                         except OSError as e:

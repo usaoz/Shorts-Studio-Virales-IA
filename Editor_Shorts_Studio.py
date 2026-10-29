@@ -66,6 +66,13 @@ except ImportError:
 # MOTOR Y MÓDULOS MODULARES (shorts_engine)
 # ==============================================================================
 from shorts_engine import *
+from motor_optimizado import (
+    aplicar_alerta_roja_rapida,
+    obtener_color_semantico,
+    evaluar_ritmo_bloque,
+    recortar_silencios_tts,
+    realzar_frame_viral,
+)
 
 
 def iniciar_aplicacion_gui() -> None:
@@ -4257,7 +4264,28 @@ def iniciar_aplicacion_gui() -> None:
         txt_guion_box.pack(fill="both", expand=True, padx=12, pady=(0, 8))
         if ruta_guion.exists():
             try:
-                txt_guion_box.insert("1.0", ruta_guion.read_text(encoding="utf-8", errors="replace"))
+                txt_guion_raw = ruta_guion.read_text(encoding="utf-8", errors="replace")
+                txt_guion_box.insert("1.0", txt_guion_raw)
+                # Validar ritmo a 3.7 palabras/segundo
+                en_g = False
+                res_r = []
+                for ln_g in txt_guion_raw.splitlines():
+                    if "[GUION]" in ln_g:
+                        en_g = True
+                        continue
+                    if en_g and "|" in ln_g:
+                        partes_g = [x.strip() for x in ln_g.split("|")]
+                        if len(partes_g) >= 7 and "-" in partes_g[0] and ":" in partes_g[0]:
+                            res_r.append(evaluar_ritmo_bloque(partes_g[0], partes_g[6]))
+                if res_r:
+                    ok_c = sum(1 for r in res_r if r["estado"] == "OK")
+                    col_ritmo = GREEN_ACCENT if ok_c == len(res_r) else "#facc15"
+                    ctk.CTkLabel(
+                        card_guion,
+                        text=f"Ritmo de locución: {ok_c}/{len(res_r)} bloques calibrados a 3.7 pal/s",
+                        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                        text_color=col_ritmo,
+                    ).pack(anchor="w", padx=12, pady=(0, 6))
             except Exception:
                 pass
         txt_guion_box.configure(state="disabled")
