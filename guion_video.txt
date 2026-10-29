@@ -1,8 +1,8 @@
-TITULO_SUPERIOR: Izquierda O Derecha Sorpresa Hermano
-TITULO_YOUTUBE: ¡Eligió la peor opción en el reto! 😱🎂 #shorts
-DESCRIPCION_YOUTUBE: Dos hermanos juegan al reto de izquierda o derecha con sorpresas muy divertidas. ¿Qué te pareció el gran final? #shorts #comedy #funny #challenge #viral
+TITULO_SUPERIOR: Broma Explosiva Hermanas Petardos
+TITULO_YOUTUBE: ¡Le llenó toda la cama de petardos a su hermana! 💥🤣 #shorts
+DESCRIPCION_YOUTUBE: Una joven le prepara una trampa explosiva llena de mini petardos a su hermana por toda la casa. ¿Logrará descubrir quién le hizo esta terrible maldad? Comenta tu opinión abajo. #shorts #bromas #comedia #hermanas #viral
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-29 20:30
+SCHEDULE: 2026-10-29 15:00
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
@@ -10,8 +10,10 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | whoosh | sorprendido:derecha | ninguna | ninguno | ¡Izquierda o derecha! ¡El hermano pequeño elige tarta mientras la hermana sufre con el guante gigante!
-00:05 - 00:11 | zoom_in | pop | ninguno | ninguna | ninguno | ¡En el segundo round escoge un pimiento y ella le regala crema batida para decorar!
-00:11 - 00:16 | alerta_roja | good_idea | risa:izquierda | ninguna | ninguno | ¡Llegan los dulces de colores para cubrir toda la deliciosa tarta de cumpleaños con mucho amor!
-00:16 - 00:22 | temblor | ding | fiesta:derecha | ninguna | ninguno | ¡La hermana prueba la salsa más picante mientras celebra el éxito absoluto de su gran hermano!
-00:22 - 00:27 | brillo_epico | kids_yeyy | sorprendido:izquierda | ninguna | ninguno | ¡El gran final desata carcajadas épicas cuando descubre la bebida secreta y su cara lo dice todo!
+00:00 - 00:05 | zoom_impacto | whoosh | diablo:derecha | ninguna | ninguno | ¡Mira cómo esta traviesa hermana llena toda la cama con peligrosos petardos ocultos por todas partes!
+00:05 - 00:10 | zoom_in | good_idea | risa:izquierda | ninguna | ninguno | ¡Esconde más sorpresas explosivas dentro de la escoba y también entre toda la ropa sucia!
+00:10 - 00:15 | alerta_roja | crowd_shocked | sorprendido:derecha | ninguna | ninguno | ¡La hermana mayor entra distraída mirando su celular y pisa los primeros petardos sin sospechar nada!
+00:15 - 00:19 | temblor | punch | enojo:izquierda | ninguna | centro:chico | ¡Intenta limpiar con la escoba pero los pequeños explosivos continúan estallando sin parar en el suelo!
+00:19 - 00:24 | zoom_in | error | lloro:derecha | ninguna | ninguno | ¡Cada prenda que sacude activa una nueva detonación que la persigue corriendo sin un solo respiro!
+00:24 - 00:29 | brillo_epico | party_horn | risa:izquierda | ninguna | ninguno | ¡Cansada de tanto susto se recuesta en la cama buscando paz pero el peligro sigue latente!
+00:29 - 00:34 | flash | kids_yeyy | sorprendido:derecha | ninguna | ninguno | ¡Al levantar la colcha descubre finalmente la trampa definitiva y su cara lo dice todo!

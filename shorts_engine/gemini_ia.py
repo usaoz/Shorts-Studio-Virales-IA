@@ -183,6 +183,7 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
    - Usa la flecha solo en 1 o 2 momentos de mayor impacto del video. En los demás escribe `ninguna`. NUNCA en el último bloque.
 6. CIRCULO (`circulo_rojo.png` para enmarcar objetos y detalles importantes):
    - Rodea y ENMARCA un objeto, detalle o revelación visual clave que el espectador debe notar (ej. un objeto en la mano, la comida o ingrediente, un regalo o juguete, un detalle oculto).
+   - PROHIBIDO ENMARCAR ROPA, ESCOTES, REMERAS O TORSOS: El círculo debe apuntar ÚNICAMENTE a un objeto tangible (en manos, piso, mesa) o al rostro en un primer plano.
    - DIRECTIVA DE ENCUADRE: Escribe la coordenada `X,Y` donde está ese objeto junto a su tamaño (`:chico` para objetos en manos/detalles pequeños, `:medio` para caras/objetos medianos):
      * Ejemplos: `65,58:chico` (objeto en mano derecha), `35,45:medio` (reacción a la izquierda), `50,68:chico` (objeto en la mesa), o `auto:chico` / `auto:medio` (para que la visión artificial detecte automáticamente el objeto en movimiento).
      * Si no hay un objeto particular que enmarcar en ese bloque, escribe `ninguno`. (Máximo 1 círculo en todo el video).

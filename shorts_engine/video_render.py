@@ -661,23 +661,35 @@ def asegurar_formato_short(
 
     dur, w, h, fps = obtener_info_video(ruta_video)
     es_horizontal = (w > h)
-    es_largo = (dur > 59.9)
+    # YouTube admite Shorts de hasta 60.0s exactos; evitar recortes innecesarios si mide <= 60.05s
+    es_largo = (dur > 60.05)
 
     if not es_horizontal and not es_largo:
+        # El video ya es vertical 9:16 y dura <=60s: devolver el archivo original intacto (cero pérdida de calidad)
         return ruta_video
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     salida_short = OUTPUT_DIR / f"{ruta_video.stem}_short.mp4"
 
     if salida_short.exists() and salida_short.stat().st_size > 1024:
-        dur_s, w_s, h_s, _ = obtener_info_video(salida_short)
-        if w_s <= h_s and dur_s <= 59.9:
-            return salida_short
+        # Verificar que el cache no sea mas viejo que el video importado
+        if salida_short.stat().st_mtime >= ruta_video.stat().st_mtime:
+            dur_s, w_s, h_s, _ = obtener_info_video(salida_short)
+            if w_s <= h_s and dur_s <= 60.05:
+                return salida_short
+        else:
+            try:
+                salida_short.unlink()
+            except OSError:
+                pass
 
-    msg = "Adaptando video a formato vertical YouTube Shorts (1080x1920 60 FPS)..."
+    msg = "Adaptando video a formato vertical YouTube Shorts en maxima calidad (1080x1920 60 FPS)..."
     if progreso_cb:
         progreso_cb(0.1, msg)
     print(f"[*] {msg}")
+
+    # Obtener el mejor encoder disponible en el sistema (GPU NVENC/AMF o CPU libx264 de alta calidad)
+    _, enc_args = detectar_encoder_video()
 
     cmd = ["ffmpeg", "-y", "-i", str(ruta_video)]
     if es_largo:
@@ -693,16 +705,21 @@ def asegurar_formato_short(
             "-filter_complex", filtro,
             "-map", "[v]",
             "-map", "0:a?",
-            "-c:v", "libx264",
-            "-preset", "veryfast",
-            "-crf", "18",
+            *enc_args,
             "-r", "60",
-            "-pix_fmt", "yuv420p",
             "-c:a", "aac",
             "-b:a", "192k",
         ])
     else:
-        cmd.extend(["-c:v", "copy", "-c:a", "copy"])
+        # Ya es vertical pero excede 60s: recortar preservando máxima fidelidad visual
+        cmd.extend([
+            "-map", "0:v",
+            "-map", "0:a?",
+            *enc_args,
+            "-r", "60",
+            "-c:a", "aac",
+            "-b:a", "192k",
+        ])
 
     cmd.append(str(salida_short))
 
@@ -1312,6 +1329,10 @@ async def editar_video_con_guion(
     if pista_musica and pista_musica.exists():
         # Volumen óptimo: presente en todo momento pero con ducking sutil cuando la voz habla
         vol_bgm = max(0.24, min(0.38, getattr(config, "volumen_musica", 0.30)))
+        # Subir volumen específicamente a Fondo 2 a pedido del usuario (0.48 para mayor presencia y energía)
+        nom_pista = pista_musica.stem.lower()
+        if "fondo 2" in nom_pista or "fondo_2" in nom_pista:
+            vol_bgm = 0.48
         fade_start = max(0.5, dur_total_audio - 0.4)
         print(f"[*] Música de fondo con ducking sutil: '{pista_musica.name}' (tono: '{tono_efectivo}', volumen: {vol_bgm:.2f}).")
         filter_str = (

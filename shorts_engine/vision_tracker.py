@@ -98,26 +98,35 @@ class RastreadorObjetivosVideo:
             mov_acum /= float(len(grises_iniciales) - 1)
         mov_norm = mov_acum / (float(np.max(mov_acum)) + 1e-5)
 
-        # 2. Mapa de saturación de color + contraste de objetos (para detectar sujetos/objetos reales)
+        # 2. Mapa de contraste de objetos y movimiento real (prioriza objetos manipulados, herramientas y manos)
         if rgb_inicial is not None:
             hsv = cv2.cvtColor(rgb_inicial, cv2.COLOR_RGB2HSV).astype(np.float32)
+            # Saturación muy atenuada (0.18): evita que ropa llamativa (remeras fucsias/amarillas) engañe al rastreador
             sat_norm = hsv[:, :, 1] / 255.0
         else:
             sat_norm = np.zeros((h, w), dtype=np.float32)
 
         gx = cv2.Sobel(g0, cv2.CV_32F, 1, 0, ksize=3)
         gy = cv2.Sobel(g0, cv2.CV_32F, 0, 1, ksize=3)
-        grad_mag = cv2.Sobel(g0, cv2.CV_32F, 1, 1, ksize=3)
         grad_mag = cv2.magnitude(gx, gy)
         grad_norm = grad_mag / (float(np.max(grad_mag)) + 1e-5)
 
-        saliencia = cv2.GaussianBlur(mov_norm * 2.10 + sat_norm * 1.15 + grad_norm * 0.55, (17, 17), 0)
+        # Movimiento (3.20) y bordes definidos (0.95) dominan ampliamente sobre el color (0.18)
+        saliencia = cv2.GaussianBlur(mov_norm * 3.20 + sat_norm * 0.18 + grad_norm * 0.95, (17, 17), 0)
 
-        # 3. Ventana Gaussiana centrada en la coordenada o zona pedida
+        # 3. Supresión de falsos positivos en el torso/pecho (remeras, escotes o ropa saturada estática):
+        # En videos verticales, el pecho suele ser ropa estática. Si no hay movimiento vigoroso allí,
+        # atenuar esa zona para forzar al rastreador a buscar en las manos (zona media-baja), piso o mesa.
         yy, xx = np.meshgrid(np.arange(h, dtype=np.float32), np.arange(w, dtype=np.float32), indexing="ij")
+        zona_torso = (xx >= w * 0.35) & (xx <= w * 0.65) & (yy >= h * 0.33) & (yy <= h * 0.52)
+        mov_torso = float(np.mean(mov_norm[zona_torso])) if np.any(zona_torso) else 0.0
+        if mov_torso < 0.22:
+            saliencia[zona_torso] *= 0.30
+
+        # 4. Ventana Gaussiana centrada en la coordenada o zona pedida
         peso_zona = np.exp(-(((xx - x_nom) ** 2 + (yy - y_nom) ** 2) / (2.0 * (radio_busq ** 2))))
 
-        limite_y_inf = int(h * 0.69) if y_nom < h * 0.56 else int(h * 0.77)
+        limite_y_inf = int(h * 0.76)
         mascara_segura = np.zeros((h, w), dtype=np.float32)
         mascara_segura[38:limite_y_inf, 30 : w - 30] = 1.0
 
