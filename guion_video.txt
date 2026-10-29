@@ -1,16 +1,16 @@
-TITULO_SUPERIOR: clase_caos_total
-TITULO_YOUTUBE: ¡Cuando el profesor dice trae algo para clase! 🤡 #shorts
-DESCRIPCION_YOUTUBE: Estos estudiantes llevaron las cosas demasiado lejos en plena lección. ¿Qué es lo más loco que has visto en un salón? #shorts #viral
+TITULO_SUPERIOR: clase_caotica_extrema
+TITULO_YOUTUBE: ¡Lo que trajeron a clase no tiene sentido! 🤯 #shorts
+DESCRIPCION_YOUTUBE: Estos estudiantes llevaron objetos imposibles a su salón de clases. ¿Cuál de todos estos alumnos está peor de la cabeza? #shorts #viral
 ESTADO_PUBLICACION: privado
-SCHEDULE: auto
+SCHEDULE: 2026-10-29 20:30
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
 ARCHIVO_SALIDA: auto
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:04 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | ¿Qué clase de locura están planeando estos alumnos en medio de la lección hoy?
-00:04 - 00:08 | zoom_in | riser_suction | diablo:izquierda | izquierda | ninguno | ¡Mira con atención, porque el plan apenas comienza a tomar una forma muy extraña!
-00:08 - 00:13 | temblor | punch+xp_Error | risa:derecha | derecha | ninguno | ¡Es increíble, lanzaron un zapato gigante! Claramente la selección natural no hizo su trabajo.
-00:13 - 00:18 | zoom_out | whoosh | lloro:centro | ninguna | box:[0,0,100,100]@00:13:estudiantes | ¡Ahora traen una bicicleta entera! ¿Acaso intentan graduarse o simplemente quieren ser expulsados hoy mismo?
-00:18 - 00:23 | brillo_epico | cash_ting+party_horn | fiesta:derecha | ninguna | ninguno | ¡Incluso abrieron un paraguas gigante! Definitivamente, estos genios merecen un premio al mayor desastre.
+00:00 - 00:04 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | ¡Mira con atención lo que estos estudiantes decidieron llevar hoy a su clase!
+00:04 - 00:08 | alerta_roja | riser_suction | diablo:izquierda | izquierda | ninguno | ¿Quién trae un panal de abejas real para estudiar en un salón cerrado?
+00:08 - 00:12 | temblor | punch+xp_Error | risa:derecha | derecha | ninguno | ¡Esa zapatilla gigante es el colmo de la estupidez humana, parece un barco!
+00:12 - 00:18 | zoom_in | metal_pipe | calavera:centro | ninguno | ninguno | ¿Ahora traen una bicicleta completa? Claramente reprobaron el examen de sentido común básico.
+00:18 - 00:23 | brillo_epico | cash_ting+party_horn | fiesta:derecha | centro | ninguno | ¡Y terminan con un paraguas gigante para esconderse de su propia vergüenza colectiva! ¿Tu que hubieras llevado a clase? Comenta

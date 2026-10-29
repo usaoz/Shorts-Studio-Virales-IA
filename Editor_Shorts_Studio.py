@@ -3953,7 +3953,7 @@ def iniciar_aplicacion_gui() -> None:
     ) -> None:
         win_r = ctk.CTkToplevel(root)
         win_r.title("Shorts Studio · Revisión Previa")
-        win_r.geometry("860x650")
+        win_r.geometry("880x670")
         win_r.resizable(False, False)
         win_r.configure(fg_color=BG_DARK)
         win_r.transient(root)
@@ -3961,11 +3961,11 @@ def iniciar_aplicacion_gui() -> None:
         win_r.grab_set()
 
         player = None
-        reproduciendo = True
+        reproduciendo = False
         duracion_total = 1.0
         arrastrando_slider = False
         cancelado_reproductor = False
-        txt_feedback: Optional[ctk.CTkTextbox] = None
+        txt_guion_box: Optional[ctk.CTkTextbox] = None
 
         def _limpiar() -> None:
             nonlocal cancelado_reproductor
@@ -3984,7 +3984,7 @@ def iniciar_aplicacion_gui() -> None:
         win_r.protocol("WM_DELETE_WINDOW", _al_cerrar_x)
 
         def _responder(acc: str) -> None:
-            fb = txt_feedback.get("1.0", "end").strip() if txt_feedback is not None else ""
+            fb = txt_guion_box.get("1.0", "end").strip() if txt_guion_box is not None else ""
             _limpiar()
             win_r.destroy()
             on_decision(acc, fb)
@@ -4064,13 +4064,13 @@ def iniciar_aplicacion_gui() -> None:
 
         btn_play = ctk.CTkButton(
             row_ctrl,
-            text="⏸",
+            text="▶",
             width=36,
             height=30,
             corner_radius=8,
             fg_color=INPUT_BG,
             hover_color="#2a3147",
-            font=ctk.CTkFont(size=13, weight="bold"),
+            font=ctk.CTkFont(size=14, weight="bold"),
         )
         lbl_tiempo = ctk.CTkLabel(
             row_ctrl,
@@ -4113,7 +4113,7 @@ def iniciar_aplicacion_gui() -> None:
                 try:
                     reproduciendo = not reproduciendo
                     player.set_pause(not reproduciendo)
-                    btn_play.configure(text="▶" if not reproduciendo else "⏸")
+                    btn_play.configure(text="■" if reproduciendo else "▶")
                 except Exception:
                     pass
 
@@ -4221,57 +4221,80 @@ def iniciar_aplicacion_gui() -> None:
             )
             btn_copiar_url.pack(side="right", padx=(0, 4), pady=4)
 
+        # Tarjeta Central: Editor de Guion y Metadatos en Vivo
+        card_guion = ctk.CTkFrame(
+            col_der,
+            fg_color=CARD_BG,
+            corner_radius=12,
+            border_width=1,
+            border_color=CARD_BORDER,
+        )
+        card_guion.pack(fill="both", expand=True, pady=(0, 8))
+
+        row_tit_g = ctk.CTkFrame(card_guion, fg_color="transparent")
+        row_tit_g.pack(fill="x", padx=12, pady=(8, 2))
+
+        ctk.CTkLabel(
+            row_tit_g,
+            text="Título y Metadatos:" if es_modo_editado else "Guion y Metadatos (Editable en vivo):",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text_color=TEXT_MAIN,
+        ).pack(side="left")
+
+        lbl_ritmo = ctk.CTkLabel(
+            row_tit_g,
+            text="",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color=GREEN_ACCENT,
+        )
+        lbl_ritmo.pack(side="right")
+
+        ctk.CTkLabel(
+            card_guion,
+            text="Modificá el texto, efectos, SFX o timings. Luego re-renderizá o subí directamente:" if not es_modo_editado else "Verificá o editá el título y la descripción antes de publicar en YouTube:",
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color=TEXT_MUTED,
+        ).pack(anchor="w", padx=12, pady=(0, 4))
+
+        txt_guion_box = ctk.CTkTextbox(
+            card_guion,
+            corner_radius=8,
+            fg_color=INPUT_BG,
+            font=ctk.CTkFont(family="Consolas", size=11),
+            text_color=TEXT_MAIN,
+            undo=True,
+        )
+        txt_guion_box.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+
+        if ruta_guion.exists():
+            try:
+                txt_guion_raw = ruta_guion.read_text(encoding="utf-8", errors="replace")
+                txt_guion_box.insert("1.0", txt_guion_raw)
+                # Validar ritmo a 3.7 palabras/segundo
+                en_g = False
+                res_r = []
+                for ln_g in txt_guion_raw.splitlines():
+                    if "[GUION]" in ln_g:
+                        en_g = True
+                        continue
+                    if en_g and "|" in ln_g:
+                        partes_g = [x.strip() for x in ln_g.split("|")]
+                        if len(partes_g) >= 7 and "-" in partes_g[0] and ":" in partes_g[0]:
+                            res_r.append(evaluar_ritmo_bloque(partes_g[0], partes_g[6]))
+                if res_r:
+                    ok_c = sum(1 for r in res_r if r["estado"] == "OK")
+                    col_ritmo = GREEN_ACCENT if ok_c == len(res_r) else "#facc15"
+                    lbl_ritmo.configure(
+                        text=f"Ritmo: {ok_c}/{len(res_r)} calibrados (3.7 pal/s)",
+                        text_color=col_ritmo,
+                    )
+            except Exception:
+                pass
+
         if not es_modo_editado:
-            # Tarjeta 1: Re-editar con indicaciones (solo videos generados desde cero)
-            card_reeditar = ctk.CTkFrame(
-                col_der,
-                fg_color=CARD_BG,
-                corner_radius=12,
-                border_width=1,
-                border_color=CARD_BORDER,
-            )
-            card_reeditar.pack(fill="x", pady=(0, 8))
-
-            ctk.CTkLabel(
-                card_reeditar,
-                text="Re-editar Guion con tus Indicaciones",
-                font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-                text_color=TEXT_MAIN,
-            ).pack(anchor="w", padx=12, pady=(8, 2))
-
-            ctk.CTkLabel(
-                card_reeditar,
-                text="Agregá contexto, corregí si entendió mal o pedí otro tono narrativo:",
-                font=ctk.CTkFont(family="Segoe UI", size=11),
-                text_color=TEXT_MUTED,
-            ).pack(anchor="w", padx=12, pady=(0, 4))
-
-            txt_feedback = ctk.CTkTextbox(
-                card_reeditar,
-                height=58,
-                corner_radius=8,
-                fg_color=INPUT_BG,
-                font=ctk.CTkFont(family="Segoe UI", size=11),
-                text_color=TEXT_MAIN,
-            )
-            txt_feedback.pack(fill="x", padx=12, pady=(0, 8))
-
-            def _autoajustar_feedback(event=None) -> None:
-                try:
-                    contenido = txt_feedback.get("1.0", "end-1c")
-                    n_lineas = max(2, min(10, len(contenido.splitlines()) + (len(contenido) // 55)))
-                    nuevo_alto = max(58, min(190, n_lineas * 20 + 16))
-                    if txt_feedback.cget("height") != nuevo_alto:
-                        txt_feedback.configure(height=nuevo_alto)
-                except Exception:
-                    pass
-
-            txt_feedback.bind("<KeyRelease>", _autoajustar_feedback)
-            txt_feedback.bind("<Control-v>", lambda e: root.after(50, _autoajustar_feedback))
-
             btn_reeditar = ctk.CTkButton(
-                card_reeditar,
-                text="Re-editar Short con IA",
+                card_guion,
+                text="⚡ Re-renderizar Video con Guion Editado",
                 command=lambda: _responder("reeditar"),
                 height=34,
                 corner_radius=10,
@@ -4280,40 +4303,21 @@ def iniciar_aplicacion_gui() -> None:
                 font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
                 text_color="#ffffff",
             )
-            btn_reeditar.pack(fill="x", padx=12, pady=(0, 10))
+            btn_reeditar.pack(fill="x", padx=12, pady=(0, 8))
         else:
-            # Tarjeta informativa para Video Editado (sin opciones de re-editar guion)
-            card_info_edit = ctk.CTkFrame(
-                col_der,
-                fg_color=CARD_BG,
-                corner_radius=12,
-                border_width=1,
-                border_color=CARD_BORDER,
-            )
-            card_info_edit.pack(fill="x", pady=(0, 8))
-
-            ctk.CTkLabel(
-                card_info_edit,
-                text="Video Editado Localmente",
-                font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-                text_color=TEXT_MAIN,
-            ).pack(anchor="w", padx=12, pady=(8, 2))
-
             tam_mb = ""
             try:
                 tam_mb = f" · {ruta_video.stat().st_size / (1024 * 1024):.1f} MB"
             except Exception:
                 pass
-
             ctk.CTkLabel(
-                card_info_edit,
-                text=f"Archivo: {ruta_video.name}{tam_mb}\nEste video ya está editado y listo. Previsualizalo en el reproductor antes de subirlo.",
-                font=ctk.CTkFont(family="Segoe UI", size=11),
+                card_guion,
+                text=f"Archivo: {ruta_video.name}{tam_mb} (video local listo)",
+                font=ctk.CTkFont(family="Segoe UI", size=10),
                 text_color=TEXT_MUTED,
-                justify="left",
-            ).pack(anchor="w", padx=12, pady=(0, 8))
+            ).pack(anchor="w", padx=12, pady=(0, 6))
 
-        # Tarjeta 2: Decisiones de Publicación (Subir, Buscar Otro / Siguiente, Descartar)
+        # Tarjeta Inferior: Decisiones de Publicación (Subir, Buscar Otro / Siguiente, Descartar)
         card_acciones = ctk.CTkFrame(
             col_der,
             fg_color=CARD_BG,
@@ -4321,14 +4325,7 @@ def iniciar_aplicacion_gui() -> None:
             border_width=1,
             border_color=CARD_BORDER,
         )
-        card_acciones.pack(fill="x", pady=(0, 8))
-
-        ctk.CTkLabel(
-            card_acciones,
-            text="Decisión de Publicación",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-            text_color=TEXT_MAIN,
-        ).pack(anchor="w", padx=12, pady=(8, 4))
+        card_acciones.pack(fill="x")
 
         btn_subir = ctk.CTkButton(
             card_acciones,
@@ -4341,10 +4338,10 @@ def iniciar_aplicacion_gui() -> None:
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             text_color="#ffffff",
         )
-        btn_subir.pack(fill="x", padx=12, pady=(0, 6))
+        btn_subir.pack(fill="x", padx=12, pady=(8, 6))
 
         row_sec = ctk.CTkFrame(card_acciones, fg_color="transparent")
-        row_sec.pack(fill="x", padx=12, pady=(0, 10))
+        row_sec.pack(fill="x", padx=12, pady=(0, 8))
         row_sec.grid_columnconfigure((0, 1), weight=1, uniform="sec_btn")
 
         btn_otro = ctk.CTkButton(
@@ -4373,66 +4370,14 @@ def iniciar_aplicacion_gui() -> None:
         )
         btn_cancelar.grid(row=0, column=1, padx=(4, 0), sticky="ew")
 
-        # Tarjeta 3: Guion / Metadatos Asignados
-        card_guion = ctk.CTkFrame(
-            col_der,
-            fg_color=CARD_BG,
-            corner_radius=12,
-            border_width=1,
-            border_color=CARD_BORDER,
-        )
-        card_guion.pack(fill="both", expand=True)
-
-        ctk.CTkLabel(
-            card_guion,
-            text="Título y Descripción para YouTube:" if es_modo_editado else "Guion y Narración generada por la IA:",
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            text_color=TEXT_MUTED,
-        ).pack(anchor="w", padx=12, pady=(6, 2))
-
-        txt_guion_box = ctk.CTkTextbox(
-            card_guion,
-            corner_radius=8,
-            fg_color=INPUT_BG,
-            font=ctk.CTkFont(family="Segoe UI", size=11),
-            text_color=TEXT_MAIN,
-        )
-        txt_guion_box.pack(fill="both", expand=True, padx=12, pady=(0, 8))
-        if ruta_guion.exists():
-            try:
-                txt_guion_raw = ruta_guion.read_text(encoding="utf-8", errors="replace")
-                txt_guion_box.insert("1.0", txt_guion_raw)
-                # Validar ritmo a 3.7 palabras/segundo
-                en_g = False
-                res_r = []
-                for ln_g in txt_guion_raw.splitlines():
-                    if "[GUION]" in ln_g:
-                        en_g = True
-                        continue
-                    if en_g and "|" in ln_g:
-                        partes_g = [x.strip() for x in ln_g.split("|")]
-                        if len(partes_g) >= 7 and "-" in partes_g[0] and ":" in partes_g[0]:
-                            res_r.append(evaluar_ritmo_bloque(partes_g[0], partes_g[6]))
-                if res_r:
-                    ok_c = sum(1 for r in res_r if r["estado"] == "OK")
-                    col_ritmo = GREEN_ACCENT if ok_c == len(res_r) else "#facc15"
-                    ctk.CTkLabel(
-                        card_guion,
-                        text=f"Ritmo de locución: {ok_c}/{len(res_r)} bloques calibrados a 3.7 pal/s",
-                        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-                        text_color=col_ritmo,
-                    ).pack(anchor="w", padx=12, pady=(0, 6))
-            except Exception:
-                pass
-        txt_guion_box.configure(state="disabled")
-
-        # Inicialización del reproductor ffpyplayer
+        # Inicialización del reproductor ffpyplayer (inicia pausado)
         try:
             from ffpyplayer.player import MediaPlayer
             from PIL import Image, ImageTk
 
-            player = MediaPlayer(str(ruta_video), ff_opts={"autoexit": False})
+            player = MediaPlayer(str(ruta_video), ff_opts={"autoexit": False, "paused": True})
             player.set_size(270, 480)
+            player.set_pause(True)
         except Exception as e_init:
             player = None
             canvas_video.create_text(
@@ -4445,7 +4390,7 @@ def iniciar_aplicacion_gui() -> None:
             )
 
         def _loop_reproductor() -> None:
-            nonlocal duracion_total
+            nonlocal duracion_total, reproduciendo
             if cancelado_reproductor:
                 return
 
@@ -4462,6 +4407,9 @@ def iniciar_aplicacion_gui() -> None:
                 if val == "eof":
                     try:
                         player.seek(0.0, relative=False)
+                        player.set_pause(True)
+                        reproduciendo = False
+                        btn_play.configure(text="▶")
                     except Exception:
                         pass
                     if not arrastrando_slider:
@@ -5285,33 +5233,15 @@ def iniciar_aplicacion_gui() -> None:
 
                                     continue
                                 elif accion == "reeditar":
-                                    _actualizar_milestone_actual("activo", f"Reel {num_actual}: Re-editando con feedback...")
-                                    _set_subprogreso(0.15, "Re-generando guion con tus correcciones...", PURPLE_MAIN)
-                                    root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}RE-GENERANDO GUIÓN CON IA..."))
+                                    _actualizar_milestone_actual("activo", f"Reel {num_actual}: Re-renderizando con guion editado...")
+                                    _set_subprogreso(0.25, f"{pref_lote}Guardando guion editado...", PURPLE_MAIN)
+                                    root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}RE-RENDERIZANDO CON GUION EDITADO..."))
 
-                                    def _cb_reedit_g(sub_frac: float, msg_ia: str) -> None:
-                                        _set_subprogreso(0.15 + max(0.0, min(1.0, sub_frac)) * 0.15, f"{pref_lote}{msg_ia}", PURPLE_MAIN)
+                                    if feedback_usr and feedback_usr.strip():
+                                        DEFAULT_GUION_TXT.write_text(feedback_usr.strip() + "\n", encoding="utf-8")
 
-                                    guion_prev_texto = ""
-                                    if DEFAULT_GUION_TXT.exists():
-                                        try:
-                                            guion_prev_texto = DEFAULT_GUION_TXT.read_text(encoding="utf-8", errors="replace")
-                                        except Exception:
-                                            pass
-
-                                    generar_guion_con_gemini_flash(
-                                        ruta_video=ruta_video_usar,
-                                        api_key=api_k,
-                                        schedule_str=sched_actual or "auto",
-                                        modo_privacidad="privado" if modo_priv == "private" else modo_priv,
-                                        contexto_titulo_orig=titulo_orig,
-                                        modelo_preferido=pref_modelo_ia,
-                                        progreso_cb=_cb_reedit_g,
-                                        contexto_feedback=feedback_usr,
-                                        guion_previo=guion_prev_texto,
-                                    )
-                                    _set_subprogreso(0.35, "Re-renderizando video a 60 FPS...", CYAN_ACCENT)
-                                    root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}RE-RENDERIZANDO SHORT GPU..."))
+                                    _set_subprogreso(0.35, f"{pref_lote}Re-renderizando video a 60 FPS con GPU...", CYAN_ACCENT)
+                                    root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}RENDERIZANDO SHORT GPU..."))
 
                                     def _cb_reedit_e(pct_edit: float, txt_edit: str) -> None:
                                         f_val = pct_edit if pct_edit <= 1.0 else (pct_edit / 100.0)
@@ -5332,6 +5262,11 @@ def iniciar_aplicacion_gui() -> None:
                                     ultimo_video_generado[0] = ruta_final
                                     continue
                                 else:
+                                    if feedback_usr and feedback_usr.strip() and not es_modo_editado:
+                                        try:
+                                            DEFAULT_GUION_TXT.write_text(feedback_usr.strip() + "\n", encoding="utf-8")
+                                        except Exception:
+                                            pass
                                     break
 
                         # Cuenta de YouTube asignada a este Reel en el lote
