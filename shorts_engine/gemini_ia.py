@@ -408,7 +408,7 @@ def generar_guion_con_gemini_flash(
 
     def _consultar_ia_robusta(
         texto_prompt: str,
-        timeout_max: float = 48.0,
+        timeout_max: float = 80.0,
         priorizar_mejor_ia: bool = True,
         paso_nombre: str = "IA",
         paso_frac: float = 0.20,
@@ -452,7 +452,7 @@ def generar_guion_con_gemini_flash(
             cli = genai.Client(
                 api_key=k,
                 http_options=types.HttpOptions(
-                    timeout=max(35000, int((tl + 8.0) * 1000)),
+                    timeout=max(60000, int((tl + 10.0) * 1000)),
                     retry_options=types.HttpRetryOptions(attempts=1),
                 ),
             )
@@ -476,8 +476,8 @@ def generar_guion_con_gemini_flash(
 
                 _notificar_estado_ia(paso_frac, f"{paso_nombre}: Probando {nom_mod} ({etiqueta_cuenta})...")
 
-                # 1. Intento con video directo (si está disponible)
-                t_video = min(40.0, timeout_max)
+                # 1. Intento con video directo (si está disponible) - Tiempo amplio (80s) para permitir procesamiento completo
+                t_video = max(75.0, timeout_max)
                 ex_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
                 fut = ex_pool.submit(_intentar_llamada, mod, partes_v if video_bytes else partes_m, t_video, k_act)
                 try:
@@ -506,15 +506,17 @@ def generar_guion_con_gemini_flash(
                             )
                         continue
 
-                    # Caso B: Video ocupado o timeout (503, 504, UNAVAILABLE, Timeout) -> Reintentar con Mosaico liviano en la MISMA cuenta
+                    # Caso B: Video rechazado, error de servidor o timeout genuino -> Solo reintentar con Mosaico si Google arrojó error
                     es_reintento_mosaico = (
                         video_bytes is not None
-                        and ("503" in err_msg_corto or "504" in err_msg_corto or "UNAVAILABLE" in err_msg_corto
-                             or "DEADLINE" in err_msg_corto or "TimeoutError" in type(e).__name__ or "timeout" in err_msg_corto.lower())
+                        and ("503" in err_msg_corto or "504" in err_msg_corto or "500" in err_msg_corto
+                             or "UNAVAILABLE" in err_msg_corto or "INTERNAL" in err_msg_corto
+                             or "DEADLINE" in err_msg_corto or "TimeoutError" in type(e).__name__
+                             or "timeout" in err_msg_corto.lower() or "payload" in err_msg_corto.lower())
                     )
                     if es_reintento_mosaico:
-                        _notificar_estado_ia(paso_frac, f"{nom_mod} demoró con video en {etiqueta_cuenta}. Reintentando con Mosaico ({etiqueta_cuenta})...")
-                        t_mosaico = max(48.0, timeout_max)
+                        _notificar_estado_ia(paso_frac, f"{nom_mod} arrojó error con video ({err_msg_corto[:40]}). Reintentando con Mosaico ({etiqueta_cuenta})...")
+                        t_mosaico = max(60.0, timeout_max)
                         ex_pool_m = concurrent.futures.ThreadPoolExecutor(max_workers=1)
                         fut_m = ex_pool_m.submit(_intentar_llamada, mod, partes_m, t_mosaico, k_act)
                         try:
@@ -598,7 +600,7 @@ def generar_guion_con_gemini_flash(
     )
     analisis_1_raw = _consultar_ia_robusta(
         prompt_p1,
-        timeout_max=48.0,
+        timeout_max=80.0,
         paso_nombre="IA Pasada 1/3 (Gancho y acción)",
         paso_frac=0.18,
     )
@@ -623,7 +625,7 @@ def generar_guion_con_gemini_flash(
     )
     analisis_2_raw = _consultar_ia_robusta(
         prompt_p2,
-        timeout_max=48.0,
+        timeout_max=80.0,
         paso_nombre="IA Pasada 2/3 (SFX y Efectos)",
         paso_frac=0.48,
     )
@@ -656,7 +658,7 @@ def generar_guion_con_gemini_flash(
     try:
         guion_final_raw = _consultar_ia_robusta(
             prompt_p3,
-            timeout_max=50.0,
+            timeout_max=80.0,
             paso_nombre="IA Pasada 3/3 (Fusión y Ritmo)",
             paso_frac=0.74,
         )
@@ -750,7 +752,7 @@ def generar_guion_con_gemini_flash(
             try:
                 res_aud_raw = _consultar_ia_robusta(
                     prompt_auditoria,
-                    timeout_max=48.0,
+                    timeout_max=80.0,
                     priorizar_mejor_ia=True,
                     paso_nombre=f"IA Auto-Auditoría (Ronda {ronda}/{max_rondas_auditoria})",
                     paso_frac=p_val,
