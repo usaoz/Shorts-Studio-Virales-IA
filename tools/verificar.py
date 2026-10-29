@@ -8,7 +8,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(RAIZ)
 sys.path.insert(0, RAIZ)
 
-archivos = ["Editor_Shorts_Studio.py", "subir_a_youtube.py"] + glob.glob("shorts_engine/*.py")
+archivos = ["Editor_Shorts_Studio.py", "subir_a_youtube.py", "ui_editor_guion.py"] + glob.glob("shorts_engine/*.py")
 for f in archivos:
     try:
         py_compile.compile(f, doraise=True)

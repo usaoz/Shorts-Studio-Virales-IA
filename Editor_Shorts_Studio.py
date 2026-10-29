@@ -73,6 +73,7 @@ from motor_optimizado import (
     recortar_silencios_tts,
     realzar_frame_viral,
 )
+from ui_editor_guion import VisualScriptEditor
 
 
 def iniciar_aplicacion_gui() -> None:
@@ -4067,8 +4068,9 @@ def iniciar_aplicacion_gui() -> None:
     ) -> None:
         win_r = ctk.CTkToplevel(root)
         win_r.title("Shorts Studio · Revisión Previa")
-        win_r.geometry("880x670")
-        win_r.resizable(False, False)
+        win_r.geometry("1080x700")
+        win_r.minsize(980, 640)
+        win_r.resizable(True, True)
         win_r.configure(fg_color=BG_DARK)
         win_r.transient(root)
         aplicar_icono_ventana(win_r)
@@ -4079,7 +4081,7 @@ def iniciar_aplicacion_gui() -> None:
         duracion_total = 1.0
         arrastrando_slider = False
         cancelado_reproductor = False
-        txt_guion_box: Optional[ctk.CTkTextbox] = None
+        txt_guion_box: Optional[Any] = None
 
         def _limpiar() -> None:
             nonlocal cancelado_reproductor
@@ -4370,13 +4372,8 @@ def iniciar_aplicacion_gui() -> None:
             text_color=TEXT_MUTED,
         ).pack(anchor="w", padx=12, pady=(0, 4))
 
-        txt_guion_box = ctk.CTkTextbox(
+        txt_guion_box = VisualScriptEditor(
             card_guion,
-            corner_radius=8,
-            fg_color=INPUT_BG,
-            font=ctk.CTkFont(family="Consolas", size=11),
-            text_color=TEXT_MAIN,
-            undo=True,
         )
         txt_guion_box.pack(fill="both", expand=True, padx=12, pady=(0, 8))
 
