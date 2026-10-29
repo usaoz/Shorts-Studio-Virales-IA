@@ -9,7 +9,7 @@ def construir_filter_complex_master_ebu_r128(
     idx_musica: int = 2,
     idx_sfx: int = 3,
     vol_voz_base: float = 1.35,
-    vol_musica_base: float = 0.22,
+    vol_musica_base: float = 0.15,
     vol_sfx_base: float = 0.75,
     lufs_objetivo: float = -14.0,
     true_peak_db: float = -1.0,

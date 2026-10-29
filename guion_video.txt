@@ -1,8 +1,8 @@
-TITULO_SUPERIOR: Perro come todo y dejan a la hija
-TITULO_YOUTUBE: ¡El perro se comió toda la comida! 😱🐶 #shorts
-DESCRIPCION_YOUTUBE: Este padre intentó dejar suficiente comida a sus mascotas antes de viajar, pero olvidó algo imperdonable. ¿Quién crees que comió más rápido? #shorts #perros #mascotas #comedia #viral
+TITULO_SUPERIOR: Truco Viral Dibujo Flotante
+TITULO_YOUTUBE: ¡El secreto definitivo para hacer flotar tus dibujos! 🎨✨ #shorts
+DESCRIPCION_YOUTUBE: Aprende el truco definitivo para hacer flotar cualquier dibujo en el agua sin fallar. ¿Sabías que el secreto estaba en secar la cuchara? Descúbrelo ahora mismo. #shorts #manualidades #trucos #viral #experimentos
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-30 21:00
+SCHEDULE: 2026-10-30 20:30
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
@@ -10,8 +10,9 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | whoosh | sorprendido:derecha | ninguna | ninguno | ¡Mira todos los interminables cuencos de comida que este padre prepara para sus adorables mascotas hoy!
-00:05 - 00:10 | zoom_in | click | ninguna | ninguna | ninguno | ¡El padre y su pequeña hija se despiden felices para emprender un largo viaje juntos muy alegres!
-00:10 - 00:16 | alerta_roja | riser_suction | risa:derecha | ninguna | ninguno | ¡Pero espera! El voraz perro devoró absolutamente toda la comida dejando al pobre gato sin nada para desayunar hoy.
-00:16 - 00:21 | temblor | error | enojo:izquierda | ninguna | ninguno | ¡El dueño regresa corriendo a casa y llena tres filas enteras con tazones para calmar tanta hambre acumulada!
-00:21 - 00:26 | brillo_epico | crowd_shocked | risa:derecha | ninguna | ninguno | ¡Lo peor de todo es que el distraído padre se olvidó a su propia hija sola en el campo!
+00:00 - 00:05 | zoom_impacto | error | enojo:izquierda | ninguna | ninguno | ¡Intenta una y otra vez transferir el dibujo al agua pero siempre se arruina por completo!
+00:05 - 00:10 | zoom_in | whoosh | sorprendido:derecha | ninguna | ninguno | ¡Su hermana mayor interviene de inmediato para explicarle que su técnica es completamente incorrecta y fallida!
+00:10 - 00:15 | alerta_roja | good_idea | ninguno | ninguna | ninguno | ¡El primer paso secreto consiste en secar perfectamente la cuchara para que no quede nada de humedad!
+00:15 - 00:20 | flash | click | ninguno | ninguna | ninguno | ¡Dibuja un divertido león con los rotuladores especiales sobre la superficie totalmente seca de la cuchara blanca!
+00:20 - 00:25 | brillo_epico | riser_suction | sorprendido:derecha | ninguna | box:[280,240,690,520]@22.2:leon_flotando | ¡Al sumergirla muy suavemente el dibujo se desliza por el agua como una película flotante perfecta!
+00:25 - 00:30 | temblor | kids_yeyy | fiesta:izquierda | ninguna | ninguno | ¡Mira la magia en acción cuando la hermosa flor cobra vida propia flotando felizmente sobre el agua!

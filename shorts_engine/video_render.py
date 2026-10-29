@@ -1399,13 +1399,13 @@ async def editar_video_con_guion(
 
     if pista_musica and pista_musica.exists():
         # Volumen óptimo: presente en todo momento pero con ducking sutil cuando la voz habla
-        vol_bgm = max(0.24, min(0.38, getattr(config, "volumen_musica", 0.30)))
-        # Ajuste de volumen por pista: Fondo 2 con mayor presencia (0.48), Fondo 1 atenuado (0.10) por copyright
+        vol_bgm = max(0.12, min(0.22, getattr(config, "volumen_musica", 0.18)))
+        # Ajuste de volumen por pista: Fondo 2 atenuado (0.24), Fondo 1 muy atenuado (0.05) por copyright
         nom_pista = pista_musica.stem.lower()
         if "fondo 2" in nom_pista or "fondo_2" in nom_pista:
-            vol_bgm = 0.48
+            vol_bgm = 0.24
         elif "fondo 1" in nom_pista or "fondo_1" in nom_pista:
-            vol_bgm = 0.10
+            vol_bgm = 0.05
         fade_start = max(0.5, dur_total_audio - 0.4)
         print(f"[*] Música de fondo con ducking sutil: '{pista_musica.name}' (tono: '{tono_efectivo}', volumen: {vol_bgm:.2f}).")
         filter_str = (
