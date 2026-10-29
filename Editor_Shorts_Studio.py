@@ -4074,6 +4074,8 @@ def iniciar_aplicacion_gui() -> None:
         win_r.configure(fg_color=BG_DARK)
         win_r.transient(root)
         aplicar_icono_ventana(win_r)
+        win_r.lift()
+        win_r.focus_force()
         win_r.grab_set()
 
         player = None
@@ -5249,17 +5251,21 @@ def iniciar_aplicacion_gui() -> None:
                                     tit=(c_tit if (es_custom_activo and c_tit) else titulo_orig) or ruta_final.stem,
                                     url_v=str(info_sel.get("url") or info_sel.get("link") or link_directo_var.get().strip() or ""),
                                 ):
-                                    abrir_dialogo_revision_short(
-                                        ruta_video=rf,
-                                        titulo=tit,
-                                        ruta_guion=DEFAULT_GUION_TXT,
-                                        on_decision=lambda acc, fb: (
-                                            datos_dec.update({"accion": acc, "feedback": fb}),
-                                            ev_decision.set(),
-                                        ),
-                                        es_modo_editado=es_modo_editado,
-                                        url_video_orig=url_v,
-                                    )
+                                    try:
+                                        abrir_dialogo_revision_short(
+                                            ruta_video=rf,
+                                            titulo=tit,
+                                            ruta_guion=DEFAULT_GUION_TXT,
+                                            on_decision=lambda acc, fb: (
+                                                datos_dec.update({"accion": acc, "feedback": fb}),
+                                                ev_decision.set(),
+                                            ),
+                                            es_modo_editado=es_modo_editado,
+                                            url_video_orig=url_v,
+                                        )
+                                    except Exception:
+                                        datos_dec.update({"accion": "subir", "feedback": ""})
+                                        ev_decision.set()
 
                                 root.after(0, _mostrar_rev)
                                 ev_decision.wait()

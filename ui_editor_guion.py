@@ -438,7 +438,9 @@ class VisualScriptEditor(ctk.CTkFrame):
 
         for c in self.cards:
             try:
-                c._manual_time_edit()
+                c.datos["t_ini"] = mmss_a_seg(c.entry_t_ini.get())
+                c.datos["t_fin"] = max(c.datos["t_ini"] + 0.5, mmss_a_seg(c.entry_t_fin.get()))
+                c.datos["texto"] = c.entry_texto.get().strip()
             except Exception:
                 pass
 
@@ -462,10 +464,16 @@ class VisualScriptEditor(ctk.CTkFrame):
         return "\n".join(lineas)
 
     def _actualizar_raw_interno(self):
-        if not self._modo_raw:
-            texto = self.exportar_a_texto()
-            self.raw_textbox.delete("1.0", "end")
-            self.raw_textbox.insert("1.0", texto)
+        if getattr(self, "_actualizando_raw", False):
+            return
+        self._actualizando_raw = True
+        try:
+            if not self._modo_raw:
+                texto = self.exportar_a_texto()
+                self.raw_textbox.delete("1.0", "end")
+                self.raw_textbox.insert("1.0", texto)
+        finally:
+            self._actualizando_raw = False
 
     def _renderizar_tarjetas(self):
         for c in self.cards:
