@@ -382,10 +382,29 @@ def generar_guion_con_gemini_flash(
 
     pares_saturados_sesion: Set[Tuple[str, str]] = set()
 
+    nombres_ui = {
+        "gemini-4-argon": "Argon 4",
+        "gemini-3.8-flash": "Gemini 3.8 Flash",
+        "gemini-3.6-flash": "Gemini 3.6 Flash",
+        "gemini-3.5-flash-lite": "Gemini 3.5 Flash Lite",
+        "gemini-3.1-flash-lite": "Gemini 3.1 Flash Lite",
+        "gemini-flash-lite-latest": "Gemini Flash Lite",
+    }
+
+    def _notificar_estado_ia(frac: float, msg: str) -> None:
+        if callable(progreso_cb):
+            try:
+                progreso_cb(frac, msg)
+            except Exception:
+                pass
+        print(f"[*] {msg}")
+
     def _consultar_ia_robusta(
         texto_prompt: str,
-        timeout_max: float = 30.0,
+        timeout_max: float = 48.0,
         priorizar_mejor_ia: bool = True,
+        paso_nombre: str = "IA",
+        paso_frac: float = 0.20,
     ) -> str:
         partes_v: List[object] = []
         if video_bytes:
@@ -423,7 +442,7 @@ def generar_guion_con_gemini_flash(
             cli = genai.Client(
                 api_key=k,
                 http_options=types.HttpOptions(
-                    timeout=max(18000, int(tl * 1000)),
+                    timeout=max(35000, int((tl + 8.0) * 1000)),
                     retry_options=types.HttpRetryOptions(attempts=1),
                 ),
             )
@@ -431,21 +450,23 @@ def generar_guion_con_gemini_flash(
             return (r.text or "").strip()
 
         for mod in jerarquia_modelos:
+            nom_mod = nombres_ui.get(mod, mod)
             for idx_k, k_act in enumerate(keys_pool):
                 if (k_act, mod) in pares_saturados_sesion:
                     continue
 
-                etiqueta_cuenta = f"Cuenta {idx_k + 1}/{len(keys_pool)}" if len(keys_pool) > 1 else "API Key"
-                print(f"[*] Consultando modelo IA: {mod} ({etiqueta_cuenta})...")
+                etiqueta_cuenta = f"Cuenta API {idx_k + 1}" + (f" de {len(keys_pool)}" if len(keys_pool) > 1 else "")
+                _notificar_estado_ia(paso_frac, f"{paso_nombre}: Consultando {nom_mod} ({etiqueta_cuenta})...")
 
                 # 1. Intento con video directo (si está disponible)
+                t_video = min(40.0, timeout_max)
                 ex_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-                fut = ex_pool.submit(_intentar_llamada, mod, partes_v if video_bytes else partes_m, timeout_max, k_act)
+                fut = ex_pool.submit(_intentar_llamada, mod, partes_v if video_bytes else partes_m, t_video, k_act)
                 try:
-                    res_txt = fut.result(timeout=timeout_max + 1.0)
+                    res_txt = fut.result(timeout=t_video + 5.0)
                     ex_pool.shutdown(wait=False, cancel_futures=True)
                     if res_txt and len(res_txt) > 80:
-                        print(f"[+] Modelo '{mod}' respondió con éxito ({etiqueta_cuenta}).")
+                        _notificar_estado_ia(paso_frac + 0.04, f"✔ {nom_mod} ({etiqueta_cuenta}) generó la respuesta con éxito.")
                         return res_txt
                 except Exception as e:
                     ultimo_err = e
@@ -456,13 +477,13 @@ def generar_guion_con_gemini_flash(
                     if "429" in err_msg_corto or "RESOURCE_EXHAUSTED" in err_msg_corto:
                         pares_saturados_sesion.add((k_act, mod))
                         if mod == "gemini-4-argon":
-                            print(f"[!] 'gemini-4-argon' sin cuota o requiere facturación en {etiqueta_cuenta}. Pasando al siguiente modelo...")
+                            _notificar_estado_ia(paso_frac, f"Argon 4 requiere facturación en {etiqueta_cuenta}. Pasando a Gemini 3.8 Flash...")
                             break
                         elif len(keys_pool) > 1 and idx_k + 1 < len(keys_pool):
-                            print(f"[!] '{mod}' sin cuota en {etiqueta_cuenta} (429). Rotando automáticamente a Cuenta {idx_k + 2}...")
+                            _notificar_estado_ia(paso_frac, f"⚠ {etiqueta_cuenta} sin cuota (429). Rotando automáticamente a Cuenta API {idx_k + 2} para {nom_mod}...")
                             continue
                         else:
-                            print(f"[!] '{mod}' sin cuota en todas las cuentas (429). Pasando al modelo inferior...")
+                            _notificar_estado_ia(paso_frac, f"⚠ Cuota de {nom_mod} agotada en todas tus cuentas (429). Pasando al modelo siguiente...")
                             continue
 
                     # Caso B: Video ocupado o timeout (503, 504, UNAVAILABLE, Timeout) -> Reintentar con Mosaico liviano
@@ -472,14 +493,15 @@ def generar_guion_con_gemini_flash(
                              or "DEADLINE" in err_msg_corto or "TimeoutError" in type(e).__name__ or "timeout" in err_msg_corto.lower())
                     )
                     if es_reintento_mosaico:
-                        print(f"[!] '{mod}' demoró o saturó con video. Reintentando con Mosaico liviano ({etiqueta_cuenta})...")
+                        _notificar_estado_ia(paso_frac, f"{nom_mod} saturó con video. Analizando con Mosaico de fotogramas ({etiqueta_cuenta})...")
+                        t_mosaico = max(48.0, timeout_max)
                         ex_pool_m = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-                        fut_m = ex_pool_m.submit(_intentar_llamada, mod, partes_m, min(24.0, timeout_max), k_act)
+                        fut_m = ex_pool_m.submit(_intentar_llamada, mod, partes_m, t_mosaico, k_act)
                         try:
-                            res_m = fut_m.result(timeout=min(24.0, timeout_max) + 1.0)
+                            res_m = fut_m.result(timeout=t_mosaico + 5.0)
                             ex_pool_m.shutdown(wait=False, cancel_futures=True)
                             if res_m and len(res_m) > 80:
-                                print(f"[+] Modelo '{mod}' respondió con éxito vía Mosaico ({etiqueta_cuenta}).")
+                                _notificar_estado_ia(paso_frac + 0.04, f"✔ {nom_mod} ({etiqueta_cuenta}) generó la respuesta vía Mosaico.")
                                 return res_m
                         except Exception as e_m:
                             ultimo_err = e_m
@@ -490,7 +512,7 @@ def generar_guion_con_gemini_flash(
                             print(f"[!] Mosaico en '{mod}' falló ({err_m_str[:60]}).")
 
                     elif mod == "gemini-4-argon":
-                        print(f"[!] 'gemini-4-argon' no respondió en {etiqueta_cuenta}. Pasando al siguiente modelo...")
+                        _notificar_estado_ia(paso_frac, f"Argon 4 no disponible en {etiqueta_cuenta}. Pasando al modelo siguiente...")
                         break
                     else:
                         print(f"[!] '{mod}' no respondió ({err_msg_corto[:60]}), pasando al siguiente...")
@@ -533,7 +555,12 @@ def generar_guion_con_gemini_flash(
         "4. NICHO REAL: ¿A qué categoría temática pertenece? (ej: mascotas/perros, autos/motos, cocina, bromas familiares, etc.).\n\n"
         "Entrega tu análisis de forma directa, descriptiva y clara:"
     )
-    analisis_1_raw = _consultar_ia_robusta(prompt_p1, timeout_max=40.0)
+    analisis_1_raw = _consultar_ia_robusta(
+        prompt_p1,
+        timeout_max=48.0,
+        paso_nombre="IA Pasada 1/3 (Gancho y acción)",
+        paso_frac=0.18,
+    )
     analisis_1 = _limpiar_bloque(analisis_1_raw)
 
     # --- PASADA 2: Detección de Momentos Clave para Efectos (SFX, Flechas, Visuales) ---
@@ -553,7 +580,12 @@ def generar_guion_con_gemini_flash(
         "- EMOJI: 'sorprendido', 'risa', 'fiesta', 'diablo', 'enojo', 'lloro', 'sueno' o 'ninguno'.\n\n"
         "Entrega el desglose temporal sugerido bloque por bloque:"
     )
-    analisis_2_raw = _consultar_ia_robusta(prompt_p2, timeout_max=40.0)
+    analisis_2_raw = _consultar_ia_robusta(
+        prompt_p2,
+        timeout_max=48.0,
+        paso_nombre="IA Pasada 2/3 (SFX y Efectos)",
+        paso_frac=0.48,
+    )
     analisis_2 = _limpiar_bloque(analisis_2_raw)
 
     # --- PASADA 3: Fusión Maestra y Redacción del Guion Viral Definitivo ---
@@ -581,7 +613,12 @@ def generar_guion_con_gemini_flash(
     )
 
     try:
-        guion_final_raw = _consultar_ia_robusta(prompt_p3, timeout_max=45.0)
+        guion_final_raw = _consultar_ia_robusta(
+            prompt_p3,
+            timeout_max=50.0,
+            paso_nombre="IA Pasada 3/3 (Fusión y Ritmo)",
+            paso_frac=0.74,
+        )
         guion_final = _limpiar_bloque(guion_final_raw)
         if guion_final and "[GUION]" in guion_final and len(guion_final) > 150:
             texto_respuesta = guion_final
@@ -590,12 +627,22 @@ def generar_guion_con_gemini_flash(
             # Fallback de emergencia si la pasada 3 falló
             print("[!] Pasada 3 no entregó estructura completa, generando síntesis directa...")
             prompt_fallback = PROMPT_COMPACTO_INTERNO + instruccion_extra_base + f"\n\n[INFORME PREVIO]:\n{analisis_1}\n\nEntrega ÚNICAMENTE el guion:"
-            fb_raw = _consultar_ia_robusta(prompt_fallback, timeout_max=35.0)
+            fb_raw = _consultar_ia_robusta(
+                prompt_fallback,
+                timeout_max=45.0,
+                paso_nombre="IA Respaldo de Guion",
+                paso_frac=0.82,
+            )
             texto_respuesta = _limpiar_bloque(fb_raw)
     except Exception as err_p3:
         print(f"[!] Fusión de pasada 3 tuvo un problema ({err_p3}), intentando síntesis de respaldo...")
         prompt_fallback = PROMPT_COMPACTO_INTERNO + instruccion_extra_base + f"\n\n[INFORME PREVIO]:\n{analisis_1}\n\nEntrega ÚNICAMENTE el guion:"
-        fb_raw = _consultar_ia_robusta(prompt_fallback, timeout_max=35.0)
+        fb_raw = _consultar_ia_robusta(
+            prompt_fallback,
+            timeout_max=45.0,
+            paso_nombre="IA Respaldo de Guion",
+            paso_frac=0.82,
+        )
         texto_respuesta = _limpiar_bloque(fb_raw)
 
     if not texto_respuesta or "[GUION]" not in texto_respuesta:
@@ -662,8 +709,10 @@ def generar_guion_con_gemini_flash(
             try:
                 res_aud_raw = _consultar_ia_robusta(
                     prompt_auditoria,
-                    timeout_max=42.0,
+                    timeout_max=48.0,
                     priorizar_mejor_ia=True,
+                    paso_nombre=f"IA Auto-Auditoría (Ronda {ronda}/{max_rondas_auditoria})",
+                    paso_frac=p_val,
                 )
                 res_aud = _limpiar_bloque(res_aud_raw)
 

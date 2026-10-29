@@ -1254,10 +1254,12 @@ async def editar_video_con_guion(
     n_segs = max(1, len(config.segmentos))
 
     # 2. Generar voz IA ajustada a la duración real 1.0x de cada segmento, subtítulos y mezcla de SFX
+    nom_voz_corta = config.voz_narrador.split("-")[-1].replace("Neural", "")
     for idx, (seg, (total_frames_seg, dur_seg_exacta)) in enumerate(zip(config.segmentos, tiempos_reales)):
+        sfx_label = f" + SFX ({'+'.join(seg.sfx_lista)})" if seg.sfx_lista else ""
         _notificar_prog(
             0.05 + 0.30 * (idx / float(n_segs)),
-            f"Generando voz IA y mezcla de efectos (bloque {idx + 1}/{n_segs})...",
+            f"Síntesis vocal ({nom_voz_corta}){sfx_label} (bloque {idx + 1}/{n_segs})...",
         )
         sfx_str = "+".join(seg.sfx_lista) if seg.sfx_lista else "-"
         info_seg = (
@@ -1346,7 +1348,7 @@ async def editar_video_con_guion(
     archivos_audio_seg.append(ruta_mix_outro_wav)
     rms_env_outro = calcular_envolvente_rms(ruta_mix_outro_wav, FPS)
 
-    _notificar_prog(0.38, "Masterizando pista de audio final con música de fondo...")
+    _notificar_prog(0.38, "Masterizando pista de audio final (Voz + Efectos SFX + Música de fondo)...")
 
     # 3. Unir el audio maestro de la voz IA + Efectos SFX (el audio original del video descargado se MUTEA completamente)
     ruta_voz_maestra = TEMP_DIR / "voz_maestra.wav"
@@ -1521,7 +1523,7 @@ async def editar_video_con_guion(
                     raise InterruptedError("Edición cancelada por el usuario.")
                 _notificar_prog(
                     0.40 + 0.58 * (idx_seg / float(max(1, len(datos_segmentos)))),
-                    f"Renderizando a 60 FPS (seg {idx_seg + 1}/{len(datos_segmentos)})...",
+                    f"Render 60 FPS: Segmento {idx_seg + 1}/{len(datos_segmentos)} (Subtítulos Neón + Tracking)...",
                 )
                 t_vid_ini = float(seg.t_inicio_video or 0.0)
                 t_vid_fin = float(seg.t_fin_video or dur_video_origen)
@@ -1591,7 +1593,7 @@ async def editar_video_con_guion(
                         frac_seg = (idx_seg + (f_idx / float(total_frames_seg))) / float(max(1, len(datos_segmentos)))
                         _notificar_prog(
                             0.40 + 0.54 * frac_seg,
-                            f"Renderizando a 60 FPS (seg {idx_seg + 1}/{len(datos_segmentos)})...",
+                            f"Render 60 FPS: Segmento {idx_seg + 1}/{len(datos_segmentos)} (Subtítulos Neón + Tracking)...",
                         )
 
                     pt_c_vid = trayectoria_circulo[f_idx] if (trayectoria_circulo and t_seg >= t_ini_callout_circulo) else (WIDTH / 2.0, HEIGHT * 0.44)
@@ -1713,7 +1715,7 @@ async def editar_video_con_guion(
 
             # 6. Renderizar Outro automático de 0.7 segundos (Freeze-Frame + Desenfoque + Flecha al Like + Subtítulo Luminoso)
             if ultimo_frame_lienzo is not None and total_frames_outro > 0:
-                _notificar_prog(0.97, "Renderizando outro final con flecha a 60 FPS...")
+                _notificar_prog(0.97, "Renderizando outro dinámico (campana de like y flecha animada a 60 FPS)...")
                 print("[*] Renderizando Outro de 0.7 segundos (Freeze-frame + desenfoque + flecha al Like)...")
                 if isinstance(ultimo_frame_lienzo, np.ndarray):
                     bg_blur = cv2.GaussianBlur(ultimo_frame_lienzo, (31, 31), 16)
