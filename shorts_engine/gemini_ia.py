@@ -412,6 +412,7 @@ def generar_guion_con_gemini_flash(
         priorizar_mejor_ia: bool = True,
         paso_nombre: str = "IA",
         paso_frac: float = 0.20,
+        solo_texto_mosaico: bool = False,
     ) -> str:
         partes_v: List[object] = []
         if video_bytes:
@@ -476,47 +477,53 @@ def generar_guion_con_gemini_flash(
 
                 _notificar_estado_ia(paso_frac, f"{paso_nombre}: Probando {nom_mod} ({etiqueta_cuenta})...")
 
-                # 1. Intento con video directo (si está disponible) - Tiempo amplio (80s) para permitir procesamiento completo
-                t_video = max(75.0, timeout_max)
+                # 1. Intento con video directo (si está disponible y no es pasada liviana)
+                usar_v = (video_bytes is not None and not solo_texto_mosaico)
+                t_video = max(75.0, timeout_max) if usar_v else min(45.0, timeout_max)
+                partes_usar = partes_v if usar_v else partes_m
                 ex_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-                fut = ex_pool.submit(_intentar_llamada, mod, partes_v if video_bytes else partes_m, t_video, k_act)
+                fut = ex_pool.submit(_intentar_llamada, mod, partes_usar, t_video, k_act)
                 try:
                     res_txt = fut.result(timeout=t_video + 5.0)
                     ex_pool.shutdown(wait=False, cancel_futures=True)
                     if res_txt and len(res_txt) > 80:
-                        _notificar_estado_ia(paso_frac + 0.04, f"✔ {nom_mod} ({etiqueta_cuenta}) generó la respuesta con éxito.")
+                        _notificar_estado_ia(paso_frac + 0.04, f"✔ {nom_mod} ({etiqueta_cuenta}) generó la respuesta.")
+                        # Priorizar la cuenta exitosa para las siguientes pasadas
+                        if idx_k > 0:
+                            keys_pool.insert(0, keys_pool.pop(idx_k))
                         return res_txt
                 except Exception as e:
                     ultimo_err = e
                     ex_pool.shutdown(wait=False, cancel_futures=True)
                     err_msg_corto = str(e) or repr(e)
 
-                    # Caso A: Cuota agotada (429 / RESOURCE_EXHAUSTED) -> Marcar saturado y rotar a la siguiente cuenta para este mismo modelo
+                    # Caso A: Cuota agotada (429 / RESOURCE_EXHAUSTED) -> Rotar cuenta
                     if "429" in err_msg_corto or "RESOURCE_EXHAUSTED" in err_msg_corto:
                         pares_saturados_sesion.add((k_act, mod))
                         if hay_siguiente_cuenta:
                             _notificar_estado_ia(
                                 paso_frac,
-                                f"⚠ {nom_mod} sin cuota (429) en {etiqueta_cuenta}. Probando {nom_mod} en {etiqueta_sig_cuenta}..."
+                                f"⚠ {nom_mod} sin cuota (429) en {etiqueta_cuenta}. Probando {etiqueta_sig_cuenta}..."
                             )
                         else:
                             _notificar_estado_ia(
                                 paso_frac,
-                                f"⚠ Cuota de {nom_mod} agotada en las {len(keys_pool)} cuentas. Pasando a {nom_sig_mod}..."
+                                f"⚠ {nom_mod} sin cuota en las {len(keys_pool)} cuentas. Pasando a {nom_sig_mod}..."
                             )
                         continue
 
-                    # Caso B: Video rechazado, error de servidor o timeout genuino -> Solo reintentar con Mosaico si Google arrojó error
+                    # Caso B: Video saturado o error de servidor -> Reintentar con Mosaico
                     es_reintento_mosaico = (
-                        video_bytes is not None
+                        usar_v
                         and ("503" in err_msg_corto or "504" in err_msg_corto or "500" in err_msg_corto
                              or "UNAVAILABLE" in err_msg_corto or "INTERNAL" in err_msg_corto
                              or "DEADLINE" in err_msg_corto or "TimeoutError" in type(e).__name__
                              or "timeout" in err_msg_corto.lower() or "payload" in err_msg_corto.lower())
                     )
                     if es_reintento_mosaico:
-                        _notificar_estado_ia(paso_frac, f"{nom_mod} arrojó error con video ({err_msg_corto[:40]}). Reintentando con Mosaico ({etiqueta_cuenta})...")
-                        t_mosaico = max(60.0, timeout_max)
+                        motivo_err = "saturado (503)" if "503" in err_msg_corto else ("demoró" if "timeout" in err_msg_corto.lower() else "falló")
+                        _notificar_estado_ia(paso_frac, f"{nom_mod} {motivo_err} con video. Probando Mosaico ({etiqueta_cuenta})...")
+                        t_mosaico = max(50.0, timeout_max)
                         ex_pool_m = concurrent.futures.ThreadPoolExecutor(max_workers=1)
                         fut_m = ex_pool_m.submit(_intentar_llamada, mod, partes_m, t_mosaico, k_act)
                         try:
@@ -524,6 +531,8 @@ def generar_guion_con_gemini_flash(
                             ex_pool_m.shutdown(wait=False, cancel_futures=True)
                             if res_m and len(res_m) > 80:
                                 _notificar_estado_ia(paso_frac + 0.04, f"✔ {nom_mod} ({etiqueta_cuenta}) generó la respuesta vía Mosaico.")
+                                if idx_k > 0:
+                                    keys_pool.insert(0, keys_pool.pop(idx_k))
                                 return res_m
                         except Exception as e_m:
                             ultimo_err = e_m
@@ -625,7 +634,8 @@ def generar_guion_con_gemini_flash(
     )
     analisis_2_raw = _consultar_ia_robusta(
         prompt_p2,
-        timeout_max=80.0,
+        timeout_max=50.0,
+        solo_texto_mosaico=True,
         paso_nombre="IA Pasada 2/3 (SFX y Efectos)",
         paso_frac=0.48,
     )
@@ -658,7 +668,8 @@ def generar_guion_con_gemini_flash(
     try:
         guion_final_raw = _consultar_ia_robusta(
             prompt_p3,
-            timeout_max=80.0,
+            timeout_max=50.0,
+            solo_texto_mosaico=True,
             paso_nombre="IA Pasada 3/3 (Fusión y Ritmo)",
             paso_frac=0.74,
         )
@@ -709,19 +720,18 @@ def generar_guion_con_gemini_flash(
                 lineas_corregidas.append(ln)
         texto_respuesta = "\n".join(lineas_corregidas)
 
-    # --- PASADA 4: AUTO-AUDITORÍA Y RE-EDICIÓN EN RETROSPECTIVA (Hasta 3 Rondas con la Mejor IA) ---
+    # --- PASADA 4: AUTO-AUDITORÍA Y RE-EDICIÓN EN RETROSPECTIVA (Control Rápido con IA) ---
     if auto_auditoria_retrospectiva and texto_respuesta and "[GUION]" in texto_respuesta:
-        max_rondas_auditoria = 3
+        max_rondas_auditoria = 1
         guion_actual_auditar = texto_respuesta
 
         for ronda in range(1, max_rondas_auditoria + 1):
             if callable(progreso_cb):
                 try:
-                    p_val = 0.86 + (ronda / max_rondas_auditoria) * 0.12
-                    progreso_cb(p_val, f"IA Auto-Auditoría (Ronda {ronda}/{max_rondas_auditoria}): Verificando coherencia y desenlace...")
+                    progreso_cb(0.92, "IA Auto-Auditoría: Verificando coherencia y desenlace...")
                 except Exception:
                     pass
-            print(f"[*] IA Auto-Auditoría (Ronda {ronda}/{max_rondas_auditoria}): Evaluando video completo, flechas y desenlace en retrospectiva con la mejor IA...")
+            print("[*] IA Auto-Auditoría: Evaluando guion en retrospectiva con IA...")
 
             prompt_auditoria = (
                 PROMPT_COMPACTO_INTERNO + instruccion_extra_base +
@@ -752,10 +762,11 @@ def generar_guion_con_gemini_flash(
             try:
                 res_aud_raw = _consultar_ia_robusta(
                     prompt_auditoria,
-                    timeout_max=80.0,
+                    timeout_max=45.0,
                     priorizar_mejor_ia=True,
-                    paso_nombre=f"IA Auto-Auditoría (Ronda {ronda}/{max_rondas_auditoria})",
-                    paso_frac=p_val,
+                    solo_texto_mosaico=True,
+                    paso_nombre="IA Auto-Auditoría",
+                    paso_frac=0.92,
                 )
                 res_aud = _limpiar_bloque(res_aud_raw)
 
