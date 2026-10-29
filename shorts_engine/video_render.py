@@ -29,6 +29,14 @@ from .audio_tts import (
     intentar_voz_elevenlabs, GestorAudioSFX
 )
 from .vision_tracker import RastreadorObjetivosVideo
+from .smart_camara import (
+    SmartCamara916,
+    compilar_trayectoria_a_expresion_ffmpeg,
+    calcular_trayectoria_x_escalada_1920,
+    transformar_coordenada_global_a_crop_916,
+)
+from .scene_cuts import DetectorCortesEscena
+from .thumbnail_picker import SelectorPortadaViral
 
 # ==============================================================================
 # 7. MOTOR DE ASSETS VISUALES (FLECHA, CÍRCULO ROJO, EMOJIS) Y EFECTOS DE CÁMARA
@@ -844,15 +852,39 @@ def extraer_frames_segmento_video(
     t_fin: float,
     total_frames_salida: int,
     modo_encuadre: str = "full",
+    x_left_global_1920: Optional[np.ndarray] = None,
 ) -> List[np.ndarray]:
     """
     Extrae el rango [t_ini, t_fin] a velocidad real 1.0x (60 FPS) sin cámara lenta
     y devuelve exactamente `total_frames_salida` fotogramas RGB (1080x1920).
+    Aplica recorte móvil inteligente 9:16 con SmartCamara916 dentro del motor de FFmpeg.
     """
     dur_clip = max(0.05, t_fin - t_ini)
     fps_extraccion = float(FPS)
 
-    if modo_encuadre == "blur":
+    if modo_encuadre == "full" and x_left_global_1920 is not None and len(x_left_global_1920) > 0:
+        idx_ini_global = max(0, int(round(t_ini * fps_extraccion)))
+        idx_fin_global = idx_ini_global + total_frames_salida
+        indices_seguros = np.clip(
+            np.arange(idx_ini_global, idx_fin_global), 0, len(x_left_global_1920) - 1
+        )
+        x_left_seg = x_left_global_1920[indices_seguros]
+        expr_x = compilar_trayectoria_a_expresion_ffmpeg(x_left_seg, fps=fps_extraccion)
+        filtro_vf = (
+            f"scale=-2:{HEIGHT}:flags=bicubic,"
+            f"crop={WIDTH}:{HEIGHT}:'{expr_x}':0,"
+            f"fps={fps_extraccion:.3f}"
+        )
+        cmd_ff = [
+            "ffmpeg", "-v", "error",
+            "-ss", f"{max(0.0, t_ini):.4f}",
+            "-t", f"{dur_clip:.4f}",
+            "-i", str(ruta_video),
+            "-vf", filtro_vf,
+            "-pix_fmt", "rgb24",
+            "-f", "rawvideo", "-",
+        ]
+    elif modo_encuadre == "blur":
         filtro_vf = (
             f"split[bg][fg];"
             f"[bg]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase:flags=lanczos,"
@@ -1187,9 +1219,40 @@ async def editar_video_con_guion(
         f"[*] Video base: '{ruta_video.name}' ({w_orig}x{h_orig} a {fps_orig:.1f} FPS | Duración exacta: {dur_video_origen:.2f}s)"
     )
 
+    # 0. Escaneo inteligente de cortes de cámara e imantación de bloques (Snap a cortes reales)
+    try:
+        detector_cortes = DetectorCortesEscena(fps_escaneo=12.0)
+        cortes_reales = detector_cortes.detectar_cortes(str(ruta_video))
+        if cortes_reales:
+            tiempos_brutos = [(float(s.t_inicio_video or 0.0), float(s.t_fin_video or dur_video_origen)) for s in config.segmentos]
+            tiempos_ajustados = detector_cortes.ajustar_bloques_guion_a_cortes(
+                tiempos_brutos, cortes_reales, ventana_imantacion_seg=0.45
+            )
+            for seg_obj, (t_ini_c, t_fin_c) in zip(config.segmentos, tiempos_ajustados):
+                seg_obj.t_inicio_video = t_ini_c
+                seg_obj.t_fin_video = t_fin_c
+            print(f"[*] Cortes de escena detectados ({len(cortes_reales)}). Bloques del guion sincronizados a los cortes de plano.")
+    except Exception as e_cortes:
+        print(f"[*] Escaneo de cortes omitido: {e_cortes}")
+
     # 1. Fijar los tramos reales 1.0x de cada segmento sobre `dur_video_origen` ANTES de generar la voz
     # para que el video de fondo NUNCA vaya en cámara lenta y dure exactamente lo mismo que `video_input`.
     tiempos_reales = _asignar_tiempos_reales_segmentos(config.segmentos, dur_video_origen)
+
+    # 1.5 Pre-calcular encuadre inteligente 9:16 (SmartCamara916) si el modo es 'full'
+    x_left_global_1920: Optional[np.ndarray] = None
+    w_escalado_1920: int = WIDTH
+    if config.modo_encuadre == "full":
+        try:
+            camara_smart = SmartCamara916(ancho_analisis=320, fps_muestreo=6.0)
+            x_left_global_1920, w_escalado_1920 = calcular_trayectoria_x_escalada_1920(
+                camara_smart, str(ruta_video), fps_salida=float(FPS), ancho_target=WIDTH, alto_target=HEIGHT
+            )
+            print(f"[*] SmartCamara916 activa: encuadre 9:16 dinámico con física de gimbal ({w_escalado_1920}x{HEIGHT}).")
+        except Exception as e_cam:
+            print(f"[!] SmartCamara916 fallback a centrado estático: {e_cam}")
+            x_left_global_1920 = None
+            w_escalado_1920 = WIDTH
 
     gestor_assets = GestorEfectosYAssets(EMOJIS_DIR, FOTOS_DIR, duracion_callouts=config.duracion_callouts)
     gestor_sfx = GestorAudioSFX(SFX_DIR)
@@ -1337,9 +1400,11 @@ async def editar_video_con_guion(
         fade_start = max(0.5, dur_total_audio - 0.4)
         print(f"[*] Música de fondo con ducking sutil: '{pista_musica.name}' (tono: '{tono_efectivo}', volumen: {vol_bgm:.2f}).")
         filter_str = (
-            f"[1:a]volume={vol_bgm:.2f},afade=t=out:st={fade_start:.2f}:d=0.4[bgm];"
-            f"[bgm][0:a]sidechaincompress=threshold=0.10:ratio=1.8:attack=100:release=350[bgm_duck];"
-            f"[0:a][bgm_duck]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.98:level=disabled[aout]"
+            f"[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume={vol_bgm:.2f},afade=t=out:st={fade_start:.2f}:d=0.4,highpass=f=60,equalizer=f=2500:t=q:w=1.5:g=-3.0[bgm];"
+            f"[0:a]aformat=sample_rates=48000:channel_layouts=stereo,asplit=2[voz_mix][voz_sc];"
+            f"[bgm][voz_sc]sidechaincompress=threshold=0.08:ratio=3.5:attack=50:release=300[bgm_duck];"
+            f"[voz_mix][bgm_duck]amix=inputs=2:duration=first:dropout_transition=0:weights='1 1':normalize=0[pre_master];"
+            f"[pre_master]loudnorm=I=-14.0:TP=-1.0:LRA=7.0:linear=true,aresample=48000[aout]"
         )
         res_mix = subprocess.run(
             [
@@ -1457,12 +1522,16 @@ async def editar_video_con_guion(
                     t_fin=t_vid_fin,
                     total_frames_salida=total_frames_seg,
                     modo_encuadre=config.modo_encuadre,
+                    x_left_global_1920=x_left_global_1920,
                 )
 
                 # Calcular trayectorias rastreadas por visión artificial para FLECHA y CIRCULO
                 mismo_objetivo = bool(
                     seg.flecha and seg.circulo and (_quitar_acentos(seg.flecha) == _quitar_acentos(seg.circulo))
                 )
+
+                idx_ancla_global = max(0, int(round(t_vid_ini * FPS)))
+                x_ancla_seg = int(x_left_global_1920[min(idx_ancla_global, len(x_left_global_1920) - 1)]) if (x_left_global_1920 is not None and len(x_left_global_1920) > 0) else 0
 
                 trayectoria_flecha: Optional[List[Tuple[float, float]]] = None
                 trayectoria_circulo: Optional[List[Tuple[float, float]]] = None
@@ -1473,6 +1542,8 @@ async def editar_video_con_guion(
                         seg.circulo,
                         t_inicio_seg=t_vid_ini,
                         t_fin_seg=t_vid_fin,
+                        x_left_en_frame_ancla=x_ancla_seg,
+                        w_escalado_1920=w_escalado_1920,
                     )
                 if seg.flecha:
                     if mismo_objetivo and trayectoria_circulo is not None:
@@ -1700,12 +1771,22 @@ async def editar_video_con_guion(
                     pass
                 raise RuntimeError(f"FFmpeg finalizó con código {proceso_ffmpeg.returncode}.\nDetalles:\n{err_txt}")
 
-            # Guardar fotograma clave de portada (miniatura para YouTube Shorts)
-            if frame_portada_candidato is not None:
+            # Guardar fotograma clave de portada viral de alto CTR
+            ruta_portada = OUTPUT_DIR / f"portada_{ruta_mp4_final.stem}.jpg"
+            portada_guardada = False
+            try:
+                selector_portada = SelectorPortadaViral(num_candidatos=14)
+                ok_p, info_p = selector_portada.extraer_mejor_portada(str(ruta_mp4_final), str(ruta_portada))
+                if ok_p:
+                    portada_guardada = True
+                    print(f"[+] Portada viral de alto CTR seleccionada y guardada: {ruta_portada.name} (Score: {info_p.get('score_total')})")
+            except Exception as e_pv:
+                print(f"[!] Selector de portada heurístico: {e_pv}")
+
+            if not portada_guardada and frame_portada_candidato is not None:
                 try:
-                    ruta_portada = OUTPUT_DIR / f"portada_{ruta_mp4_final.stem}.jpg"
                     frame_portada_candidato.convert("RGB").save(str(ruta_portada), "JPEG", quality=95)
-                    print(f"[+] Fotograma clave de portada guardado: {ruta_portada.name}")
+                    print(f"[+] Fotograma clave de portada guardado (fallback): {ruta_portada.name}")
                 except Exception as e_portada:
                     print(f"[!] No se pudo guardar fotograma de portada: {e_portada}")
 

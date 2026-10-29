@@ -4799,11 +4799,11 @@ def iniciar_aplicacion_gui() -> None:
                     base_pct_reel = (idx_lote / cant_cola) * 100.0
                     ancho_pct_reel = 100.0 / cant_cola
 
-                    def _set_subprogreso(frac_interna: float, msg_est: str, col_est: str = "#facc15") -> None:
+                    def _set_subprogreso(frac_interna: float, msg_est: str, col_est: str = "#ffffff") -> None:
                         pct_g = base_pct_reel + (max(0.0, min(1.0, frac_interna)) * ancho_pct_reel)
                         root.after(
                             0,
-                            lambda pg=pct_g, m=msg_est, c=col_est: _actualizar_progreso_ui(pg, m, c, PURPLE_MAIN),
+                            lambda pg=pct_g, m=msg_est, c=col_est: _actualizar_progreso_ui(pg, m, "#ffffff", PURPLE_MAIN),
                         )
 
                     def _actualizar_milestone_actual(tipo_m: str, texto_corto: str) -> None:

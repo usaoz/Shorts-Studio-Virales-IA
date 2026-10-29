@@ -15,6 +15,7 @@ from .config import (
     parsear_directiva_circulo,
     ObjetivoCirculoIA,
 )
+from .smart_camara import transformar_coordenada_global_a_crop_916
 
 # ==============================================================================
 # SEGUIMIENTO INTELIGENTE DE OBJETIVOS (GROUNDED-ANCHOR + FORWARD-BACKWARD LK)
@@ -352,6 +353,8 @@ class RastreadorObjetivosVideo:
         especificacion: Optional[str],
         t_inicio_seg: float = 0.0,
         t_fin_seg: float = 5.0,
+        x_left_en_frame_ancla: int = 0,
+        w_escalado_1920: int = 1080,
     ) -> Optional[List[Tuple[float, float]]]:
         """
         Calcula la trayectoria del objetivo a 60 FPS en coordenadas 1080x1920.
@@ -369,6 +372,22 @@ class RastreadorObjetivosVideo:
         if "box:" in spec_clean or "box:[" in spec_clean or ("," in spec_clean and "->" not in spec_clean):
             info_c = parsear_directiva_circulo(especificacion, t_inicio_seg, t_fin_seg)
             if info_c.activo:
+                if w_escalado_1920 > WIDTH:
+                    visible, xc_crop, yc_crop, w_crop, h_crop = transformar_coordenada_global_a_crop_916(
+                        xc_pct_global=info_c.xc_pct,
+                        yc_pct_global=info_c.yc_pct,
+                        ancho_pct_global=info_c.ancho_pct,
+                        alto_pct_global=info_c.alto_pct,
+                        x_left_en_frame_ancla=x_left_en_frame_ancla,
+                        w_escalado_1920=w_escalado_1920,
+                    )
+                    if not visible:
+                        print(f"[*] Objeto '{info_c.etiqueta}' fuera de encuadre 9:16 (círculo cancelado).")
+                        return None
+                    info_c.xc_pct = xc_crop
+                    info_c.yc_pct = yc_crop
+                    info_c.ancho_pct = w_crop
+                    info_c.alto_pct = h_crop
                 return cls._rastrear_caja_grounding(
                     frames_rgb=frames_rgb,
                     info_c=info_c,
