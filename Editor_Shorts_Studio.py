@@ -4161,6 +4161,7 @@ def iniciar_aplicacion_gui() -> None:
             if player is not None and duracion_total > 0:
                 try:
                     player.seek(slider_seek.get() * duracion_total, relative=False)
+                    win_r.after(10, _loop_reproductor)
                 except Exception:
                     pass
 
@@ -4232,6 +4233,8 @@ def iniciar_aplicacion_gui() -> None:
                     reproduciendo = not reproduciendo
                     player.set_pause(not reproduciendo)
                     btn_play.configure(text="■" if reproduciendo else "▶")
+                    if reproduciendo:
+                        win_r.after(10, _loop_reproductor)
                 except Exception:
                     pass
 
@@ -4549,7 +4552,11 @@ def iniciar_aplicacion_gui() -> None:
                 else:
                     delay_ms = int(val * 1000) if isinstance(val, (int, float)) and val > 0 else 20
 
-                delay_ms = max(5, min(50, delay_ms))
+                # Cuando el video está en pausa, no saturar el event loop de Tkinter (ahorro 85% CPU)
+                if not reproduciendo:
+                    delay_ms = max(delay_ms, 120)
+                else:
+                    delay_ms = max(5, min(50, delay_ms))
                 win_r.after(delay_ms, _loop_reproductor)
 
         if player is not None:
