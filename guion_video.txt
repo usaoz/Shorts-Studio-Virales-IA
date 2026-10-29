@@ -1,6 +1,6 @@
-TITULO_SUPERIOR: Broma Explosiva Hermanas Petardos
-TITULO_YOUTUBE: ¡Le llenó toda la cama de petardos a su hermana! 💥🤣 #shorts
-DESCRIPCION_YOUTUBE: Una joven le prepara una trampa explosiva llena de mini petardos a su hermana por toda la casa. ¿Logrará descubrir quién le hizo esta terrible maldad? Comenta tu opinión abajo. #shorts #bromas #comedia #hermanas #viral
+TITULO_SUPERIOR: El Reto Izquierda o Derecha
+TITULO_YOUTUBE: ¡La peor elección en el reto de izquierda o derecha! 😱🔥 #shorts
+DESCRIPCION_YOUTUBE: Dos hermanos se enfrentan en el reto más divertido eligiendo objetos a ciegas sin saber qué les tocará. ¿Quién crees que tuvo peor suerte con los ingredientes? #shorts #retos #diversión #viral #humor
 ESTADO_PUBLICACION: privado
 SCHEDULE: 2026-10-29 15:00
 PARA_NINOS: no
@@ -10,10 +10,9 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | whoosh | diablo:derecha | ninguna | ninguno | ¡Mira cómo esta traviesa hermana llena toda la cama con peligrosos petardos ocultos por todas partes!
-00:05 - 00:10 | zoom_in | good_idea | risa:izquierda | ninguna | ninguno | ¡Esconde más sorpresas explosivas dentro de la escoba y también entre toda la ropa sucia!
-00:10 - 00:15 | alerta_roja | crowd_shocked | sorprendido:derecha | ninguna | ninguno | ¡La hermana mayor entra distraída mirando su celular y pisa los primeros petardos sin sospechar nada!
-00:15 - 00:19 | temblor | punch | enojo:izquierda | ninguna | centro:chico | ¡Intenta limpiar con la escoba pero los pequeños explosivos continúan estallando sin parar en el suelo!
-00:19 - 00:24 | zoom_in | error | lloro:derecha | ninguna | ninguno | ¡Cada prenda que sacude activa una nueva detonación que la persigue corriendo sin un solo respiro!
-00:24 - 00:29 | brillo_epico | party_horn | risa:izquierda | ninguna | ninguno | ¡Cansada de tanto susto se recuesta en la cama buscando paz pero el peligro sigue latente!
-00:29 - 00:34 | flash | kids_yeyy | sorprendido:derecha | ninguna | ninguno | ¡Al levantar la colcha descubre finalmente la trampa definitiva y su cara lo dice todo!
+00:00 - 00:04 | zoom_impacto | whoosh | sorprendido:derecha | izquierda | ninguno | ¡Empieza el reto definitivo donde elegir mal significa sufrir las peores consecuencias! ¡Atentos a todo!
+00:04 - 00:09 | zoom_in | riser_suction | diablo:izquierda | ninguna | ninguno | ¡La hermana escoge un pimiento rojo mientras él se queda con la rica crema! ¡Pobre chica!
+00:09 - 00:14 | flash | ding | risa:derecha | ninguna | ninguno | ¡Ella muerde el pimiento picante con mucha fuerza mientras su hermano decora feliz la tarta!
+00:14 - 00:19 | temblor | pop | fiesta:izquierda | centro | ninguno | ¡Los dulces de colores llegan para salvar la tarta de cumpleaños mientras ella sufre el picante!
+00:19 - 00:23 | alerta_roja | cartoon_laugh | diablo:derecha | ninguna | ninguno | ¡Llega la prueba final de bebidas y la hermana se arrepiente al instante de su elección!
+00:23 - 00:28 | brillo_epico | cash_ting | fiesta:derecha | izquierda | ninguno | ¡El hermano celebra su gran victoria con la tarta perfecta mientras ella lamenta su mala suerte!

@@ -709,6 +709,7 @@ def asegurar_formato_short(
             "-r", "60",
             "-c:a", "aac",
             "-b:a", "192k",
+            "-movflags", "+faststart",
         ])
     else:
         # Ya es vertical pero excede 60s: recortar preservando máxima fidelidad visual
@@ -719,6 +720,7 @@ def asegurar_formato_short(
             "-r", "60",
             "-c:a", "aac",
             "-b:a", "192k",
+            "-movflags", "+faststart",
         ])
 
     cmd.append(str(salida_short))
@@ -1408,6 +1410,7 @@ async def editar_video_con_guion(
             "-c:a", "aac",
             "-b:a", "192k",
             "-shortest",
+            "-movflags", "+faststart",
             str(ruta_mp4_final),
         ]
 
