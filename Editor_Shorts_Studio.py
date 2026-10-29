@@ -1925,65 +1925,99 @@ def iniciar_aplicacion_gui() -> None:
             button_color="#2d354d",
         ).pack(fill="x", padx=18, pady=(0, 12))
 
-        # 3. Tarjeta de API Key Gemini
+        # 3. Tarjeta de API Key Gemini / Argon 4 Multi-Cuenta
         card_api = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
         card_api.pack(fill="x", padx=24, pady=(0, 10))
 
         top_api = ctk.CTkFrame(card_api, fg_color="transparent")
-        top_api.pack(fill="x", padx=18, pady=(12, 6))
+        top_api.pack(fill="x", padx=18, pady=(12, 4))
 
         ctk.CTkLabel(
             top_api,
-            text="Clave API de Gemini Flash",
+            text="Claves API de Gemini / Argon 4 (Multi-Cuenta)",
             font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(side="left")
 
         ctk.CTkButton(
             top_api,
-            text="Obtener",
+            text="Obtener Clave Gratis",
             command=lambda: webbrowser.open("https://aistudio.google.com/apikey"),
             corner_radius=14,
             height=28,
-            width=120,
+            width=140,
             fg_color="#1e293b",
             hover_color="#334155",
             text_color=CYAN_ACCENT,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         ).pack(side="right")
 
-        key_var = tk.StringVar(value=obtener_gemini_api_key())
-        row_k = ctk.CTkFrame(card_api, fg_color="transparent")
-        row_k.pack(fill="x", padx=18, pady=(0, 12))
+        ctk.CTkLabel(
+            card_api,
+            text="Ingresá 1 o varias claves (una por línea o separadas por coma). La app rotará cuentas si una agota su cuota (429).",
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color=TEXT_MUTED,
+            anchor="w",
+            justify="left",
+        ).pack(fill="x", padx=18, pady=(0, 6))
 
-        ent_k = ctk.CTkEntry(
-            row_k,
-            textvariable=key_var,
-            corner_radius=14,
-            height=34,
+        keys_existentes = obtener_gemini_api_keys()
+        txt_k = ctk.CTkTextbox(
+            card_api,
+            corner_radius=12,
+            height=66,
             fg_color=INPUT_BG,
             border_color="#2e364f",
-            font=ctk.CTkFont(family="Consolas", size=13),
+            border_width=1,
+            font=ctk.CTkFont(family="Consolas", size=12),
         )
-        ent_k.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        txt_k.pack(fill="x", padx=18, pady=(0, 8))
+        if keys_existentes:
+            txt_k.insert("1.0", "\n".join(keys_existentes))
+
+        row_k_bottom = ctk.CTkFrame(card_api, fg_color="transparent")
+        row_k_bottom.pack(fill="x", padx=18, pady=(0, 12))
+
+        n_ini = len(keys_existentes)
+        lbl_status_k = ctk.CTkLabel(
+            row_k_bottom,
+            text=f"✔ Pool activo: {n_ini} cuenta{'s' if n_ini != 1 else ''} vinculada{'s' if n_ini != 1 else ''}" if n_ini else "⚠ Sin claves cargadas",
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            text_color=GREEN_ACCENT if n_ini else "#f59e0b",
+        )
+        lbl_status_k.pack(side="left")
 
         def _guardar_k() -> None:
-            k = key_var.get().strip()
-            if k:
-                guardar_gemini_api_key(k)
+            k_raw = txt_k.get("1.0", "end").strip()
+            keys_lista = extraer_gemini_api_keys(k_raw)
+            guardar_gemini_api_key("\n".join(keys_lista))
+            n_k = len(keys_lista)
+            lbl_status_k.configure(
+                text=f"✔ Pool activo: {n_k} cuenta{'s' if n_k != 1 else ''} vinculada{'s' if n_k != 1 else ''}" if n_k else "⚠ Sin claves cargadas",
+                text_color=GREEN_ACCENT if n_k else "#f59e0b",
+            )
+            if n_k > 1:
+                messagebox.showinfo(
+                    "Multi-Cuenta Activa",
+                    f"¡Se guardaron {n_k} API Keys en el pool!\nLa rotación automática entre cuentas está activa si se agota la cuota diaria.",
+                    parent=win,
+                )
+            elif n_k == 1:
                 messagebox.showinfo("Guardado", "API Key guardada correctamente.", parent=win)
+            else:
+                messagebox.showwarning("Atención", "No se detectó ninguna API Key válida.", parent=win)
 
         ctk.CTkButton(
-            row_k,
-            text="Guardar",
+            row_k_bottom,
+            text="Guardar Claves",
             command=_guardar_k,
             corner_radius=14,
-            height=34,
-            width=90,
+            height=32,
+            width=120,
             fg_color=GREEN_ACCENT,
             hover_color="#059669",
             text_color="#052e16",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         ).pack(side="right")
 
         # 4. Carpeta Output

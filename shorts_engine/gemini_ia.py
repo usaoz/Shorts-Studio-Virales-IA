@@ -19,20 +19,64 @@ from .config import (
 GEMINI_KEY_FILE = BASE_DIR / "gemini_api_key.txt"
 
 
-def obtener_gemini_api_key() -> str:
+def extraer_gemini_api_keys(raw: Any) -> List[str]:
+    """
+    Extrae y limpia claves de Gemini desde strings (separadas por salto de línea, coma o punto y coma)
+    o desde listas, eliminando espacios y duplicados conservando el orden de prioridad.
+    """
+    if not raw:
+        return []
+    if isinstance(raw, (list, tuple, set)):
+        candidatos = list(raw)
+    else:
+        candidatos = re.split(r"[\r\n,;]+", str(raw).strip())
+    resultado: List[str] = []
+    vistos = set()
+    for c in candidatos:
+        limpio = str(c).strip().strip("'\"")
+        if len(limpio) >= 20 and limpio not in vistos:
+            vistos.add(limpio)
+            resultado.append(limpio)
+    return resultado
+
+
+def obtener_gemini_api_keys() -> List[str]:
+    """
+    Devuelve la lista completa de API Keys de Gemini configuradas (desde entorno o archivo),
+    permitiendo rotación automática multi-cuenta en caso de saturación o límite de cuota (429).
+    """
+    keys: List[str] = []
     env_k = os.environ.get("GEMINI_API_KEY", "").strip()
     if env_k:
-        return env_k
+        keys.extend(extraer_gemini_api_keys(env_k))
     if GEMINI_KEY_FILE.exists():
         try:
-            return GEMINI_KEY_FILE.read_text(encoding="utf-8-sig").strip()
+            content = GEMINI_KEY_FILE.read_text(encoding="utf-8-sig")
+            keys.extend(extraer_gemini_api_keys(content))
         except Exception:
             pass
-    return ""
+    final_keys: List[str] = []
+    vistos = set()
+    for k in keys:
+        if k not in vistos:
+            vistos.add(k)
+            final_keys.append(k)
+    return final_keys
+
+
+def obtener_gemini_api_key() -> str:
+    """Devuelve la clave principal (primera) disponible."""
+    keys = obtener_gemini_api_keys()
+    return keys[0] if keys else ""
 
 
 def guardar_gemini_api_key(api_key: str) -> None:
-    GEMINI_KEY_FILE.write_text(api_key.strip(), encoding="utf-8")
+    """Guarda una o varias claves en el archivo de texto, una por línea."""
+    keys = extraer_gemini_api_keys(api_key)
+    if keys:
+        GEMINI_KEY_FILE.write_text("\n".join(keys), encoding="utf-8")
+    else:
+        GEMINI_KEY_FILE.write_text(api_key.strip(), encoding="utf-8")
 
 
 def generar_mosaico_video(ruta_video: Path, cols: int = 4, rows: int = 2) -> Tuple[bytes, float]:
@@ -255,8 +299,10 @@ def generar_guion_con_gemini_flash(
     from google import genai
     from google.genai import types
 
-    key_limpia = api_key.strip()
-    if not key_limpia:
+    keys_pool = extraer_gemini_api_keys(api_key)
+    if not keys_pool:
+        keys_pool = obtener_gemini_api_keys()
+    if not keys_pool:
         raise ValueError("No ingresaste tu GEMINI_API_KEY gratuita de Google AI Studio.")
 
     jpeg_bytes, dur_seg = generar_mosaico_video(ruta_video)
@@ -334,7 +380,7 @@ def generar_guion_con_gemini_flash(
         f"- FLECHA y CIRCULO: úsalos para destacar elementos IMPORTANTES del video (ej. el objeto en la mano, la reacción, el detalle clave). Especifica su coordenada X,Y o zona (ej. '65,55' o 'auto:chico') para que el encuadre caiga exactamente sobre el objeto real.\n"
     )
 
-    modelos_saturados_sesion: Set[str] = set()
+    pares_saturados_sesion: Set[Tuple[str, str]] = set()
 
     def _consultar_ia_robusta(
         texto_prompt: str,
@@ -352,70 +398,109 @@ def generar_guion_con_gemini_flash(
             texto_prompt,
         ]
 
-        # Jerarquía estricta de mayor a menor potencia:
-        # Siempre intenta usar la IA más poderosa primero (3.8 -> 3.6 -> 3.5 -> latest -> 2.5)
-        # El segundo que recibe error o no responde pasa de inmediato al modelo inferior.
-        jerarquia_modelos = [
+        # Jerarquía maestra de modelos de mayor a menor potencia:
+        # Argon 4 es la mejor (calidad y razonamiento máximo), luego 3.8, 3.6, 3.5 Lite, 3.1 Lite
+        base_jerarquia = [
+            "gemini-4-argon",
             "gemini-3.8-flash",
             "gemini-3.6-flash",
             "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite",
             "gemini-flash-lite-latest",
-            "gemini-2.5-flash",
         ]
+        if modelo_preferido and modelo_preferido.strip():
+            mod_p = modelo_preferido.strip()
+            jerarquia_modelos = [mod_p] + [m for m in base_jerarquia if m != mod_p]
+        else:
+            jerarquia_modelos = list(base_jerarquia)
 
-        # Prioridad 1: Intentar con video comprimido directo, en orden de potencia
-        plan_intentos: List[Tuple[str, List[object], float]] = []
-        for mod in jerarquia_modelos:
-            if mod in modelos_saturados_sesion:
-                continue
-            plan_intentos.append((mod, partes_v, timeout_max))
-
-        # Prioridad 2: Respaldo con mosaico liviano si falló el video en los modelos disponibles
-        for mod in jerarquia_modelos:
-            if mod in modelos_saturados_sesion and mod == "gemini-3.8-flash":
-                continue
-            plan_intentos.append((mod, partes_m, min(22.0, timeout_max)))
+        # Filtrar modelos obsoletos / dados de baja
+        jerarquia_modelos = [m for m in jerarquia_modelos if "2.5" not in m]
 
         ultimo_err: Optional[Exception] = None
-        for mod, cont_env, t_lim in plan_intentos:
-            print(f"[*] Consultando modelo IA: {mod}...")
-            def _call(m=mod, cnt=cont_env, tl=t_lim):
-                cli = genai.Client(
-                    api_key=key_limpia,
-                    http_options=types.HttpOptions(
-                        timeout=max(18000, int(tl * 1000)),
-                        retry_options=types.HttpRetryOptions(attempts=1),
-                    ),
-                )
-                r = cli.models.generate_content(model=m, contents=cnt)
-                return (r.text or "").strip()
 
-            ex_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-            fut = ex_pool.submit(_call)
-            try:
-                res_txt = fut.result(timeout=t_lim + 1.0)
-                ex_pool.shutdown(wait=False, cancel_futures=True)
-                if res_txt and len(res_txt) > 80:
-                    print(f"[+] Modelo '{mod}' respondió con éxito.")
-                    return res_txt
-            except Exception as e:
-                ultimo_err = e
-                ex_pool.shutdown(wait=False, cancel_futures=True)
-                err_msg_corto = str(e) or repr(e)
-                if "429" in err_msg_corto or "RESOURCE_EXHAUSTED" in err_msg_corto:
-                    modelos_saturados_sesion.add(mod)
-                    print(f"[!] '{mod}' sin cuota (429/saturado), pasando inmediatamente al modelo inferior...")
-                elif "503" in err_msg_corto or "UNAVAILABLE" in err_msg_corto:
-                    print(f"[!] '{mod}' ocupado/no disponible (503), pasando inmediatamente al modelo inferior...")
-                elif "TimeoutError" in type(e).__name__ or "timeout" in err_msg_corto.lower():
-                    print(f"[!] '{mod}' no respondió en {t_lim:.0f}s, pasando inmediatamente al modelo inferior...")
-                else:
-                    print(f"[!] '{mod}' no respondió ({err_msg_corto[:60]}), pasando inmediatamente al modelo inferior...")
+        def _intentar_llamada(m: str, cnt: List[object], tl: float, k: str) -> str:
+            cli = genai.Client(
+                api_key=k,
+                http_options=types.HttpOptions(
+                    timeout=max(18000, int(tl * 1000)),
+                    retry_options=types.HttpRetryOptions(attempts=1),
+                ),
+            )
+            r = cli.models.generate_content(model=m, contents=cnt)
+            return (r.text or "").strip()
+
+        for mod in jerarquia_modelos:
+            for idx_k, k_act in enumerate(keys_pool):
+                if (k_act, mod) in pares_saturados_sesion:
+                    continue
+
+                etiqueta_cuenta = f"Cuenta {idx_k + 1}/{len(keys_pool)}" if len(keys_pool) > 1 else "API Key"
+                print(f"[*] Consultando modelo IA: {mod} ({etiqueta_cuenta})...")
+
+                # 1. Intento con video directo (si está disponible)
+                ex_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+                fut = ex_pool.submit(_intentar_llamada, mod, partes_v if video_bytes else partes_m, timeout_max, k_act)
+                try:
+                    res_txt = fut.result(timeout=timeout_max + 1.0)
+                    ex_pool.shutdown(wait=False, cancel_futures=True)
+                    if res_txt and len(res_txt) > 80:
+                        print(f"[+] Modelo '{mod}' respondió con éxito ({etiqueta_cuenta}).")
+                        return res_txt
+                except Exception as e:
+                    ultimo_err = e
+                    ex_pool.shutdown(wait=False, cancel_futures=True)
+                    err_msg_corto = str(e) or repr(e)
+
+                    # Caso A: Cuota agotada (429) -> Rotar a siguiente cuenta para este modelo
+                    if "429" in err_msg_corto or "RESOURCE_EXHAUSTED" in err_msg_corto:
+                        pares_saturados_sesion.add((k_act, mod))
+                        if mod == "gemini-4-argon":
+                            print(f"[!] 'gemini-4-argon' sin cuota o requiere facturación en {etiqueta_cuenta}. Pasando al siguiente modelo...")
+                            break
+                        elif len(keys_pool) > 1 and idx_k + 1 < len(keys_pool):
+                            print(f"[!] '{mod}' sin cuota en {etiqueta_cuenta} (429). Rotando automáticamente a Cuenta {idx_k + 2}...")
+                            continue
+                        else:
+                            print(f"[!] '{mod}' sin cuota en todas las cuentas (429). Pasando al modelo inferior...")
+                            continue
+
+                    # Caso B: Video ocupado o timeout (503, 504, UNAVAILABLE, Timeout) -> Reintentar con Mosaico liviano
+                    es_reintento_mosaico = (
+                        video_bytes is not None
+                        and ("503" in err_msg_corto or "504" in err_msg_corto or "UNAVAILABLE" in err_msg_corto
+                             or "DEADLINE" in err_msg_corto or "TimeoutError" in type(e).__name__ or "timeout" in err_msg_corto.lower())
+                    )
+                    if es_reintento_mosaico:
+                        print(f"[!] '{mod}' demoró o saturó con video. Reintentando con Mosaico liviano ({etiqueta_cuenta})...")
+                        ex_pool_m = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+                        fut_m = ex_pool_m.submit(_intentar_llamada, mod, partes_m, min(24.0, timeout_max), k_act)
+                        try:
+                            res_m = fut_m.result(timeout=min(24.0, timeout_max) + 1.0)
+                            ex_pool_m.shutdown(wait=False, cancel_futures=True)
+                            if res_m and len(res_m) > 80:
+                                print(f"[+] Modelo '{mod}' respondió con éxito vía Mosaico ({etiqueta_cuenta}).")
+                                return res_m
+                        except Exception as e_m:
+                            ultimo_err = e_m
+                            ex_pool_m.shutdown(wait=False, cancel_futures=True)
+                            err_m_str = str(e_m) or repr(e_m)
+                            if "429" in err_m_str or "RESOURCE_EXHAUSTED" in err_m_str:
+                                pares_saturados_sesion.add((k_act, mod))
+                            print(f"[!] Mosaico en '{mod}' falló ({err_m_str[:60]}).")
+
+                    elif mod == "gemini-4-argon":
+                        print(f"[!] 'gemini-4-argon' no respondió en {etiqueta_cuenta}. Pasando al siguiente modelo...")
+                        break
+                    else:
+                        print(f"[!] '{mod}' no respondió ({err_msg_corto[:60]}), pasando al siguiente...")
 
         det_err = str(ultimo_err) if (ultimo_err and str(ultimo_err).strip()) else "Sin respuesta"
+        total_k = len(keys_pool)
         raise RuntimeError(
-            f"Todos los modelos de Gemini (3.8, 3.6, 3.5, 2.5) están sin cuota o no responden (429/503/timeout). "
-            f"Por favor verifica tu API Key o cuota en Google AI Studio. Detalle: {det_err}"
+            f"Todos los modelos de Gemini y Argon 4 consultados en {total_k} cuenta{'s' if total_k != 1 else ''} "
+            f"están sin cuota o no responden (429/503/timeout).\n"
+            f"Por favor verifica tus API Keys o cuota en Google AI Studio (aistudio.google.com/apikey). Detalle: {det_err}"
         )
 
     def _limpiar_bloque(texto_raw: str) -> str:
