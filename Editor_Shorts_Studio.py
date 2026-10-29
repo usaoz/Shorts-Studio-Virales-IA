@@ -459,6 +459,8 @@ def iniciar_aplicacion_gui() -> None:
         "500K+ vistas": 500_000,
         "1.0M+ vistas": 1_000_000,
         "5.0M+ vistas": 5_000_000,
+        "10M+ vistas": 10_000_000,
+        "20M+ vistas": 20_000_000,
         "Sin mínimo": 0,
     }
 
@@ -783,7 +785,7 @@ def iniciar_aplicacion_gui() -> None:
         command=lambda _: (_guardar_memoria(), renderizar_chips_canales()),
         corner_radius=12,
         height=28,
-        width=115,
+        width=128,
         font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
         fg_color="#1e2436",
         button_color="#2d354d",
@@ -4784,7 +4786,13 @@ def iniciar_aplicacion_gui() -> None:
                                     ),
                                 ),
                             )
-                            res_viral = buscar_short_viral_en_canal(c_cand, min_views=min_v, estricto_min_views=True, cuenta_id=cid_reel)
+                            res_viral = buscar_short_viral_en_canal(
+                                c_cand,
+                                min_views=min_v,
+                                estricto_min_views=True,
+                                cuenta_id=cid_reel,
+                                ids_excluir=ids_reservados_sesion,
+                            )
                             if res_viral:
                                 elegido_info = res_viral
                                 canal_usado = c_cand
@@ -5140,7 +5148,13 @@ def iniciar_aplicacion_gui() -> None:
                                                 raise InterruptedError("Operación detenida por el usuario.")
                                             c_lbl = etiqueta_corta_canal(c_cand)
                                             _set_subprogreso(0.06, f"{pref_lote}Buscando en {c_lbl}...", "#facc15")
-                                            res_viral = buscar_short_viral_en_canal(c_cand, min_views=min_v, estricto_min_views=True, cuenta_id=cid_actual)
+                                            res_viral = buscar_short_viral_en_canal(
+                                                c_cand,
+                                                min_views=min_v,
+                                                estricto_min_views=True,
+                                                cuenta_id=cid_actual,
+                                                ids_excluir=ids_reservados_sesion,
+                                            )
                                             if res_viral:
                                                 nuevo_elegido = res_viral
                                                 ids_reservados_sesion.append(res_viral[0])

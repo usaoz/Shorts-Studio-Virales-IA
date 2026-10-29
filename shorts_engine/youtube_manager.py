@@ -9,7 +9,7 @@ import subprocess
 import sys
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 from .config import (
     BASE_DIR, DEFAULT_VIDEO_INPUT, WIN_NO_WINDOW, WIN_STARTUPINFO,
     HORARIOS_PICO_POR_DIA, HORARIOS_PICO_OPTIMOS
@@ -421,13 +421,15 @@ def sincronizar_cuota_real_youtube() -> Tuple[int, int, float]:
 def buscar_short_viral_en_canal(
     url_canal: str,
     min_views: int = 1_000_000,
-    max_escanear: int = 45,
+    max_escanear: int = 180,
     estricto_min_views: bool = True,
     cuenta_id: Optional[str] = None,
+    ids_excluir: Optional[Iterable[str]] = None,
 ) -> Optional[Tuple[str, str, int]]:
     """
-    Escanea rápidamente la pestaña /shorts de un canal con yt-dlp (--flat-playlist)
-    y devuelve el primer Short NO usado previamente que supere `min_views`.
+    Escanea la pestaña /shorts de un canal con yt-dlp (--flat-playlist),
+    filtra los no usados y devuelve el Short MÁS VISTO (ordenado por views descendente)
+    que supere `min_views`.
     Si `estricto_min_views=True` y ningún video supera `min_views`, retorna None para que
     el flujo busque en el siguiente canal disponible.
     Retorna (url_short, titulo, view_count) o None.
@@ -437,6 +439,12 @@ def buscar_short_viral_en_canal(
         return None
 
     usados = cargar_videos_usados(cuenta_id=cuenta_id)
+    if ids_excluir:
+        for item_ex in ids_excluir:
+            s_ex = str(item_ex).strip()
+            m_ex = re.search(r"(?:shorts/|v=|youtu\.be/)([A-Za-z0-9_-]{11})", s_ex)
+            usados.add(m_ex.group(1) if m_ex else s_ex)
+
     ejecutable_ytdlp = shutil.which("yt-dlp")
     cmd_base = [ejecutable_ytdlp] if ejecutable_ytdlp else [sys.executable, "-m", "yt_dlp"]
 
@@ -448,7 +456,7 @@ def buscar_short_viral_en_canal(
         str(max_escanear),
         url_shorts,
     ]
-    print(f"[*] Escaneando Shorts virales en {etiqueta_corta_canal(url_shorts)} (mínimo {min_views:,} vistas)...")
+    print(f"[*] Escaneando Shorts virales en {etiqueta_corta_canal(url_shorts)} (hasta {max_escanear} videos, filtro {min_views:,} vistas)...")
     try:
         proc = subprocess.run(
             cmd,
@@ -456,7 +464,7 @@ def buscar_short_viral_en_canal(
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=28,
+            timeout=35,
             creationflags=WIN_NO_WINDOW,
             startupinfo=WIN_STARTUPINFO,
         )
@@ -486,8 +494,10 @@ def buscar_short_viral_en_canal(
             continue
 
     if candidatos:
+        # Priorizar SIEMPRE el Short con mayor cantidad de vistas reales
+        candidatos.sort(key=lambda x: x[2], reverse=True)
         elegido = candidatos[0]
-        print(f"[+] Short viral encontrado en {etiqueta_corta_canal(url_shorts)}: '{elegido[1]}' ({elegido[2]:,} vistas) -> {elegido[0]}")
+        print(f"[+] Short más viral encontrado en {etiqueta_corta_canal(url_shorts)}: '{elegido[1]}' ({elegido[2]:,} vistas de {len(candidatos)} candidatos) -> {elegido[0]}")
         return elegido
 
     if estricto_min_views:
