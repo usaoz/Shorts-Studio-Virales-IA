@@ -1799,16 +1799,9 @@ def iniciar_aplicacion_gui() -> None:
         aplicar_icono_ventana(win)
         win.grab_set()
 
-        ctk.CTkLabel(
-            win,
-            text="Ajustes del Estudio",
-            font=ctk.CTkFont(family="Segoe UI", size=20, weight="bold"),
-            text_color=TEXT_MAIN,
-        ).pack(anchor="w", padx=24, pady=(16, 8))
-
         # 1. Tarjeta de Modo de Trabajo, Título/Guión (IA vs Manual), Acción Final y Selección de Canales
         card_modo = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
-        card_modo.pack(fill="x", padx=24, pady=(0, 8))
+        card_modo.pack(fill="x", padx=24, pady=(18, 8))
 
         ctk.CTkLabel(
             card_modo,
