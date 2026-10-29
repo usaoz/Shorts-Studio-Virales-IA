@@ -3231,7 +3231,7 @@ def iniciar_aplicacion_gui() -> None:
         prog_top_row,
         text="Listo — Elige tus canales o link arriba y dale a Crear y Subir",
         font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-        text_color=CYAN_ACCENT,
+        text_color="#ffffff",
     )
     lbl_estado.pack(side="left")
 
@@ -3288,7 +3288,7 @@ def iniciar_aplicacion_gui() -> None:
     def _actualizar_progreso_ui(
         pct_total: float,
         texto_estado: Optional[str] = None,
-        color_estado: str = "#facc15",
+        color_estado: str = "#ffffff",
         color_barra: str = PURPLE_MAIN,
     ) -> None:
         pct_clamp = max(0.0, min(100.0, float(pct_total)))
@@ -3296,7 +3296,9 @@ def iniciar_aplicacion_gui() -> None:
         barra_progreso_proceso.configure(progress_color=color_barra)
         lbl_porcentaje_proceso.configure(text=f"{int(round(pct_clamp))}%")
         if texto_estado is not None:
-            lbl_estado.configure(text=texto_estado, text_color=color_estado)
+            # Todos los textos que indican el avance de la edición/subida se muestran en color blanco puro (#ffffff)
+            color_final = "#ffffff" if color_estado not in ("#ef4444", "#f87171") else color_estado
+            lbl_estado.configure(text=texto_estado, text_color=color_final)
 
     def _renderizar_milestones_ui(estados_reels: List[Dict[str, str]]) -> None:
         for w in frame_milestones.winfo_children():

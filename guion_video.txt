@@ -1,8 +1,8 @@
-TITULO_SUPERIOR: El Reto Izquierda o Derecha
-TITULO_YOUTUBE: ¡La peor elección en el reto de izquierda o derecha! 😱🔥 #shorts
-DESCRIPCION_YOUTUBE: Dos hermanos se enfrentan en el reto más divertido eligiendo objetos a ciegas sin saber qué les tocará. ¿Quién crees que tuvo peor suerte con los ingredientes? #shorts #retos #diversión #viral #humor
+TITULO_SUPERIOR: Maestra Cae en Broma Epica de Alumna
+TITULO_YOUTUBE: ¡La profesora cayó en la mejor broma escolar! 🤣🍟 #shorts
+DESCRIPCION_YOUTUBE: Una alumna finge dibujar un paquete de papas fritas y engaña por completo a su profesora. ¿Alguna vez le hiciste una broma pesada a tu profesor en clase? #shorts #comedy #funny #viral #school
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-29 15:00
+SCHEDULE: 2026-10-29 20:00
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
@@ -10,9 +10,7 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:04 | zoom_impacto | whoosh | sorprendido:derecha | izquierda | ninguno | ¡Empieza el reto definitivo donde elegir mal significa sufrir las peores consecuencias! ¡Atentos a todo!
-00:04 - 00:09 | zoom_in | riser_suction | diablo:izquierda | ninguna | ninguno | ¡La hermana escoge un pimiento rojo mientras él se queda con la rica crema! ¡Pobre chica!
-00:09 - 00:14 | flash | ding | risa:derecha | ninguna | ninguno | ¡Ella muerde el pimiento picante con mucha fuerza mientras su hermano decora feliz la tarta!
-00:14 - 00:19 | temblor | pop | fiesta:izquierda | centro | ninguno | ¡Los dulces de colores llegan para salvar la tarta de cumpleaños mientras ella sufre el picante!
-00:19 - 00:23 | alerta_roja | cartoon_laugh | diablo:derecha | ninguna | ninguno | ¡Llega la prueba final de bebidas y la hermana se arrepiente al instante de su elección!
-00:23 - 00:28 | brillo_epico | cash_ting | fiesta:derecha | izquierda | ninguno | ¡El hermano celebra su gran victoria con la tarta perfecta mientras ella lamenta su mala suerte!
+00:00 - 00:06 | zoom_impacto | whoosh | ninguno | ninguna | ninguna | ¡Mira atentamente a esta astuta alumna que finge dibujar un increíble paquete de papas fritas! ¡Todo parece un trabajo escolar perfecto!
+00:06 - 00:11 | zoom_in | good_idea | sorprendido:derecha | ninguna | ninguna | ¡La profesora se acerca con enorme curiosidad para observar de cerca el supuesto dibujo hiperrealista de la talentosa joven!
+00:11 - 00:16 | flash | ding | risa:izquierda | ninguna | centro:chico | ¡Pero la sorpresa es total cuando la maestra descubre que la bolsa es completamente real y está pegada!
+00:16 - 00:22 | brillo_epico | cartoon_laugh | lloro:derecha | ninguna | ninguna | ¡La profesora no lo puede creer y la alumna sale corriendo de risa tras completar su épica broma escolar!
