@@ -247,9 +247,16 @@ class GestorEfectosYAssets:
         crop_w = WIDTH / zoom
         crop_h = HEIGHT / zoom
 
-        # Centro base estable de cámara (suave hacia el objetivo, sin acoplar vibraciones a overlays)
-        cx_base = 0.65 * (WIDTH / 2.0) + 0.35 * fx
-        cy_base = 0.65 * (HEIGHT / 2.0) + 0.35 * fy
+        # Centro base estable de cámara con anclaje elástico (Tethered Pivot):
+        # 35% hacia el objetivo y 65% de anclaje al centro seguro (540, 960)
+        pivote_x = (WIDTH * 0.5) + (fx - (WIDTH * 0.5)) * 0.35
+        pivote_y = (HEIGHT * 0.5) + (fy - (HEIGHT * 0.5)) * 0.35
+
+        # Clamping de Zona Segura (Safe Action Cone): máx +/- 14% de desplazamiento del centro
+        max_dx = WIDTH * 0.14
+        max_dy = HEIGHT * 0.14
+        cx_base = float(np.clip(pivote_x, (WIDTH * 0.5) - max_dx, (WIDTH * 0.5) + max_dx))
+        cy_base = float(np.clip(pivote_y, (HEIGHT * 0.5) - max_dy, (HEIGHT * 0.5) + max_dy))
 
         # El temblor (shake) afecta el encuadre del fotograma para impacto visual
         x0 = float(np.clip(cx_base + shake_x - crop_w / 2.0, 0.0, WIDTH - crop_w))
@@ -266,11 +273,13 @@ class GestorEfectosYAssets:
         else:
             frame_zoomed = frame_rgb
 
-        # Coordenadas de pantalla firmes y desacopladas de sacudidas de alta frecuencia
+        # Proyección exacta física píxel a píxel sobre el recorte zoomeado
+        scale_x = WIDTH / float(max(1, ix1 - ix0))
+        scale_y = HEIGHT / float(max(1, iy1 - iy0))
         puntos_pantalla: List[Tuple[float, float]] = []
         for vx, vy in puntos_rastreados:
-            sx = (vx - (cx_base - crop_w / 2.0)) * (WIDTH / crop_w)
-            sy = (vy - (cy_base - crop_h / 2.0)) * (HEIGHT / crop_h)
+            sx = (vx - float(ix0)) * scale_x
+            sy = (vy - float(iy0)) * scale_y
             sx = float(np.clip(sx, 48.0, WIDTH - 48.0))
             sy = float(np.clip(sy, 64.0, HEIGHT - 180.0))
             puntos_pantalla.append((sx, sy))

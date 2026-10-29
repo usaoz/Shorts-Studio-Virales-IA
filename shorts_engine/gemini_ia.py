@@ -187,6 +187,9 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
      * NUNCA enmarques el pecho, ropa, remera, torso o fondo vacío.
      * NUNCA pongas círculos sobre personas enteras ni zonas genéricas ('auto', 'centro', 'derecha').
      * Si no hay un objeto físico clave puntual, el campo CIRCULO DEBE SER exactamente `ninguno`. (Máximo 1 círculo en todo el video).
+   - REGLA DE PUNTO DE CONTACTO (NO ENMARCAR HERRAMIENTAS NI BRAZOS):
+     * Si una mano, cuchillo, cúter, pinza o herramienta está tocando o cortando un objeto (ej. un pastel, una fruta, una pieza), el `box:[ymin,xmin,ymax,xmax]` debe enmarcar EXCLUSIVAMENTE EL OBJETO QUE RECIBE LA ACCIÓN (el pastel/pieza), NUNCA el mango de la herramienta ni la mano/brazo que entra en escena.
+     * Prohibido redondear coordenadas a múltiplos de 50 (como [100,50,450,400]). Calcula los bordes ajustados al objeto real.
    - COORDENADAS NATIVAS (ESCALA 0 A 1000):
      Localiza la caja delimitadora (bounding box) exacta del objeto en el segundo clave (`t_ancla`) donde mejor se aprecia:
      Formato obligatorio: `box:[ymin,xmin,ymax,xmax]@t_ancla:etiqueta`
@@ -222,7 +225,7 @@ def generar_video_compacto_ia(ruta_video: Path) -> Tuple[Optional[bytes], float]
     en movimiento + con audio a la IA (Argon 4 / Gemini 3.8 / Gemini 3.5), de modo
     que vea la acción real segundo a segundo y no adivine por fotos sueltas.
     """
-    dur_seg, _, _, _ = obtener_info_video(ruta_video)
+    dur_seg, w_v, h_v, _ = obtener_info_video(ruta_video)
     TEMP_DIR.mkdir(parents=True, exist_ok=True)
     ruta_low = TEMP_DIR / "video_analisis_ia.mp4"
     if ruta_low.exists():
@@ -230,11 +233,13 @@ def generar_video_compacto_ia(ruta_video: Path) -> Tuple[Optional[bytes], float]
             ruta_low.unlink()
         except OSError:
             pass
+    # Mantener aspecto nativo 9:16 vertical (360x640) o 16:9 horizontal (640x360) para eliminar distorsión de aspecto
+    filtro_escala = "scale=360:640:flags=fast_bilinear,fps=4" if (h_v >= w_v) else "scale=640:360:flags=fast_bilinear,fps=4"
     res = subprocess.run(
         [
             "ffmpeg", "-y",
             "-i", str(ruta_video),
-            "-vf", "scale=-2:360,fps=4",
+            "-vf", filtro_escala,
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "32",
             "-c:a", "aac", "-b:a", "48k",
             str(ruta_low),

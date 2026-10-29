@@ -58,6 +58,168 @@ class RastreadorObjetivosVideo:
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         return clahe.apply(gris)
 
+    @staticmethod
+    def _normalizar_mapa(mapa: np.ndarray) -> np.ndarray:
+        p99 = float(np.percentile(mapa, 99.2))
+        if p99 <= 1e-5:
+            return np.zeros_like(mapa, dtype=np.float32)
+        return np.clip(mapa.astype(np.float32) / p99, 0.0, 1.0)
+
+    @classmethod
+    def _calcular_mapa_saliencia_interaccion(
+        cls,
+        frames_rgb: List[np.ndarray],
+        frames_gris: List[np.ndarray],
+        idx_ancla: int,
+    ) -> np.ndarray:
+        """
+        Construye un mapa de calor 2D (0.0 a 1.0) en espacio 360x640 fusionando:
+          1. Saliencia cromática respecto al fondo dominante (CIE Lab + Saturación HSV).
+          2. Compacidad morfológica de objetos sólidos (Sobel + MORPH_CLOSE).
+          3. Micro-movimiento en ventana temporal (+/- 6 frames).
+          4. Intersección física de interacción.
+        """
+        frame_orig = frames_rgb[idx_ancla]
+        gris_ancla = frames_gris[idx_ancla]
+        h_t, w_t = gris_ancla.shape[:2]
+        frame_peq = cv2.resize(frame_orig, (w_t, h_t), interpolation=cv2.INTER_AREA)
+
+        # 1. Distancia perceptual de color contra el fondo perimetral
+        lab = cv2.cvtColor(frame_peq, cv2.COLOR_RGB2LAB).astype(np.float32)
+        hsv = cv2.cvtColor(frame_peq, cv2.COLOR_RGB2HSV).astype(np.float32)
+
+        borde_l = np.median(np.concatenate([lab[0:10, :, 0].ravel(), lab[-10:, :, 0].ravel()]))
+        borde_a = np.median(np.concatenate([lab[:, 0:10, 1].ravel(), lab[:, -10:, 1].ravel()]))
+        borde_b = np.median(np.concatenate([lab[:, 0:10, 2].ravel(), lab[:, -10:, 2].ravel()]))
+
+        dist_lab = np.sqrt(
+            0.35 * (lab[:, :, 0] - borde_l) ** 2
+            + 1.25 * (lab[:, :, 1] - borde_a) ** 2
+            + 1.25 * (lab[:, :, 2] - borde_b) ** 2
+        )
+        mapa_color = cls._normalizar_mapa(dist_lab * (1.0 + hsv[:, :, 1] / 128.0))
+
+        # 2. Densidad y compacidad de textura/bordes (descarta paredes y líneas vacías)
+        gx = cv2.Sobel(gris_ancla, cv2.CV_32F, 1, 0, ksize=3)
+        gy = cv2.Sobel(gris_ancla, cv2.CV_32F, 0, 1, ksize=3)
+        mag = cv2.magnitude(gx, gy)
+        kernel_obj = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
+        densidad_bordes = cv2.morphologyEx(mag, cv2.MORPH_CLOSE, kernel_obj)
+        densidad_bordes = cv2.GaussianBlur(densidad_bordes, (15, 15), 0)
+        mapa_textura = cls._normalizar_mapa(densidad_bordes)
+
+        # 3. Energía de interacción temporal (+/- 6 fotogramas)
+        acum_mov = np.zeros((h_t, w_t), dtype=np.float32)
+        idx_ini = max(0, idx_ancla - 6)
+        idx_fin = min(len(frames_gris) - 1, idx_ancla + 6)
+        for k in range(idx_ini, idx_fin):
+            diff = cv2.absdiff(frames_gris[k], frames_gris[k + 1]).astype(np.float32)
+            diff[diff < 8.0] = 0.0
+            acum_mov += diff
+        mapa_mov = cls._normalizar_mapa(cv2.GaussianBlur(acum_mov, (17, 17), 0))
+
+        # 4. Intersección física (donde el movimiento toca la masa del objeto)
+        interaccion = cls._normalizar_mapa((mapa_color * 0.6 + mapa_textura * 0.4) * (0.35 + 0.65 * mapa_mov))
+
+        mapa_final = (
+            0.38 * mapa_color
+            + 0.30 * mapa_textura
+            + 0.14 * mapa_mov
+            + 0.18 * interaccion
+        )
+
+        # Máscara segura: atenúa bordes extremos fuera del área de interés
+        yy, xx = np.mgrid[0:h_t, 0:w_t]
+        y_norm = yy / float(h_t)
+        x_norm = xx / float(w_t)
+        mascara_segura = np.ones((h_t, w_t), dtype=np.float32)
+        mascara_segura[y_norm < 0.08] *= 0.2
+        mascara_segura[y_norm > 0.88] *= 0.2
+        mascara_segura[(x_norm < 0.05) | (x_norm > 0.95)] *= 0.3
+
+        return cls._normalizar_mapa(mapa_final * mascara_segura)
+
+    @classmethod
+    def _autocorregir_ancla_semantica(
+        cls,
+        frames_rgb: List[np.ndarray],
+        frames_gris: List[np.ndarray],
+        idx_ancla: int,
+        xc_trab: float,
+        yc_trab: float,
+        w_caja_trab: float,
+        h_caja_trab: float,
+    ) -> Tuple[float, float, float, float, float]:
+        """
+        Atracción gravitacional semántica (SGAA): si la caja de Gemini cayó en
+        el mango de una herramienta, en el antebrazo o en el fondo vacío,
+        desplaza el centroide hacia el objeto físico en interacción real.
+        """
+        h_t, w_t = frames_gris[idx_ancla].shape[:2]
+        mapa_saliencia = cls._calcular_mapa_saliencia_interaccion(frames_rgb, frames_gris, idx_ancla)
+
+        r_nucleo_x = max(6, int(round(w_caja_trab * 0.28)))
+        r_nucleo_y = max(6, int(round(h_caja_trab * 0.28)))
+        x0 = max(0, int(round(xc_trab)) - r_nucleo_x)
+        x1 = min(w_t, int(round(xc_trab)) + r_nucleo_x)
+        y0 = max(0, int(round(yc_trab)) - r_nucleo_y)
+        y1 = min(h_t, int(round(yc_trab)) + r_nucleo_y)
+
+        roi_gemini = mapa_saliencia[y0:y1, x0:x1]
+        energia_en_gemini = float(np.mean(roi_gemini)) if roi_gemini.size > 0 else 0.0
+
+        caja_es_vaga = (w_caja_trab > w_t * 0.28) or (h_caja_trab > h_t * 0.28) or (energia_en_gemini < 0.32)
+
+        yy, xx = np.mgrid[0:h_t, 0:w_t]
+        sigma_x = w_t * (0.42 if caja_es_vaga else 0.22)
+        sigma_y = h_t * (0.48 if caja_es_vaga else 0.25)
+        prior_gemini = np.exp(-0.5 * (((xx - xc_trab) / sigma_x) ** 2 + ((yy - yc_trab) / sigma_y) ** 2))
+        prior_demo = np.exp(-0.5 * (((xx - (w_t * 0.50)) / (w_t * 0.35)) ** 2 + ((yy - (h_t * 0.54)) / (h_t * 0.28)) ** 2))
+        peso_prior = (0.45 * prior_gemini + 0.55 * prior_demo) if caja_es_vaga else (0.75 * prior_gemini + 0.25 * prior_demo)
+
+        mapa_busqueda = mapa_saliencia * peso_prior
+
+        tam_ventana = max(15, int(round(min(w_t, h_t) * 0.14)))
+        if tam_ventana % 2 == 0:
+            tam_ventana += 1
+        mapa_densidad = cv2.GaussianBlur(mapa_busqueda, (tam_ventana, tam_ventana), 0)
+        _, max_val, _, max_loc = cv2.minMaxLoc(mapa_densidad)
+        pico_x, pico_y = float(max_loc[0]), float(max_loc[1])
+
+        # Refinamiento Mean-Shift local
+        radio_ms = int(round(min(w_t, h_t) * 0.12))
+        mx0, mx1 = max(0, int(round(pico_x)) - radio_ms), min(w_t, int(round(pico_x)) + radio_ms)
+        my0, my1 = max(0, int(round(pico_y)) - radio_ms), min(h_t, int(round(pico_y)) + radio_ms)
+        sub_mapa = mapa_saliencia[my0:my1, mx0:mx1]
+
+        if sub_mapa.size > 0:
+            umbral_local = float(np.percentile(sub_mapa, 65))
+            mascara_masa = np.maximum(0.0, sub_mapa - umbral_local)
+            suma_masa = float(np.sum(mascara_masa))
+            if suma_masa > 1e-4:
+                gy_l, gx_l = np.mgrid[my0:my1, mx0:mx1]
+                pico_x = float(np.sum(gx_l * mascara_masa) / suma_masa)
+                pico_y = float(np.sum(gy_l * mascara_masa) / suma_masa)
+
+        r_eval = max(6, int(round(min(w_t, h_t) * 0.08)))
+        roi_nuevo = mapa_saliencia[
+            max(0, int(pico_y) - r_eval) : min(h_t, int(pico_y) + r_eval),
+            max(0, int(pico_x) - r_eval) : min(w_t, int(pico_x) + r_eval),
+        ]
+        energia_nueva = float(np.mean(roi_nuevo)) if roi_nuevo.size > 0 else 0.0
+
+        if energia_nueva > (energia_en_gemini * 1.15) or caja_es_vaga:
+            xc_final, yc_final = pico_x, pico_y
+            w_final = min(w_caja_trab, w_t * 0.24)
+            h_final = min(h_caja_trab, h_t * 0.24)
+            confianza = energia_nueva
+        else:
+            xc_final, yc_final = xc_trab, yc_trab
+            w_final, h_final = w_caja_trab, h_caja_trab
+            confianza = energia_en_gemini
+
+        return xc_final, yc_final, w_final, h_final, confianza
+
     @classmethod
     def _adquirir_puntos_semilla_en_caja(
         cls,
@@ -519,7 +681,22 @@ class RastreadorObjetivosVideo:
         frac_ancla = max(0.0, min(1.0, t_ancla_rel / dur_seg))
         idx_ancla = int(round(frac_ancla * (n_frames - 1)))
 
-        # 4. Semillas Shi-Tomasi en el núcleo del objeto
+        # 3.5 Autocorrección Morfológica por Saliencia e Interacción (SGAA)
+        xc_tr, yc_tr, w_caja_tr, h_caja_tr, confianza = cls._autocorregir_ancla_semantica(
+            frames_rgb=frames_rgb,
+            frames_gris=frames_gris,
+            idx_ancla=idx_ancla,
+            xc_trab=xc_tr,
+            yc_trab=yc_tr,
+            w_caja_trab=w_caja_tr,
+            h_caja_trab=h_caja_tr,
+        )
+
+        if confianza < 0.14:
+            print(f"[*] Objeto '{info_c.etiqueta}' sin saliencia real detectable (círculo omitido por seguridad).")
+            return None
+
+        # 4. Semillas Shi-Tomasi en el núcleo del objeto real autocorregido
         pts_semilla = cls._adquirir_puntos_semilla_en_caja(
             frames_gris[idx_ancla], xc_tr, yc_tr, w_caja_tr, h_caja_tr
         )

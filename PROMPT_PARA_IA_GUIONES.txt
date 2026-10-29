@@ -98,6 +98,9 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
     * NUNCA enmarques el pecho, ropa, remera, torso o fondo vacío.
     * NUNCA pongas círculos sobre personas enteras ni zonas genéricas ('auto', 'centro', 'derecha').
     * Si no hay un objeto físico clave puntual, el campo CIRCULO DEBE SER exactamente 'ninguno'. (Máximo 1 círculo en todo el video).
+  - REGLA DE PUNTO DE CONTACTO (NO ENMARCAR HERRAMIENTAS NI BRAZOS):
+    * Si una mano, cuchillo, cúter, pinza o herramienta está tocando o cortando un objeto (ej. un pastel, una fruta, una pieza), el `box:[ymin,xmin,ymax,xmax]` debe enmarcar EXCLUSIVAMENTE EL OBJETO QUE RECIBE LA ACCIÓN (el pastel/pieza), NUNCA el mango de la herramienta ni la mano/brazo que entra en escena.
+    * Prohibido redondear coordenadas a múltiplos de 50 (como [100,50,450,400]). Calcula los bordes ajustados al objeto real.
   - COORDENADAS NATIVAS (ESCALA 0 A 1000):
     Localiza la caja delimitadora (bounding box) exacta del objeto en el segundo clave ('t_ancla') donde mejor se aprecia:
     Formato obligatorio: 'box:[ymin,xmin,ymax,xmax]@t_ancla:etiqueta'
