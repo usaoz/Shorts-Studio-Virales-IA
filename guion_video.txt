@@ -1,17 +1,16 @@
-TITULO_SUPERIOR: cosas_raras_clase_shorts
-TITULO_YOUTUBE: ¡Llevaron cosas RIDÍCULAS a la clase y pasó ESTO! 😱 #shorts
-DESCRIPCION_YOUTUBE: Estos estudiantes rompieron todas las reglas al traer objetos totalmente absurdos y gigantescos al salón. ¿Y tú qué objeto extraño habrías llevado a clases? #shorts #viral #comedia #humor
+TITULO_SUPERIOR: trampa_hermanas
+TITULO_YOUTUBE: ¡Intentó engañar a su hermana y terminó así! 🍪💸 #shorts
+DESCRIPCION_YOUTUBE: Una hermana mayor tramposa roba las galletas de su hermanita, pero el karma actúa de inmediato. ¿Crees que merecía ese castigo? #shorts #viral
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-30 21:00
+SCHEDULE: auto
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
 ARCHIVO_SALIDA: auto
-
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:05 | zoom_impacto | whoosh | sorprendido:derecha | centro | box:[180,310,480,470]@01.2:objeto | ¡Nadie puede creer lo que este estudiante acaba de sacar en pleno salón, un gran objeto!
-00:05 - 00:09 | alerta_roja | crowd_shocked | risa:izquierda | izquierda | ninguno | ¡Pero mira el tamaño de esa enorme zapatilla amarilla que apareció de la nada misma!
-00:09 - 00:14 | temblor | good_idea | risa:centro | ninguna | ninguno | ¡Por si fuera poco, decidieron meter una bicicleta entera directo al pupitre de la clase!
-00:14 - 00:18 | brillo_epico | party_horn | fiesta:derecha | derecha | ninguno | ¡Y cuando creías que lo habías visto todo, abren una sombrilla gigante adentro del aula!
-00:18 - 00:23 | zoom_in | kids_yeyy | fiesta:centro | ninguna | ninguno | ¿Tú qué traerías a la escuela para sorprender a todos hoy? ¡Coméntalo ahora mismo aquí!
+00:00 - 00:05 | zoom_impacto | crowd_shocked+whoosh | sorprendido:derecha | centro | ninguno | ¡Esta hermana mayor engaña a su hermanita para robarle casi todas las galletas del plato sin que lo note!
+00:05 - 00:10 | alerta_roja | riser_suction | diablo:izquierda | ninguna | ninguno | ¡Pero la mamá llega con un reto de 50 dólares para quien termine sus galletas primero!
+00:10 - 00:15 | brillo_epico | cash_ting+party_horn | fiesta:derecha | ninguna | ninguno | ¡La pequeña solo tiene una galleta, así que se la come rápido y se gana todo el dinero!
+00:15 - 00:20 | zoom_in | suspense_hit | ojos:izquierda | ninguna | ninguno | ¡Ahora con las uvas, la hermana mayor se apura a comer primero para volver a ganar!
+00:20 - 00:25 | temblor | cartoon_laugh+error | risa:derecha | ninguna | ninguno | ¡Pero la mamá le entrega un trapo sucio para limpiar la mesa por tramposa y avariciosa!

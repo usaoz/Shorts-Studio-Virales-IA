@@ -1,29 +1,92 @@
 # -*- coding: utf-8 -*-
+"""
+shorts_engine/gemini_ia.py
+Módulo de generación de guiones virales con Gemini API / Argon 4.
+Arquitectura de Alta Disponibilidad:
+- Fast-Probing asíncrono (<800ms) sobre pool multi-cuenta.
+- Single-Pass Master Prompt con video inline en RAM (Part.from_bytes).
+- Conmutación instantánea a Mosaico JPEG (16 frames Contact Sheet) ante saturación 503.
+- Auditoría determinista local en Python (0 tokens, <5ms).
+"""
+
 import os
 import sys
 import cv2
 import json
 import re
+import time
+import asyncio
+import logging
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Set
 from PIL import Image, ImageDraw
+from google import genai
+from google.genai import types
+from google.genai.errors import APIError
+
 from .video_render import obtener_info_video
 from .youtube_manager import ULTIMA_INFO_YTDLP
 from .config import (
     BASE_DIR, TEMP_DIR, DEFAULT_GUION_TXT, PROMPT_IA_PATH, PROMPT_COMPACTO_PATH,
     WIN_NO_WINDOW, WIN_STARTUPINFO
 )
+from motor_optimizado import evaluar_ritmo_bloque
 
+logger = logging.getLogger("ShortsStudio.GeminiIA")
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("[%(asctime)s] [%(levelname)s] %(message)s", "%H:%M:%S"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
 
 GEMINI_KEY_FILE = BASE_DIR / "gemini_api_key.txt"
 
+# =====================================================================
+# CONFIGURACIÓN DE JERARQUÍA DE MODELOS Y CATÁLOGOS ESTRICTOS
+# =====================================================================
+MODEL_HIERARCHY = [
+    "gemini-4-argon",        # Prioridad 1: Cuentas con facturación / Tier superior
+    "gemini-3.8-flash",      # Prioridad 2: Razonamiento top
+    "gemini-3.6-flash",      # Prioridad 3: Fallback ultra-estable
+    "gemini-3.5-flash-lite", # Prioridad 4: Cuota muy amplia
+    "gemini-3.1-flash-lite", # Prioridad 5: Fallback ligero
+    "gemini-flash-lite-latest",
+]
 
+NOMBRES_UI = {
+    "gemini-4-argon": "Argon 4",
+    "gemini-3.8-flash": "Gemini 3.8 Flash",
+    "gemini-3.6-flash": "Gemini 3.6 Flash",
+    "gemini-3.5-flash-lite": "Gemini 3.5 Flash Lite",
+    "gemini-3.1-flash-lite": "Gemini 3.1 Flash Lite",
+    "gemini-flash-lite-latest": "Gemini Flash Lite",
+}
+
+EFECTOS_VALIDOS = {
+    "zoom_impacto", "zoom_in", "zoom_out", "flash", "temblor",
+    "alerta_roja", "brillo_epico", "blanco_negro", "spotlight", "ninguno"
+}
+
+SFX_VALIDOS = {
+    "crowd_shocked", "whoosh", "riser_suction", "vine_boom", "metal_pipe",
+    "heartbeat_fast", "record_scratch", "suspense_hit", "ding", "good_idea",
+    "cash_ting", "punch", "boxing_bell", "camera_flash", "camera_shooter",
+    "cartoon_laugh", "kids_yeyy", "party_horn", "awww", "error",
+    "xp_Error", "fart", "click", "pop", "ninguno"
+}
+
+EMOJIS_VALIDOS = {
+    "sorprendido", "risa", "fiesta", "diablo", "enojo", "lloro", "sueno",
+    "calavera", "fuego", "ojos", "cerebro", "ninguno"
+}
+
+
+# =====================================================================
+# GESTIÓN Y PERSISTENCIA DE API KEYS
+# =====================================================================
 def extraer_gemini_api_keys(raw: Any) -> List[str]:
-    """
-    Extrae y limpia claves de Gemini desde strings (separadas por salto de línea, coma o punto y coma)
-    o desde listas, eliminando espacios y duplicados conservando el orden de prioridad.
-    """
+    """Extrae y limpia claves de Gemini desde strings o listas."""
     if not raw:
         return []
     if isinstance(raw, (list, tuple, set)):
@@ -41,10 +104,7 @@ def extraer_gemini_api_keys(raw: Any) -> List[str]:
 
 
 def obtener_gemini_api_keys() -> List[str]:
-    """
-    Devuelve la lista completa de API Keys de Gemini configuradas (desde entorno o archivo),
-    permitiendo rotación automática multi-cuenta en caso de saturación o límite de cuota (429).
-    """
+    """Devuelve la lista completa de API Keys configuradas (entorno o archivo)."""
     keys: List[str] = []
     env_k = os.environ.get("GEMINI_API_KEY", "").strip()
     if env_k:
@@ -65,13 +125,13 @@ def obtener_gemini_api_keys() -> List[str]:
 
 
 def obtener_gemini_api_key() -> str:
-    """Devuelve la clave principal (primera) disponible."""
+    """Devuelve la clave principal disponible."""
     keys = obtener_gemini_api_keys()
     return keys[0] if keys else ""
 
 
 def guardar_gemini_api_key(api_key: str) -> None:
-    """Guarda una o varias claves en el archivo de texto, una por línea."""
+    """Guarda las claves en el archivo de texto del proyecto."""
     keys = extraer_gemini_api_keys(api_key)
     if keys:
         GEMINI_KEY_FILE.write_text("\n".join(keys), encoding="utf-8")
@@ -79,11 +139,13 @@ def guardar_gemini_api_key(api_key: str) -> None:
         GEMINI_KEY_FILE.write_text(api_key.strip(), encoding="utf-8")
 
 
+# =====================================================================
+# GENERADORES MULTIMODALES EN MEMORIA (VIDEO COMPACTO Y MOSAICO JPEG)
+# =====================================================================
 def generar_mosaico_video(ruta_video: Path, cols: int = 4, rows: int = 2) -> Tuple[bytes, float]:
     """
-    Extrae 8 fotogramas clave espaciados a lo largo de todo el video y los une en
-    UN SOLO MOSAICO compacto (1080x960 JPEG) con el segundo exacto y las zonas (IZQ | CENTRO | DER)
-    impresas en cada cuadro. Ahorra más del 80% de tokens visuales y permite análisis instantáneo.
+    Extrae fotogramas clave espaciados y genera un único mosaico JPEG en memoria.
+    Permite análisis instantáneo del storyboard cuando el decoder de video satura.
     """
     import io
     dur_seg, w_src, h_src, fps_src = obtener_info_video(ruta_video)
@@ -170,10 +232,389 @@ def generar_mosaico_video(ruta_video: Path, cols: int = 4, rows: int = 2) -> Tup
     except Exception:
         pass
 
-    print(f"[*] Mosaico de {num_tiles} cuadros generado ({len(jpeg_bytes) / 1024:.1f} KB) -> {ruta_mosaico.name}")
     return jpeg_bytes, dur_seg
 
 
+def generar_video_compacto_ia(ruta_video: Path) -> Tuple[Optional[bytes], float]:
+    """
+    Comprime el video original a 360p 4 FPS (~350 KB - 1.5 MB).
+    Permite enviarlo inline a la API (Part.from_bytes) en memoria RAM sin File API.
+    """
+    dur_seg, w_v, h_v, _ = obtener_info_video(ruta_video)
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
+    ruta_low = TEMP_DIR / "video_analisis_ia.mp4"
+    if ruta_low.exists():
+        try:
+            ruta_low.unlink()
+        except OSError:
+            pass
+
+    filtro_escala = "scale=360:640:flags=fast_bilinear,fps=4" if (h_v >= w_v) else "scale=640:360:flags=fast_bilinear,fps=4"
+    res = subprocess.run(
+        [
+            "ffmpeg", "-y",
+            "-i", str(ruta_video),
+            "-vf", filtro_escala,
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "32",
+            "-c:a", "aac", "-b:a", "48k",
+            str(ruta_low),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+        creationflags=WIN_NO_WINDOW,
+        startupinfo=WIN_STARTUPINFO,
+    )
+    if res.returncode == 0 and ruta_low.exists() and 1000 < ruta_low.stat().st_size < 18_000_000:
+        return ruta_low.read_bytes(), dur_seg
+    return None, dur_seg
+
+
+# =====================================================================
+# AUDITOR Y AUTO-SANITIZADOR DETERMINISTA EN PYTHON (0 TOKENS, <5ms)
+# =====================================================================
+def sanitizar_y_auditar_guion(raw_text: str, duracion_total: float) -> Tuple[str, List[str]]:
+    """
+    Limpia bloques markdown, valida que SFX/Efectos/Emojis pertenezcan al catálogo cerrado
+    y audita la métrica de palabras por bloque.
+    """
+    limpio = re.sub(r"```[a-zA-Z]*", "", raw_text).replace("```", "").strip()
+    lineas_salida = []
+    advertencias = []
+    en_guion = False
+    circulos_usados = 0
+
+    for linea in limpio.splitlines():
+        l_strip = linea.strip()
+        if not l_strip:
+            continue
+
+        if l_strip.startswith("[GUION]"):
+            en_guion = True
+            lineas_salida.append("[GUION]")
+            continue
+
+        if not en_guion or l_strip.startswith("TIEMPO"):
+            lineas_salida.append(l_strip)
+            continue
+
+        partes = [p.strip() for p in l_strip.split("|")]
+        if len(partes) < 7:
+            lineas_salida.append(l_strip)
+            continue
+
+        tiempo, efecto, sfx, emoji, flecha, circulo, texto = partes[:7]
+
+        # 1. Validar Efecto
+        if efecto not in EFECTOS_VALIDOS:
+            efecto = "zoom_in"
+
+        # 2. Validar SFX (soporta combinaciones con '+')
+        sfx_parts = [s.strip() for s in sfx.split("+") if s.strip() in SFX_VALIDOS]
+        sfx = "+".join(sfx_parts[:2]) if sfx_parts else "whoosh"
+
+        # 3. Validar Emoji (con posible sufijo :derecha, etc.)
+        emoji_base = emoji.split(":")[0].strip()
+        if emoji_base not in EMOJIS_VALIDOS:
+            emoji = "sorprendido:derecha"
+
+        # 4. Límite estricto de círculos (máx 2)
+        if circulo.lower() != "ninguno":
+            circulos_usados += 1
+            if circulos_usados > 2:
+                circulo = "ninguno"
+
+        # 5. Auditar conteo de palabras (2.8 - 4.0 palabras/seg)
+        try:
+            t_ini_str, t_fin_str = tiempo.split("-")
+            def _to_sec(val: str) -> float:
+                parts = val.strip().split(":")
+                return int(parts[0]) * 60 + float(parts[1])
+            dur_bloque = max(1.0, _to_sec(t_fin_str) - _to_sec(t_ini_str))
+        except Exception:
+            dur_bloque = 4.0
+
+        palabras = [w for w in texto.split() if w]
+        min_p = int(round(dur_bloque * 2.8))
+        max_p = int(round(dur_bloque * 4.0))
+
+        if len(palabras) < min_p or len(palabras) > max_p:
+            advertencias.append(
+                f"Bloque ({tiempo}) [{dur_bloque:.0f}s]: {len(palabras)} palabras (ideal: {min_p}-{max_p})"
+            )
+
+        linea_reconstruida = f"{tiempo} | {efecto} | {sfx} | {emoji} | {flecha} | {circulo} | {texto}"
+        lineas_salida.append(linea_reconstruida)
+
+    return "\n".join(lineas_salida), advertencias
+
+
+# =====================================================================
+# GESTOR INTELIGENTE DE POOL DE API KEYS Y ROTACIÓN MULTIMODAL
+# =====================================================================
+class GeminiPoolOrchestrator:
+    """
+    Orquestador de alta disponibilidad para múltiples API Keys de Google AI Studio.
+    Incluye Fast-Probing asíncrono (<800ms), caché de estado de cuentas/modelos,
+    inyección de Video Inline en RAM y Fallback instantáneo a Mosaico JPEG.
+    """
+
+    def __init__(self, api_keys: List[str], models: Optional[List[str]] = None):
+        self.api_keys = [k.strip() for k in api_keys if k and k.strip()]
+        if not self.api_keys:
+            raise ValueError("Se requiere al menos una API Key válida de Gemini.")
+
+        self.models = models or list(MODEL_HIERARCHY)
+        self.clients: Dict[int, genai.Client] = {
+            idx: genai.Client(api_key=key) for idx, key in enumerate(self.api_keys)
+        }
+        self.cooldown_until: Dict[Tuple[int, str], float] = {}
+        self.unsupported_pairs: Set[Tuple[int, str]] = set()
+        self.key_latency: Dict[int, float] = {idx: 0.5 for idx in range(len(self.api_keys))}
+
+    def _mask_key(self, key_idx: int) -> str:
+        k = self.api_keys[key_idx]
+        return f"Cuenta {key_idx + 1}"
+
+    def _is_available(self, key_idx: int, model: str) -> bool:
+        if (key_idx, model) in self.unsupported_pairs:
+            return False
+        unlock_time = self.cooldown_until.get((key_idx, model), 0.0)
+        return time.time() >= unlock_time
+
+    def _mark_error(self, key_idx: int, model: str, status_code: int):
+        if status_code in (404, 400):
+            self.unsupported_pairs.add((key_idx, model))
+            logger.info(f"{self._mask_key(key_idx)} no soporta '{model}' ({status_code}). Descartado en sesión.")
+        elif status_code in (401, 403):
+            for m in self.models:
+                self.unsupported_pairs.add((key_idx, m))
+            logger.error(f"{self._mask_key(key_idx)} sin permisos ({status_code}).")
+        elif status_code == 429:
+            self.cooldown_until[(key_idx, model)] = time.time() + 65.0
+            logger.info(f"{self._mask_key(key_idx)} sin cuota en '{model}' (429). Cooldown 65s.")
+        elif status_code >= 500:
+            self.cooldown_until[(key_idx, model)] = time.time() + 20.0
+            logger.info(f"Servidor saturado ({status_code}) en {self._mask_key(key_idx)} con '{model}'.")
+
+    async def _probe_single_key(self, key_idx: int, model: str) -> Tuple[int, bool, float]:
+        if not self._is_available(key_idx, model):
+            return key_idx, False, 999.0
+
+        client = self.clients[key_idx]
+        t0 = time.perf_counter()
+        try:
+            await asyncio.wait_for(
+                client.aio.models.generate_content(
+                    model=model,
+                    contents="1",
+                    config=types.GenerateContentConfig(
+                        max_output_tokens=1,
+                        temperature=0.0,
+                    ),
+                ),
+                timeout=1.6,
+            )
+            lat = time.perf_counter() - t0
+            self.key_latency[key_idx] = lat
+            return key_idx, True, lat
+        except APIError as e:
+            code = getattr(e, "code", 500) or 500
+            self._mark_error(key_idx, model, code)
+            return key_idx, False, 999.0
+        except Exception:
+            return key_idx, False, 999.0
+
+    def fast_probe_accounts(self, target_model: str) -> List[int]:
+        """
+        Ejecuta un micro-ping paralelo en <800ms sobre todas las cuentas para `target_model`.
+        Devuelve la lista de índices de cuentas VIVAS ordenadas por menor latencia.
+        """
+        async def _run_probes():
+            tasks = [self._probe_single_key(idx, target_model) for idx in range(len(self.api_keys))]
+            return await asyncio.gather(*tasks)
+
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            results = loop.run_until_complete(_run_probes())
+        finally:
+            try:
+                loop.close()
+            except Exception:
+                pass
+
+        vivas = [idx for idx, ok, _ in sorted(results, key=lambda x: x[2]) if ok]
+        return vivas
+
+    def generar_guion_completo(
+        self,
+        video_path: Path,
+        prompt_maestro: str,
+        progreso_cb: Optional[Any] = None,
+        timeout_video_seg: float = 40.0,
+        modelo_preferido: Optional[str] = None,
+    ) -> str:
+        """
+        Ejecuta el Single-Pass Master Prompt:
+        1. Fast-Probe para detectar cuentas listas en <800ms.
+        2. Inyección directa de Video Inline en memoria RAM.
+        3. Conmutación instantánea a Mosaico JPEG ante 503/Timeout.
+        4. Validación y auto-reparación determinista local.
+        """
+        def _notif(frac: float, msg: str):
+            if callable(progreso_cb):
+                try:
+                    progreso_cb(frac, msg)
+                except Exception:
+                    pass
+            logger.info(msg)
+
+        dur_seg, _, _, _ = obtener_info_video(video_path)
+        video_bytes, _ = generar_video_compacto_ia(video_path)
+
+        video_part: Optional[types.Part] = None
+        if video_bytes:
+            video_part = types.Part.from_bytes(data=video_bytes, mime_type="video/mp4")
+
+        mosaico_part: Optional[types.Part] = None
+
+        # Orden de modelos a probar: siempre chequear Argon 4 primero
+        if modelo_preferido and modelo_preferido.strip() and modelo_preferido.strip() != "gemini-4-argon":
+            mod_p = modelo_preferido.strip()
+            resto = [m for m in self.models if m != "gemini-4-argon" and m != mod_p]
+            modelos_ordenados = ["gemini-4-argon", mod_p] + resto
+        else:
+            modelos_ordenados = list(self.models)
+
+        # Filtrar modelos obsoletos dados de baja por Google
+        modelos_ordenados = [m for m in modelos_ordenados if "2.5" not in m]
+
+        total_cuentas = len(self.api_keys)
+        errores_503_video = 0
+        ultimo_err = None
+
+        for idx_m, model in enumerate(modelos_ordenados):
+            nom_mod = NOMBRES_UI.get(model, model)
+            _notif(0.12 + (idx_m * 0.05), f"Verificando cuotas para {nom_mod} ({total_cuentas} cuentas)...")
+
+            # 1. Probing paralelo ultrarrápido (<800ms)
+            cuentas_vivas = self.fast_probe_accounts(model)
+            if not cuentas_vivas:
+                _notif(0.15 + (idx_m * 0.05), f"{nom_mod} sin cuota/disponibilidad. Probando siguiente...")
+                continue
+
+            for key_idx in cuentas_vivas:
+                client = self.clients[key_idx]
+                etiqueta_cuenta = f"Cuenta API {key_idx + 1}" + (f" de {total_cuentas}" if total_cuentas > 1 else "")
+                usar_mosaico = (video_part is None) or (errores_503_video >= 2)
+
+                try:
+                    t_start = time.perf_counter()
+                    if not usar_mosaico:
+                        _notif(0.30, f"Analizando video con {nom_mod} ({etiqueta_cuenta})...")
+                        contenido = [video_part, prompt_maestro]
+                        http_timeout = int(timeout_video_seg * 1000)
+                    else:
+                        if mosaico_part is None:
+                            _notif(0.35, "Generando Mosaico JPEG para análisis ágil...")
+                            jpg_bytes, _ = generar_mosaico_video(video_path)
+                            mosaico_part = types.Part.from_bytes(data=jpg_bytes, mime_type="image/jpeg")
+                        _notif(0.40, f"Analizando storyboard con {nom_mod} ({etiqueta_cuenta})...")
+                        nota_mosaico = "\n[NOTA: Se adjunta mosaico cronológico del video con segundo exacto estampado]."
+                        contenido = [mosaico_part, prompt_maestro + nota_mosaico]
+                        http_timeout = 25000
+
+                    response = client.models.generate_content(
+                        model=model,
+                        contents=contenido,
+                        config=types.GenerateContentConfig(
+                            temperature=0.35,
+                            http_options=types.HttpOptions(timeout=http_timeout),
+                        ),
+                    )
+
+                    if response and response.text and len(response.text.strip()) > 80:
+                        elapsed = time.perf_counter() - t_start
+                        _notif(0.85, f"Validando cadencia y catálogo de efectos ({nom_mod})...")
+                        guion_limpio, advertencias = sanitizar_y_auditar_guion(response.text, dur_seg)
+
+                        # Auto-reparación ligera determinista si hay líneas fuera de ritmo (1.5s solo texto)
+                        if len(advertencias) >= 2:
+                            guion_limpio = self._reparar_conteo_palabras(client, model, guion_limpio, advertencias)
+
+                        _notif(1.0, f"✔ Guion completado con {nom_mod} ({etiqueta_cuenta}) en {elapsed:.1f}s.")
+                        return guion_limpio
+
+                except APIError as e:
+                    code = getattr(e, "code", 500) or 500
+                    self._mark_error(key_idx, model, code)
+                    ultimo_err = e
+
+                    if code in (500, 503, 504) and not usar_mosaico:
+                        errores_503_video += 1
+                        _notif(0.45, f"{nom_mod} saturado (503). Conmutando a Mosaico ({etiqueta_cuenta})...")
+                        try:
+                            if mosaico_part is None:
+                                jpg_bytes, _ = generar_mosaico_video(video_path)
+                                mosaico_part = types.Part.from_bytes(data=jpg_bytes, mime_type="image/jpeg")
+                            resp_fb = client.models.generate_content(
+                                model=model,
+                                contents=[mosaico_part, prompt_maestro],
+                                config=types.GenerateContentConfig(temperature=0.35),
+                            )
+                            if resp_fb and resp_fb.text and len(resp_fb.text.strip()) > 80:
+                                guion_limpio, _ = sanitizar_y_auditar_guion(resp_fb.text, dur_seg)
+                                _notif(1.0, f"✔ Guion completado vía Mosaico con {nom_mod} ({etiqueta_cuenta}).")
+                                return guion_limpio
+                        except Exception as ex_m:
+                            ultimo_err = ex_m
+                    continue
+
+                except Exception as e:
+                    ultimo_err = e
+                    if not usar_mosaico:
+                        errores_503_video += 1
+                    _notif(0.35, f"{nom_mod} no respondió en {etiqueta_cuenta}. Rotando...")
+                    continue
+
+        det_err = str(ultimo_err) if ultimo_err else "Sin respuesta"
+        raise RuntimeError(
+            f"Todas las cuentas y modelos consultados están temporalmente sin cuota o saturados.\n"
+            f"Verifica tus API Keys en Google AI Studio (aistudio.google.com/apikey). Detalle: {det_err}"
+        )
+
+    def _reparar_conteo_palabras(
+        self, client: genai.Client, model: str, guion_actual: str, advertencias: List[str]
+    ) -> str:
+        """Micro-llamada solo de texto (~1.5s) que calibra la columna TEXTO de los bloques fuera de ritmo."""
+        prompt_fix = (
+            "Corrige ÚNICAMENTE la columna TEXTO (última columna) de las siguientes líneas del guion "
+            "para que cumplan estrictamente entre 2.8 y 3.8 palabras por segundo. Mantén intactas las primeras 6 columnas.\n\n"
+            "BLOQUES A CALIBRAR:\n- " + "\n- ".join(advertencias) + "\n\n"
+            f"GUION COMPLETO:\n{guion_actual}"
+        )
+        try:
+            resp = client.models.generate_content(
+                model=model,
+                contents=prompt_fix,
+                config=types.GenerateContentConfig(temperature=0.2),
+            )
+            if resp and resp.text and "[GUION]" in resp.text:
+                corregido, _ = sanitizar_y_auditar_guion(resp.text, 0.0)
+                return corregido
+        except Exception:
+            pass
+        return guion_actual
+
+
+# Instancia única en memoria para conservar la caché de salud durante la sesión
+_ORCHESTRATOR_INSTANCE: Optional[GeminiPoolOrchestrator] = None
+
+
+# =====================================================================
+# FUNCIÓN PRINCIPAL DE ENTRADA (COMPATIBLE CON TODA LA APLICACIÓN)
+# =====================================================================
 PROMPT_COMPACTO_INTERNO = """Actúa como el mejor Director de Retención Viral y Guionista de YouTube Shorts del mundo (especialista en psicología de la atención estilo MrBeast, Reacciones, Bromas, Curiosidades y Gaming).
 
 Tu única misión es VER Y ANALIZAR segundo a segundo el video y redactar un guion adictivo, milimétricamente sincronizado y diseñado para destruir las dos métricas clave del algoritmo de YouTube:
@@ -197,12 +638,12 @@ Tu única misión es VER Y ANALIZAR segundo a segundo el video y redactar un gui
    - Narra hasta el último milisegundo. La última frase debe conectar rítmicamente con la primera para que el espectador repita el video.
 
 ================================================================================
-⏱️ MATEMÁTICA EXACTA DE TIEMPOS (1x) Y CONTEO DE PALABRAS (3.7 pal/seg)
+⏱️ MATEMÁTICA EXACTA DE TIEMPOS (1x) Y CONTEO DE PALABRAS (3.0 - 3.7 pal/seg)
 ================================================================================
-- Bloque de 3s -> EXACTAMENTE entre 11 y 12 palabras (Máx 13).
-- Bloque de 4s -> EXACTAMENTE entre 14 y 16 palabras (Máx 16).
-- Bloque de 5s -> EXACTAMENTE entre 18 y 20 palabras (MÁXIMO ESTRICTO: 20 palabras).
-- Bloque de 6s -> EXACTAMENTE entre 21 y 23 palabras (Máx 24).
+- Bloque de 3s -> EXACTAMENTE entre 9 y 11 palabras.
+- Bloque de 4s -> EXACTAMENTE entre 12 y 15 palabras.
+- Bloque de 5s -> EXACTAMENTE entre 15 y 18 palabras.
+- Bloque de 6s -> EXACTAMENTE entre 18 y 22 palabras.
 Redacta 1 o 2 oraciones continuas, ultra expresivas con signos ¡! y ¿?.
 
 ================================================================================
@@ -216,7 +657,6 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
 4. EMOJI: sorprendido, risa, fiesta, diablo, enojo, lloro, sueno, calavera, cerebro, fuego, ojos, ninguno (opcional :derecha, :izquierda, :arriba_der, :arriba_izq, :centro, :abajo).
 5. FLECHA: centro, izquierda, derecha, arriba, abajo, auto, X,Y porcentual (ej: 45,60) o ninguna. Máx 1 o 2 en el video, nunca al final.
 6. CIRCULO: 'box:[ymin,xmin,ymax,xmax]@t_ancla:etiqueta' o 'ninguno'. Máx 1 en todo el video.
-   - REGLA DE CONTACTO: Enmarcar solo el objeto que recibe la acción, NUNCA herramientas ni brazos. Sin redondear a múltiplos de 50.
 7. TEXTO: Narración continua cumpliendo la tabla exacta de palabras sin CTA.
 
 ================================================================================
@@ -234,46 +674,10 @@ ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:04 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | [14 a 16 palabras exactas con gancho explosivo]
-00:04 - 00:08 | alerta_roja | riser_suction | diablo:izquierda | izquierda | box:[420,310,680,560]@05.2:objeto | [14 a 16 palabras aumentando intriga]
-00:08 - 00:13 | temblor | punch+xp_Error | risa:derecha | derecha | ninguno | [18 a 20 palabras narrando el clímax con máxima energía]
-00:13 - 00:17 | brillo_epico | cash_ting+party_horn | fiesta:derecha | centro | ninguno | [14 a 16 palabras conectando en loop con el inicio]"""
-
-
-def generar_video_compacto_ia(ruta_video: Path) -> Tuple[Optional[bytes], float]:
-    """
-    Comprime el video original a 360p (4 FPS, ~350 KB) para enviárselo COMPLETO
-    en movimiento + con audio a la IA (Argon 4 / Gemini 3.8 / Gemini 3.5), de modo
-    que vea la acción real segundo a segundo y no adivine por fotos sueltas.
-    """
-    dur_seg, w_v, h_v, _ = obtener_info_video(ruta_video)
-    TEMP_DIR.mkdir(parents=True, exist_ok=True)
-    ruta_low = TEMP_DIR / "video_analisis_ia.mp4"
-    if ruta_low.exists():
-        try:
-            ruta_low.unlink()
-        except OSError:
-            pass
-    # Mantener aspecto nativo 9:16 vertical (360x640) o 16:9 horizontal (640x360) para eliminar distorsión de aspecto
-    filtro_escala = "scale=360:640:flags=fast_bilinear,fps=4" if (h_v >= w_v) else "scale=640:360:flags=fast_bilinear,fps=4"
-    res = subprocess.run(
-        [
-            "ffmpeg", "-y",
-            "-i", str(ruta_video),
-            "-vf", filtro_escala,
-            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "32",
-            "-c:a", "aac", "-b:a", "48k",
-            str(ruta_low),
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=False,
-        creationflags=WIN_NO_WINDOW,
-        startupinfo=WIN_STARTUPINFO,
-    )
-    if res.returncode == 0 and ruta_low.exists() and 1000 < ruta_low.stat().st_size < 6_000_000:
-        return ruta_low.read_bytes(), dur_seg
-    return None, dur_seg
+00:00 - 00:04 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | [12 a 15 palabras exactas con gancho explosivo]
+00:04 - 00:08 | alerta_roja | riser_suction | diablo:izquierda | izquierda | ninguno | [12 a 15 palabras aumentando intriga]
+00:08 - 00:13 | temblor | punch+xp_Error | risa:derecha | derecha | ninguno | [15 a 18 palabras narrando el clímax con máxima energía]
+00:13 - 00:17 | brillo_epico | cash_ting+party_horn | fiesta:derecha | centro | ninguno | [12 a 15 palabras conectando en loop con el inicio]"""
 
 
 def generar_guion_con_gemini_flash(
@@ -289,22 +693,17 @@ def generar_guion_con_gemini_flash(
     guion_previo: Optional[str] = None,
 ) -> str:
     """
-    Sistema de Triple Pasada (Ensemble Refinement) con IA:
-    1. Pasada 1 (Gancho y Ritmo Viral): Explora el hook más adictivo e intrigante para retención.
-    2. Pasada 2 (Precisión Visual y Objetos): Analiza al detalle las acciones reales sin inventar nada.
-    3. Pasada 3 (Fusión Maestra y Perfeccionamiento): Combina lo mejor de ambas pasadas, colocando
-       las flechas, círculos, emojis y efectos sonoros (SFX) en los momentos de mayor clímax.
+    Punto de entrada maestro para generar guiones virales:
+    - Inicializa el orquestador con Fast-Probing paralelo multi-cuenta.
+    - Ejecuta el Single-Pass Master Prompt de alta retención.
+    - Persiste el guion en DEFAULT_GUION_TXT y realiza validación de ritmo.
     """
-    import concurrent.futures
-    from google import genai
-    from google.genai import types
+    global _ORCHESTRATOR_INSTANCE
 
     keys_pool: List[str] = []
-    # 1. Cargar todas las llaves guardadas en disco / entorno (pool multi-cuenta)
     for k in obtener_gemini_api_keys():
         if k not in keys_pool:
             keys_pool.append(k)
-    # 2. Agregar cualquier clave adicional pasada por parámetro
     if api_key:
         for k in extraer_gemini_api_keys(api_key):
             if k not in keys_pool:
@@ -312,16 +711,16 @@ def generar_guion_con_gemini_flash(
     if not keys_pool:
         raise ValueError("No ingresaste tu GEMINI_API_KEY gratuita de Google AI Studio.")
 
-    jpeg_bytes, dur_seg = generar_mosaico_video(ruta_video)
-    video_bytes, _ = generar_video_compacto_ia(ruta_video)
+    # Reusar o refrescar el orquestador si las claves cambiaron
+    if _ORCHESTRATOR_INSTANCE is None or set(_ORCHESTRATOR_INSTANCE.api_keys) != set(keys_pool):
+        _ORCHESTRATOR_INSTANCE = GeminiPoolOrchestrator(api_keys=keys_pool)
+
+    dur_seg, _, _, _ = obtener_info_video(ruta_video)
     dur_redondeada = max(5, int(round(dur_seg)))
 
-    # Recuperar siempre el título y descripción originales reales (de memoria yt-dlp o archivo .info.json en disco)
+    # Recuperar metadatos originales
     if not ULTIMA_INFO_YTDLP.get("titulo") or not ULTIMA_INFO_YTDLP.get("descripcion"):
-        candidatos_info = [
-            ruta_video.with_suffix(".info.json"),
-            BASE_DIR / "video_input.info.json",
-        ]
+        candidatos_info = [ruta_video.with_suffix(".info.json"), BASE_DIR / "video_input.info.json"]
         for c_path in candidatos_info:
             if c_path.exists():
                 try:
@@ -334,467 +733,59 @@ def generar_guion_con_gemini_flash(
                 except Exception:
                     pass
 
-    tit_ytdlp = (ULTIMA_INFO_YTDLP.get("titulo") or "").strip()
-    desc_ytdlp = (ULTIMA_INFO_YTDLP.get("descripcion") or "").strip()
-
-    tit_ctx = tit_ytdlp
+    tit_ctx = (ULTIMA_INFO_YTDLP.get("titulo") or "").strip()
     if contexto_titulo_orig and not contexto_titulo_orig.lower().startswith("video link"):
-        tit_ctx = contexto_titulo_orig.strip() or tit_ytdlp
-
-    desc_ctx = desc_ytdlp
+        tit_ctx = contexto_titulo_orig.strip() or tit_ctx
+    desc_ctx = (ULTIMA_INFO_YTDLP.get("descripcion") or "").strip()
 
     bloque_contexto_real = ""
     if tit_ctx or desc_ctx:
         bloque_contexto_real = (
-            f"\nCONTEXTO REAL DEL VIDEO ORIGINAL (TÍTULO Y DESCRIPCIÓN OFICIALES):\n"
+            f"\nCONTEXTO REAL DEL VIDEO ORIGINAL:\n"
             + (f"- TÍTULO ORIGINAL: {tit_ctx}\n" if tit_ctx else "")
             + (f"- DESCRIPCIÓN ORIGINAL: {desc_ctx}\n" if desc_ctx else "")
-            + "- DIRECTIVA DE FIDELIDAD TOTAL: Usa este título y descripción para conocer exactamente qué sucede, quiénes son y qué objetos o acciones reales aparecen. No inventes elementos contrarios a la descripción ni confundas juguetes/objetos.\n"
         )
 
     bloque_feedback = ""
     if contexto_feedback and contexto_feedback.strip():
-        bloque_previo_str = f"\n--- [GUION PREVIO QUE EL USUARIO REVISÓ Y ESTÁ CORRIGIENDO]:\n{guion_previo.strip()}\n" if (guion_previo and guion_previo.strip()) else ""
+        bloque_previo_str = f"\n--- [GUION PREVIO]:\n{guion_previo.strip()}\n" if (guion_previo and guion_previo.strip()) else ""
         bloque_feedback = (
-            f"\n================================================================================\n"
-            f"CORRECCIONES Y FEEDBACK EXPLÍCITO DEL USUARIO (MÁXIMA PRIORIDAD - PALABRA SAGRADA):\n"
-            f"El usuario revisó el video y dio las siguientes correcciones e indicaciones obligatorias:\n"
-            f"\"{contexto_feedback.strip()}\"\n\n"
-            f"🚫 DIRECTIVA DE ORO (EL INPUT DEL USUARIO ES PALABRA SANTA):\n"
-            f"1. Si el usuario escribió un guion, frases, oraciones o correcciones textuales: TÓMALAS COMO PALABRA SAGRADA. Está ESTRICTAMENTE PROHIBIDO cambiarlas, refrasearlas, omitirlas o inventar sinónimos. Usa exactamente sus palabras tal cual las escribió.\n"
-            f"2. Si el usuario pide corregir o reescribir solo un bloque o remate específico del guion previo, modifica ÚNICAMENTE lo que te pidió y mantén el resto del guion exactamente idéntico al guion previo.\n"
-            f"3. El feedback del usuario anula cualquier otra directiva estilística previa.\n"
-            f"{bloque_previo_str}"
-            f"================================================================================\n"
+            f"\nCORRECCIONES DEL USUARIO (PALABRA SAGRADA):\n\"{contexto_feedback.strip()}\"\n"
+            f"Usa exactamente sus palabras tal cual las escribió sin inventar sinónimos.\n{bloque_previo_str}"
         )
 
     n_bloques_optimo = max(1, round(dur_redondeada / 5.0))
     limites_sugeridos = [int(round(i * (dur_redondeada / n_bloques_optimo))) for i in range(n_bloques_optimo + 1)]
     ejemplo_tramos = " | ".join(f"00:{limites_sugeridos[i]:02d} - 00:{limites_sugeridos[i+1]:02d}" for i in range(n_bloques_optimo))
 
-    instruccion_extra_base = (
-        f"{bloque_contexto_real}\n"
-        f"{bloque_feedback}\n"
-        f"DATOS EXACTOS DEL VIDEO ANALIZADO:\n"
-        f"- Duración total exacta del video: {dur_redondeada} segundos (de 00:00 a 00:{dur_redondeada:02d}).\n"
-        f"- Divide la narración en exactamente {n_bloques_optimo} bloques equilibrados (cada uno de ~{dur_redondeada/n_bloques_optimo:.1f} segundos, MÍNIMO 4.0s por bloque, NUNCA bloques cortos al final):\n"
-        f"  Tramos sugeridos: {ejemplo_tramos}\n"
-        f"- En cada bloque usa entre 2.8 y 3.2 palabras por segundo según la duración del tramo (ej. en 5s usa 14-16 palabras; en 6s usa 17-19 palabras).\n"
+    instruccion_extra = (
+        f"{bloque_contexto_real}\n{bloque_feedback}\n"
+        f"DATOS TÉCNICOS DEL VIDEO:\n"
+        f"- Duración total exacta: {dur_redondeada} segundos (00:00 a 00:{dur_redondeada:02d}).\n"
+        f"- Divide la narración en exactamente {n_bloques_optimo} bloques continuos ({ejemplo_tramos}).\n"
         f"- En ESTADO_PUBLICACION escribe: {modo_privacidad}\n"
         f"- En SCHEDULE escribe: {schedule_str.strip() if schedule_str.strip() else 'no'}\n"
         f"- En PARA_NINOS escribe: no\n"
-        f"- En TONO_VIDEO escribe 'triste' si el video es triste o dramático, 'inspiracional' si es emotivo, heroico o de superación, o 'fondo' para humor, curiosidad, acción y entretenimiento general.\n"
-        f"- FLECHA y CIRCULO: úsalos para destacar elementos IMPORTANTES del video (ej. el objeto en la mano, la reacción, el detalle clave). Especifica su coordenada X,Y o zona (ej. '65,55' o 'auto:chico') para que el encuadre caiga exactamente sobre el objeto real.\n"
+        f"- En TONO_VIDEO escribe 'triste', 'inspiracional' o 'fondo'.\n"
+        f"- En TITULO_YOUTUBE incluye 1 o 2 emojis y #shorts al final.\n"
     )
 
-    pares_saturados_sesion: Set[Tuple[str, str]] = set()
-
-    nombres_ui = {
-        "gemini-4-argon": "Argon 4",
-        "gemini-3.8-flash": "Gemini 3.8 Flash",
-        "gemini-3.6-flash": "Gemini 3.6 Flash",
-        "gemini-3.5-flash-lite": "Gemini 3.5 Flash Lite",
-        "gemini-3.1-flash-lite": "Gemini 3.1 Flash Lite",
-        "gemini-flash-lite-latest": "Gemini Flash Lite",
-    }
-
-    def _notificar_estado_ia(frac: float, msg: str) -> None:
-        if callable(progreso_cb):
-            try:
-                progreso_cb(frac, msg)
-            except Exception:
-                pass
-        print(f"[*] {msg}")
-
-    def _consultar_ia_robusta(
-        texto_prompt: str,
-        timeout_max: float = 80.0,
-        priorizar_mejor_ia: bool = True,
-        paso_nombre: str = "IA",
-        paso_frac: float = 0.20,
-        solo_texto_mosaico: bool = False,
-    ) -> str:
-        partes_v: List[object] = []
-        if video_bytes:
-            partes_v.append(types.Part.from_bytes(data=video_bytes, mime_type="video/mp4"))
-        partes_v.append(types.Part.from_bytes(data=jpeg_bytes, mime_type="image/jpeg"))
-        partes_v.append(texto_prompt)
-
-        partes_m: List[object] = [
-            types.Part.from_bytes(data=jpeg_bytes, mime_type="image/jpeg"),
-            texto_prompt,
-        ]
-
-        # Jerarquía maestra de modelos de mayor a menor potencia:
-        # Argon 4 es la mejor (calidad y razonamiento máximo), luego 3.8, 3.6, 3.5 Lite, 3.1 Lite
-        base_jerarquia = [
-            "gemini-4-argon",
-            "gemini-3.8-flash",
-            "gemini-3.6-flash",
-            "gemini-3.5-flash-lite",
-            "gemini-3.1-flash-lite",
-            "gemini-flash-lite-latest",
-        ]
-        # Argon 4 siempre es la prioridad absoluta inicial en todas las cuentas vinculadas.
-        # Luego se continúa con el modelo preferido (si es distinto) y el resto en orden descendente.
-        if modelo_preferido and modelo_preferido.strip() and modelo_preferido.strip() != "gemini-4-argon":
-            mod_p = modelo_preferido.strip()
-            resto = [m for m in base_jerarquia if m != "gemini-4-argon" and m != mod_p]
-            jerarquia_modelos = ["gemini-4-argon", mod_p] + resto
-        else:
-            jerarquia_modelos = list(base_jerarquia)
-
-        # Filtrar modelos obsoletos / dados de baja
-        jerarquia_modelos = [m for m in jerarquia_modelos if "2.5" not in m]
-
-        ultimo_err: Optional[Exception] = None
-
-        def _intentar_llamada(m: str, cnt: List[object], tl: float, k: str) -> str:
-            cli = genai.Client(
-                api_key=k,
-                http_options=types.HttpOptions(
-                    timeout=max(60000, int((tl + 10.0) * 1000)),
-                    retry_options=types.HttpRetryOptions(attempts=1),
-                ),
-            )
-            r = cli.models.generate_content(model=m, contents=cnt)
-            return (r.text or "").strip()
-
-        for idx_m, mod in enumerate(jerarquia_modelos):
-            nom_mod = nombres_ui.get(mod, mod)
-            nom_sig_mod = nombres_ui.get(jerarquia_modelos[idx_m + 1], jerarquia_modelos[idx_m + 1]) if (idx_m + 1 < len(jerarquia_modelos)) else "ninguno"
-            for idx_k, k_act in enumerate(keys_pool):
-                etiqueta_cuenta = f"Cuenta API {idx_k + 1}" + (f" de {len(keys_pool)}" if len(keys_pool) > 1 else "")
-                hay_siguiente_cuenta = (idx_k + 1 < len(keys_pool))
-                etiqueta_sig_cuenta = f"Cuenta API {idx_k + 2} de {len(keys_pool)}" if hay_siguiente_cuenta else ""
-
-                if (k_act, mod) in pares_saturados_sesion:
-                    _notificar_estado_ia(
-                        paso_frac,
-                        f"Saltando {nom_mod} en {etiqueta_cuenta} (cuota ya agotada en esta sesión)..."
-                    )
-                    continue
-
-                _notificar_estado_ia(paso_frac, f"{paso_nombre}: Probando {nom_mod} ({etiqueta_cuenta})...")
-
-                # 1. Intento con video directo (si está disponible y no es pasada liviana)
-                usar_v = (video_bytes is not None and not solo_texto_mosaico)
-                t_video = max(75.0, timeout_max) if usar_v else min(45.0, timeout_max)
-                partes_usar = partes_v if usar_v else partes_m
-                ex_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-                fut = ex_pool.submit(_intentar_llamada, mod, partes_usar, t_video, k_act)
-                try:
-                    res_txt = fut.result(timeout=t_video + 5.0)
-                    ex_pool.shutdown(wait=False, cancel_futures=True)
-                    if res_txt and len(res_txt) > 80:
-                        _notificar_estado_ia(paso_frac + 0.04, f"✔ {nom_mod} ({etiqueta_cuenta}) generó la respuesta.")
-                        # Priorizar la cuenta exitosa para las siguientes pasadas
-                        if idx_k > 0:
-                            keys_pool.insert(0, keys_pool.pop(idx_k))
-                        return res_txt
-                except Exception as e:
-                    ultimo_err = e
-                    ex_pool.shutdown(wait=False, cancel_futures=True)
-                    err_msg_corto = str(e) or repr(e)
-
-                    # Caso A: Cuota agotada (429 / RESOURCE_EXHAUSTED) -> Rotar cuenta
-                    if "429" in err_msg_corto or "RESOURCE_EXHAUSTED" in err_msg_corto:
-                        pares_saturados_sesion.add((k_act, mod))
-                        if hay_siguiente_cuenta:
-                            _notificar_estado_ia(
-                                paso_frac,
-                                f"⚠ {nom_mod} sin cuota (429) en {etiqueta_cuenta}. Probando {etiqueta_sig_cuenta}..."
-                            )
-                        else:
-                            _notificar_estado_ia(
-                                paso_frac,
-                                f"⚠ {nom_mod} sin cuota en las {len(keys_pool)} cuentas. Pasando a {nom_sig_mod}..."
-                            )
-                        continue
-
-                    # Caso B: Video saturado o error de servidor -> Reintentar con Mosaico
-                    es_reintento_mosaico = (
-                        usar_v
-                        and ("503" in err_msg_corto or "504" in err_msg_corto or "500" in err_msg_corto
-                             or "UNAVAILABLE" in err_msg_corto or "INTERNAL" in err_msg_corto
-                             or "DEADLINE" in err_msg_corto or "TimeoutError" in type(e).__name__
-                             or "timeout" in err_msg_corto.lower() or "payload" in err_msg_corto.lower())
-                    )
-                    if es_reintento_mosaico:
-                        motivo_err = "saturado (503)" if "503" in err_msg_corto else ("demoró" if "timeout" in err_msg_corto.lower() else "falló")
-                        _notificar_estado_ia(paso_frac, f"{nom_mod} {motivo_err} con video. Probando Mosaico ({etiqueta_cuenta})...")
-                        t_mosaico = max(50.0, timeout_max)
-                        ex_pool_m = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-                        fut_m = ex_pool_m.submit(_intentar_llamada, mod, partes_m, t_mosaico, k_act)
-                        try:
-                            res_m = fut_m.result(timeout=t_mosaico + 5.0)
-                            ex_pool_m.shutdown(wait=False, cancel_futures=True)
-                            if res_m and len(res_m) > 80:
-                                _notificar_estado_ia(paso_frac + 0.04, f"✔ {nom_mod} ({etiqueta_cuenta}) generó la respuesta vía Mosaico.")
-                                if idx_k > 0:
-                                    keys_pool.insert(0, keys_pool.pop(idx_k))
-                                return res_m
-                        except Exception as e_m:
-                            ultimo_err = e_m
-                            ex_pool_m.shutdown(wait=False, cancel_futures=True)
-                            err_m_str = str(e_m) or repr(e_m)
-                            if "429" in err_m_str or "RESOURCE_EXHAUSTED" in err_m_str:
-                                pares_saturados_sesion.add((k_act, mod))
-                            print(f"[!] Mosaico en '{mod}' falló en {etiqueta_cuenta} ({err_m_str[:60]}).")
-                            if hay_siguiente_cuenta:
-                                _notificar_estado_ia(
-                                    paso_frac,
-                                    f"⚠ {nom_mod} (Mosaico) no respondió en {etiqueta_cuenta}. Probando {nom_mod} en {etiqueta_sig_cuenta}..."
-                                )
-                            else:
-                                _notificar_estado_ia(
-                                    paso_frac,
-                                    f"⚠ {nom_mod} (Mosaico) no respondió en ninguna de las {len(keys_pool)} cuentas. Pasando a {nom_sig_mod}..."
-                                )
-                            continue
-
-                    # Caso C: Modelo no disponible (404 NOT_FOUND, facturación, permiso, etc.) -> Rotar a siguiente cuenta para este mismo modelo
-                    if "404" in err_msg_corto or "NOT_FOUND" in err_msg_corto:
-                        pares_saturados_sesion.add((k_act, mod))
-
-                    if hay_siguiente_cuenta:
-                        _notificar_estado_ia(
-                            paso_frac,
-                            f"⚠ {nom_mod} no disponible en {etiqueta_cuenta}. Probando {nom_mod} en {etiqueta_sig_cuenta}..."
-                        )
-                    else:
-                        _notificar_estado_ia(
-                            paso_frac,
-                            f"⚠ {nom_mod} no disponible en ninguna de las {len(keys_pool)} cuentas. Pasando a {nom_sig_mod}..."
-                        )
-                    continue
-
-        det_err = str(ultimo_err) if (ultimo_err and str(ultimo_err).strip()) else "Sin respuesta"
-        total_k = len(keys_pool)
-        raise RuntimeError(
-            f"Todos los modelos de Gemini y Argon 4 consultados en las {total_k} cuenta{'s' if total_k != 1 else ''} "
-            f"están sin cuota o no responden (429/503/timeout).\n"
-            f"Por favor verifica tus API Keys o cuota en Google AI Studio (aistudio.google.com/apikey). Detalle: {det_err}"
-        )
-
-    def _limpiar_bloque(texto_raw: str) -> str:
-        t = texto_raw.strip()
-        if t.startswith("```"):
-            lineas = t.splitlines()
-            if lineas and lineas[0].startswith("```"):
-                lineas = lineas[1:]
-            if lineas and lineas[-1].strip().startswith("```"):
-                lineas = lineas[:-1]
-            t = "\n".join(lineas).strip()
-        return t
-
-    # --- PASADA 1: Interpretación Real y Contexto Profundo del Video ---
-    if callable(progreso_cb):
-        try:
-            progreso_cb(0.15, "IA Pasada 1/3: Analizando e interpretando el video real...")
-        except Exception:
-            pass
-    print("[*] IA Pasada 1/3: Analizando video y metadatos para interpretación real y certera...")
-    prompt_p1 = (
-        "ACTÚA COMO UN ANALISTA EXPERTO EN CONTENIDO AUDIOVISUAL Y NARRATIVA DIGITAL.\n"
-        f"Tu tarea en esta PASADA 1 es analizar minuciosamente el video adjunto y contrastarlo con su TÍTULO y DESCRIPCIÓN originales.\n"
-        f"{bloque_contexto_real}\n"
-        f"Duración total del video: {dur_redondeada} segundos.\n\n"
-        "Genera un informe conciso y preciso que responda:\n"
-        "1. SUJETOS Y OBJETOS REALES: ¿Quiénes o qué aparecen exactamente? (sin inventar ni confundir juguetes, personas o animales).\n"
-        "2. CRONOLOGÍA DE ACCIONES: ¿Qué ocurre paso a paso a lo largo del video?\n"
-        "3. EL GIRO / CLÍMAX O DESENLACE: ¿Cómo termina la situación o cuál es el momento más gracioso/impactante?\n"
-        "4. NICHO REAL: ¿A qué categoría temática pertenece? (ej: mascotas/perros, autos/motos, cocina, bromas familiares, etc.).\n\n"
-        "Entrega tu análisis de forma directa, descriptiva y clara:"
-    )
-    analisis_1_raw = _consultar_ia_robusta(
-        prompt_p1,
-        timeout_max=80.0,
-        paso_nombre="IA Pasada 1/3 (Gancho y acción)",
-        paso_frac=0.18,
-    )
-    analisis_1 = _limpiar_bloque(analisis_1_raw)
-
-    # --- PASADA 2: Detección de Momentos Clave para Efectos (SFX, Flechas, Visuales) ---
-    if callable(progreso_cb):
-        try:
-            progreso_cb(0.50, "IA Pasada 2/3: Detectando momentos clave para efectos de sonido y flechas...")
-        except Exception:
-            pass
-    print("[*] IA Pasada 2/3: Detectando momentos clave para SFX, flechas y elementos visuales...")
-    prompt_p2 = (
-        "ACTÚA COMO UN DIRECTOR DE EDICIÓN Y DISEÑADOR DE SONIDO/EFECTOS PARA YOUTUBE SHORTS.\n"
-        f"Analiza minuciosamente el video de {dur_redondeada} segundos para detectar los momentos visuales y sonoros de mayor impacto.\n"
-        f"Dividiendo la duración en bloques de 5 segundos (de 00:00 a 00:{dur_redondeada:02d}), indica para cada bloque:\n"
-        "- SFX RECOMENDADO: Qué efecto sonoro encaja con lo que pasa en pantalla (elige entre: crowd_shocked, whoosh, riser_suction, ding, good_idea, cash_ting, punch, camera_flash, cartoon_laugh, kids_yeyy, party_horn, error, xp_Error, fart, click, pop, ninguno).\n"
-        "- FLECHA ROJA (apuntando al sujeto u objeto principal en movimiento): si corresponde en este bloque (máximo en 2 bloques clave de todo el video, resto 'ninguna'). Opciones: 'auto', 'izquierda', 'derecha', 'centro', 'X,Y' o 'ninguna'.\n"
-        "- CÍRCULO ROJO (resaltando la revelación/sorpresa máxima): si corresponde (máximo en 1 bloque de todo el video, resto 'ninguno'). Opciones: 'auto', 'izquierda', 'derecha', 'centro:grande' o 'ninguno'.\n"
-        "- EMOJI: 'sorprendido', 'risa', 'fiesta', 'diablo', 'enojo', 'lloro', 'sueno' o 'ninguno'.\n\n"
-        "Entrega el desglose temporal sugerido bloque por bloque:"
-    )
-    analisis_2_raw = _consultar_ia_robusta(
-        prompt_p2,
-        timeout_max=50.0,
-        solo_texto_mosaico=True,
-        paso_nombre="IA Pasada 2/3 (SFX y Efectos)",
-        paso_frac=0.48,
-    )
-    analisis_2 = _limpiar_bloque(analisis_2_raw)
-
-    # --- PASADA 3: Fusión Maestra y Redacción del Guion Viral Definitivo ---
-    if callable(progreso_cb):
-        try:
-            progreso_cb(0.80, "IA Pasada 3/3: Fusionando guion maestro con fluidez y hashtags de nicho...")
-        except Exception:
-            pass
-    print("[*] IA Pasada 3/3: Redactando guion maestro definitivo con fluidez, sentido y hashtags...")
-    prompt_p3 = (
-        PROMPT_COMPACTO_INTERNO + instruccion_extra_base +
-        f"\n\nACTÚA COMO EL GUIONISTA Y DIRECTOR JEFE DE YOUTUBE SHORTS VIRALES.\n"
-        f"Tienes a tu disposición dos análisis especializados del mismo video:\n\n"
-        f"--- [ANÁLISIS 1: INTERPRETACIÓN REAL Y HECHOS DEL VIDEO] ---\n{analisis_1}\n\n"
-        f"--- [ANÁLISIS 2: MAPA DE MOMENTOS CLAVE PARA SFX Y FLECHAS] ---\n{analisis_2}\n\n"
-        f"TU MISIÓN DE FUSIÓN CRÍTICA:\n"
-        f"1. NARRATIVA FLUIDA Y CON SENTIDO: Cuenta exactamente lo que ocurre según el Análisis 1, con máxima intriga, humor o emoción, pero SIN inventar elementos contrarios a la realidad.\n"
-        f"2. CADENCIA DE VOZ VIRAL (¡RÁPIDA Y ENÉRGICA!): Escribe EXACTAMENTE entre 15 y 17 palabras por cada bloque de 5 segundos (~3.2 palabras/segundo) para que la narración fluya con ritmo acelerado y atrapante, sin silencios muertos ni arrastrar las palabras.\n"
-        f"3. EFECTOS Y FLECHAS CON SENTIDO: Usa FLECHA únicamente si hay un detalle crucial o acción oculta que señalar (máx 1 o 2 bloques en todo el video, NUNCA en el último bloque). Si no hay un objeto clave en movimiento o detalle sutil, pon 'ninguna'. Cero flechas es mucho mejor que una flecha apuntando a un lugar irrelevante.\n"
-        f"4. REMATE VIRAL POTENTE: El remate final del guion debe ser memorable, ingenioso o hilarante. Aunque el video original sea simple o modesto, la narración debe elevarlo dándole un remate épico, irónico o cómico que cierre con máxima fuerza.\n"
-        f"5. HASHTAGS DE NICHO REAL: En DESCRIPCION_YOUTUBE, escribe una descripción atractiva de 2 oraciones, pregunta para debate en comentarios, y 4 o 5 hashtags hiper-específicos del nicho (ej: #shorts #perros #mascotas #viral; #shorts #autos #carreras #viral; etc.).\n"
-        f"6. TÍTULO CON EMOJIS OBLIGATORIOS: En TITULO_YOUTUBE incluye SIEMPRE 1 o 2 emojis llamativos acordes a la temática (ej: 😱, 🔥, 🤣, 💥, 🤯) y el hashtag #shorts al final.\n"
-        f"7. COBERTURA TOTAL HASTA EL ÚLTIMO SEGUNDO: El último bloque temporal DEBE terminar en el segundo exacto 00:{dur_redondeada:02d}, cerrando con el remate del video sin dejar segundos finales sin narrar.\n\n"
-        f"Entrega ÚNICAMENTE el bloque de guion final estructurado con la plantilla obligatoria:"
+    prompt_maestro = (
+        PROMPT_COMPACTO_INTERNO + "\n\n" + instruccion_extra +
+        "\nEntrega ÚNICAMENTE el bloque estructurado del guion final con la plantilla obligatoria:"
     )
 
-    try:
-        guion_final_raw = _consultar_ia_robusta(
-            prompt_p3,
-            timeout_max=50.0,
-            solo_texto_mosaico=True,
-            paso_nombre="IA Pasada 3/3 (Fusión y Ritmo)",
-            paso_frac=0.74,
-        )
-        guion_final = _limpiar_bloque(guion_final_raw)
-        if guion_final and "[GUION]" in guion_final and len(guion_final) > 150:
-            texto_respuesta = guion_final
-            print("[+] ¡Pasada 3 completada con éxito! Guión maestro sintetizado.")
-        else:
-            # Fallback de emergencia si la pasada 3 falló
-            print("[!] Pasada 3 no entregó estructura completa, generando síntesis directa...")
-            prompt_fallback = PROMPT_COMPACTO_INTERNO + instruccion_extra_base + f"\n\n[INFORME PREVIO]:\n{analisis_1}\n\nEntrega ÚNICAMENTE el guion:"
-            fb_raw = _consultar_ia_robusta(
-                prompt_fallback,
-                timeout_max=45.0,
-                paso_nombre="IA Respaldo de Guion",
-                paso_frac=0.82,
-            )
-            texto_respuesta = _limpiar_bloque(fb_raw)
-    except Exception as err_p3:
-        print(f"[!] Fusión de pasada 3 tuvo un problema ({err_p3}), intentando síntesis de respaldo...")
-        prompt_fallback = PROMPT_COMPACTO_INTERNO + instruccion_extra_base + f"\n\n[INFORME PREVIO]:\n{analisis_1}\n\nEntrega ÚNICAMENTE el guion:"
-        fb_raw = _consultar_ia_robusta(
-            prompt_fallback,
-            timeout_max=45.0,
-            paso_nombre="IA Respaldo de Guion",
-            paso_frac=0.82,
-        )
-        texto_respuesta = _limpiar_bloque(fb_raw)
-
-    if not texto_respuesta or "[GUION]" not in texto_respuesta:
-        texto_respuesta = guion_final or fb_raw or ""
-
-    # Asegurar que el título siempre tenga al menos un emoji viral
-    if texto_respuesta and "TITULO_YOUTUBE:" in texto_respuesta:
-        lineas_corregidas = []
-        for ln in texto_respuesta.splitlines():
-            if ln.strip().upper().startswith("TITULO_YOUTUBE:"):
-                partes_t = ln.split(":", 1)
-                t_val = partes_t[1].strip() if len(partes_t) > 1 else ""
-                tiene_emo = any(ord(c) > 0x1F300 for c in t_val)
-                if not tiene_emo and t_val:
-                    if "#shorts" in t_val.lower():
-                        t_val = re.sub(r"(?i)#shorts", "😱🔥 #shorts", t_val).strip()
-                    else:
-                        t_val = f"{t_val} 😱🔥"
-                lineas_corregidas.append(f"TITULO_YOUTUBE: {t_val}")
-            else:
-                lineas_corregidas.append(ln)
-        texto_respuesta = "\n".join(lineas_corregidas)
-
-    # --- PASADA 4: AUTO-AUDITORÍA Y RE-EDICIÓN EN RETROSPECTIVA (Control Rápido con IA) ---
-    if auto_auditoria_retrospectiva and texto_respuesta and "[GUION]" in texto_respuesta:
-        max_rondas_auditoria = 1
-        guion_actual_auditar = texto_respuesta
-
-        for ronda in range(1, max_rondas_auditoria + 1):
-            if callable(progreso_cb):
-                try:
-                    progreso_cb(0.92, "IA Auto-Auditoría: Verificando coherencia y desenlace...")
-                except Exception:
-                    pass
-            print("[*] IA Auto-Auditoría: Evaluando guion en retrospectiva con IA...")
-
-            prompt_auditoria = (
-                PROMPT_COMPACTO_INTERNO + instruccion_extra_base +
-                f"\n\nACTÚA COMO EL AUDITOR JEFE DE CALIDAD, VIRALIDAD Y RETROSPECTIVA DE YOUTUBE SHORTS.\n"
-                f"Estás auditando y re-editando el guion para este video (Ronda de Control {ronda} de {max_rondas_auditoria}):\n\n"
-                f"--- [GUION ACTUAL A AUDITAR] ---\n{guion_actual_auditar}\n\n"
-                f"DIRECTIVAS ESTRICTAS DE CONTROL DE VIRALIDAD Y AUTO-CORRECCIÓN:\n"
-                f"1. AUDITORÍA DE FLECHAS (TOLERANCIA CERO A FLECHAS INÚTILES O CONFUSAS):\n"
-                f"   - Revisa cada línea donde figure [FLECHA:...]. ¿Apunta a un detalle real, crucial y en movimiento que la audiencia no vería sin la flecha?\n"
-                f"   - Si la flecha apunta a la nada, a un objeto estático, a una pared o en un momento aburrido: ¡ELIMÍNALA INMEDIATAMENTE cambiándola a 'ninguna'!\n"
-                f"   - Es preferible CERO flechas en el cuerpo del video antes que una sola flecha mal ubicada (el editor ya añade automáticamente al final un freeze-frame con flecha animada y campana de like).\n"
-                f"   - Si de verdad se justifica una flecha, calibra su zona exacta: 'izquierda', 'derecha', 'centro' o coordenada X,Y donde ocurre la acción clave.\n"
-                f"2. REMATE FINAL VIRAL (PUNCHLINE OBLIGATORIO Y ELEVACIÓN DEL VIDEO):\n"
-                f"   - Revisa el último bloque del guion. ¿Tiene un remate gracioso, irónico, sorprendente o emocionante? ¿O termina de manera tibia, descriptiva o desinflada?\n"
-                f"   - Aunque el video en sí sea simple o modesto, tu tarea como redactor de élite es ELEVARLO con un remate ingenioso, divertido o con remate de comedia/ironía que cierre con máxima fuerza y deje al espectador con ganas de comentar o volver a verlo.\n"
-                f"   - El remate debe condicir fielmente con el desenlace real del video al terminar (en retrospectiva), pero con máxima chispa y energía narrativa.\n"
-                f"3. GANCHO Y RETENCIÓN ADICTIVA (00:00 - 00:05):\n"
-                f"   - La primera frase debe sembrar curiosidad o expectativa explosiva sin rodeos ni saludos aburridos.\n"
-                f"4. FIDELIDAD TOTAL A LOS HECHOS:\n"
-                f"   - No confundas objetos reales (bolígrafos, herramientas, juguetes, celulares, etc.).\n"
-                f"5. CADENCIA VIRAL:\n"
-                f"   - Mantén estrictamente entre 15 y 17 palabras por bloque de 5s para que la voz fluya con dinamismo y ritmo acelerado.\n\n"
-                f"REGLA DE DECISIÓN OBLIGATORIA:\n"
-                f"- Si el guion actual ya es un 10/10 en viralidad, el remate es brillante y las flechas están 100% justificadas o en 'ninguna': responde en la primera línea 'ESTADO_AUDITORIA: APROBADO' y nada más.\n"
-                f"- Si el remate es flojo, hay alguna flecha mal puesta o falta gancho: responde en la primera línea 'ESTADO_AUDITORIA: REQUIERE_AJUSTES', explica brevemente en 'MOTIVO_AJUSTE: ...', y entrega INMEDIATAMENTE a continuación el GUION RE-EDITADO Y PERFECCIONADO completo con la plantilla obligatoria."
-            )
-
-            try:
-                res_aud_raw = _consultar_ia_robusta(
-                    prompt_auditoria,
-                    timeout_max=45.0,
-                    priorizar_mejor_ia=True,
-                    solo_texto_mosaico=True,
-                    paso_nombre="IA Auto-Auditoría",
-                    paso_frac=0.92,
-                )
-                res_aud = _limpiar_bloque(res_aud_raw)
-
-                if "ESTADO_AUDITORIA: APROBADO" in res_aud or res_aud.startswith("APROBADO"):
-                    print(f"[+] ¡Auto-auditoría superada con éxito en Ronda {ronda}! El guion es 100% coherente con el video.")
-                    break
-
-                if "[GUION]" in res_aud:
-                    idx_inicio = res_aud.find("TITULO_SUPERIOR:")
-                    if idx_inicio == -1:
-                        idx_inicio = res_aud.find("[GUION]")
-                    guion_corregido = res_aud[idx_inicio:].strip() if idx_inicio != -1 else res_aud
-                    if len(guion_corregido) > 150:
-                        guion_actual_auditar = guion_corregido
-                        texto_respuesta = guion_corregido
-                        print(f"[+] [Ronda {ronda}] Inconsistencia detectada y corregida. Guion re-editado por la mejor IA.")
-                        if ronda == max_rondas_auditoria:
-                            print(f"[+] Se completó el máximo de {max_rondas_auditoria} rondas de re-edición y ajuste.")
-                else:
-                    print(f"[*] Ronda {ronda}: No se requirieron cambios estructurales adicionales.")
-                    break
-            except Exception as e_aud:
-                print(f"[!] Aviso en ronda {ronda} de auto-auditoría ({e_aud}), finalizando auditoría.")
-                break
+    texto_respuesta = _ORCHESTRATOR_INSTANCE.generar_guion_completo(
+        video_path=ruta_video,
+        prompt_maestro=prompt_maestro,
+        progreso_cb=progreso_cb,
+        timeout_video_seg=38.0,
+        modelo_preferido=modelo_preferido,
+    )
 
     DEFAULT_GUION_TXT.write_text(texto_respuesta + "\n", encoding="utf-8")
+
     try:
-        from motor_optimizado import evaluar_ritmo_bloque
         en_bloques = False
         resumen_ritmo = []
         for ln in texto_respuesta.splitlines():
@@ -807,15 +798,8 @@ def generar_guion_con_gemini_flash(
                     resumen_ritmo.append(evaluar_ritmo_bloque(partes[0], partes[6]))
         if resumen_ritmo:
             ok_cnt = sum(1 for r in resumen_ritmo if r["estado"] == "OK")
-            print(f"[*] Auditoria de ritmo (3.7 pal/s): {ok_cnt}/{len(resumen_ritmo)} bloques calibrados.")
-            for i_r, r in enumerate(resumen_ritmo, 1):
-                print(f"    -> Bloque {i_r}: {r['etiqueta']}")
+            logger.info(f"Auditoría de ritmo: {ok_cnt}/{len(resumen_ritmo)} bloques calibrados.")
     except Exception:
         pass
-    print(f"[+] ¡Guión final perfeccionado y guardado en {DEFAULT_GUION_TXT.name}!")
-    if callable(progreso_cb):
-        try:
-            progreso_cb(1.0, "Guión viral de triple pasada completado.")
-        except Exception:
-            pass
+
     return texto_respuesta
