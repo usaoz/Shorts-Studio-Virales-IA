@@ -2083,15 +2083,11 @@ def iniciar_aplicacion_gui() -> None:
         ).pack(fill="x", padx=4)
 
         aplicar_icono_ventana(win)
-
-        def _mostrar_ajustes():
-            win.update_idletasks()
-            win.deiconify()
-            win.lift()
-            win.focus_force()
-            win.grab_set()
-
-        win.after(1, _mostrar_ajustes)
+        win.update_idletasks()
+        win.deiconify()
+        win.lift()
+        win.focus_force()
+        win.grab_set()
 
     def finalizar_app_completamente() -> None:
         try:
