@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Optional, Set, Tuple
 from .config import (
     DEFAULT_GUION_TXT, DEFAULT_VIDEO_INPUT,
-    ConfigGuion, SegmentoVideoGuion,
+    ConfigGuion, SegmentoVideoGuion, parsear_altura_subtitulos,
     MODO_ENCUADRE_DEFAULT, EDGE_VOICE_DEFAULT, VOCES_DISPONIBLES,
     VOLUMEN_AUDIO_VIDEO_ORIGINAL, VOLUMEN_MUSICA_FONDO,
     DURACION_CALLOUTS_DEFAULT
@@ -52,6 +52,17 @@ def _parsear_tiempo_a_segundos(t_str: str) -> Optional[float]:
         return float(t_str.replace(",", "."))
     except ValueError:
         return None
+
+
+def _es_campo_altura(val: str) -> bool:
+    v = str(val).strip().lower()
+    if not v:
+        return False
+    if v in ("arriba", "medio", "centro", "abajo", "muy_abajo", "fondo", "auto", "default"):
+        return True
+    if re.match(r"^(y:)?\d{1,4}%?$", v):
+        return True
+    return False
 
 
 def _normalizar_efecto(efecto_raw: Optional[str]) -> str:
@@ -360,6 +371,7 @@ def cargar_guion_video(ruta_guion: Path) -> ConfigGuion:
 
     # Formato de texto estructurado separado por '|'
     en_guion = False
+    tiene_col_altura = False
     for linea in contenido.splitlines():
         limpia = linea.strip()
         if not limpia or limpia.startswith("#") or limpia.startswith("//"):
@@ -433,6 +445,8 @@ def cargar_guion_video(ruta_guion: Path) -> ConfigGuion:
 
         partes = [p.strip() for p in limpia.split("|")]
         if len(partes) >= 2 and _quitar_acentos(partes[0].upper()) in ("TIEMPO", "TIEMPOS", "TIME"):
+            if any("ALTURA" in p.upper() or "Y_TEXTO" in p.upper() for p in partes):
+                tiene_col_altura = True
             continue
 
         t_ini, t_fin = None, None
@@ -458,6 +472,23 @@ def cargar_guion_video(ruta_guion: Path) -> ConfigGuion:
             sfx_lista = _normalizar_sfx_lista(sfx_str)
             emoji, pos_emoji = _normalizar_emoji(emoji_str)
             flecha, _ = _normalizar_objetivo(flecha_str)
+        altura_str = "70%"
+        if len(partes) >= 8 and (tiene_col_altura or _es_campo_altura(partes[6])):
+            # FORMATO DE 8 COLUMNAS (CON ALTURA DE SUBTÍTULOS):
+            # TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | ALTURA | TEXTO
+            rango_t, efecto_str, sfx_str, emoji_str, flecha_str, circulo_str, altura_str = partes[:7]
+            texto_voz = " | ".join(partes[7:]).strip()
+            if "-" in rango_t and rango_t.lower() != "-":
+                t1, t2 = rango_t.split("-", 1)
+                t_ini = _parsear_tiempo_a_segundos(t1)
+                t_fin = _parsear_tiempo_a_segundos(t2)
+            efecto = _normalizar_efecto(efecto_str)
+            sfx_lista = _normalizar_sfx_lista(sfx_str)
+            emoji, pos_emoji = _normalizar_emoji(emoji_str)
+            flecha, _ = _normalizar_objetivo(flecha_str)
+            circulo, tam_circulo = _normalizar_objetivo(circulo_str)
+            if circulo == "si" and not flecha:
+                circulo = None
         elif len(partes) >= 7:
             # FORMATO OFICIAL DE 7 COLUMNAS:
             # TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
@@ -506,6 +537,7 @@ def cargar_guion_video(ruta_guion: Path) -> ConfigGuion:
         elif circulo == "si":
             circulo = "auto"
 
+        y_sub_seg = parsear_altura_subtitulos(altura_str)
         if texto_voz:
             config.segmentos.append(
                 SegmentoVideoGuion(
@@ -520,6 +552,7 @@ def cargar_guion_video(ruta_guion: Path) -> ConfigGuion:
                     flecha=flecha,
                     circulo=circulo,
                     tamano_circulo=tam_circulo,
+                    y_subtitulos=y_sub_seg,
                 )
             )
 

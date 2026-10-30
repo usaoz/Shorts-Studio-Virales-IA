@@ -4598,12 +4598,7 @@ def iniciar_aplicacion_gui() -> None:
         )
         lbl_estado.pack(side="left")
 
-        lbl_ritmo = ctk.CTkLabel(
-            hdr_inner, text="",
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            text_color=GREEN_ACCENT,
-        )
-        lbl_ritmo.pack(side="right")
+
 
         # Selector interactivo de Canción / Música de Fondo
         pistas_disponibles = ["Auto", "Sin Música"]
@@ -4678,7 +4673,7 @@ def iniciar_aplicacion_gui() -> None:
                 except Exception:
                     pass
 
-        def _overlay_pos_en_reproductor(x_pct, y_pct, tipo, tam, rot) -> None:
+        def _overlay_pos_en_reproductor(x_pct, y_pct, tipo, tam, rot, alt_pct=None) -> None:
             if x_pct == "seek":
                 try:
                     _seek_en_reproductor(float(y_pct))
@@ -4686,36 +4681,52 @@ def iniciar_aplicacion_gui() -> None:
                     pass
                 return
             canvas_video.delete("overlay_pos")
-            if x_pct is None or y_pct is None or not tipo or tipo == "ninguno":
+            if (x_pct is None and alt_pct is None) or (not tipo and alt_pct is None):
                 return
             try:
-                px = (float(x_pct) / 100.0) * 270.0
-                py = (float(y_pct) / 100.0) * 480.0
-                r_px = 22 if tam == "chico" else (32 if tam == "medio" else 44)
+                # 1. Indicador en vivo de altura de texto / subtítulos
+                if alt_pct is not None:
+                    try:
+                        v_alt = float(alt_pct)
+                        sub_y = (v_alt / 100.0) * 480.0
+                        canvas_video.create_line(0, sub_y, 270, sub_y, fill="#10b981", dash=(4, 3), width=1.5, tags="overlay_pos")
+                        bw, bh = 190, 22
+                        bx0 = (270 - bw) // 2
+                        by0 = sub_y - (bh // 2)
+                        canvas_video.create_rectangle(bx0 - 1, by0 - 1, bx0 + bw + 1, by0 + bh + 1, fill="#000000", outline="#10b981", width=1.5, tags="overlay_pos")
+                        canvas_video.create_rectangle(bx0, by0, bx0 + bw, by0 + bh, fill="#071824", outline="", tags="overlay_pos")
+                        canvas_video.create_text(135, sub_y, text=f"💬 Subtítulos ({v_alt:.0f}%)", fill="#38bdf8", font=("Segoe UI", 8, "bold"), tags="overlay_pos")
+                    except Exception:
+                        pass
 
-                if tipo in ("circulo", "ambos"):
-                    canvas_video.create_oval(px - r_px - 2, py - r_px - 2, px + r_px + 2, py + r_px + 2, outline="#000000", width=5, tags="overlay_pos")
-                    canvas_video.create_oval(px - r_px, py - r_px, px + r_px, py + r_px, outline="#ef4444", width=3, tags="overlay_pos")
-                    canvas_video.create_line(px - 8, py, px + 8, py, fill="#000000", width=3, tags="overlay_pos")
-                    canvas_video.create_line(px - 8, py, px + 8, py, fill="#38bdf8", width=1.5, tags="overlay_pos")
-                    canvas_video.create_line(px, py - 8, px, py + 8, fill="#000000", width=3, tags="overlay_pos")
-                    canvas_video.create_line(px, py - 8, px, py + 8, fill="#38bdf8", width=1.5, tags="overlay_pos")
-                    canvas_video.create_oval(px - 3, py - 3, px + 3, py + 3, fill="#38bdf8", outline="#000000", width=1, tags="overlay_pos")
+                if x_pct is not None and y_pct is not None and tipo not in (None, "", "ninguno", "altura_only"):
+                    px = (float(x_pct) / 100.0) * 270.0
+                    py = (float(y_pct) / 100.0) * 480.0
+                    r_px = 22 if tam == "chico" else (32 if tam == "medio" else 44)
 
-                if tipo in ("flecha", "ambos"):
-                    rad = math.radians(float(rot))
-                    dist_flecha = 60
-                    fx0 = px + dist_flecha * math.cos(rad)
-                    fy0 = py + dist_flecha * math.sin(rad)
-                    gap_c = (r_px + 4) if tipo == "ambos" else 0
-                    tip_x = px + gap_c * math.cos(rad)
-                    tip_y = py + gap_c * math.sin(rad)
+                    if tipo in ("circulo", "ambos"):
+                        canvas_video.create_oval(px - r_px - 2, py - r_px - 2, px + r_px + 2, py + r_px + 2, outline="#000000", width=5, tags="overlay_pos")
+                        canvas_video.create_oval(px - r_px, py - r_px, px + r_px, py + r_px, outline="#ef4444", width=3, tags="overlay_pos")
+                        canvas_video.create_line(px - 8, py, px + 8, py, fill="#000000", width=3, tags="overlay_pos")
+                        canvas_video.create_line(px - 8, py, px + 8, py, fill="#38bdf8", width=1.5, tags="overlay_pos")
+                        canvas_video.create_line(px, py - 8, px, py + 8, fill="#000000", width=3, tags="overlay_pos")
+                        canvas_video.create_line(px, py - 8, px, py + 8, fill="#38bdf8", width=1.5, tags="overlay_pos")
+                        canvas_video.create_oval(px - 3, py - 3, px + 3, py + 3, fill="#38bdf8", outline="#000000", width=1, tags="overlay_pos")
 
-                    canvas_video.create_line(fx0, fy0, tip_x, tip_y, fill="#000000", width=7, arrow=tk.LAST, arrowshape=(18, 20, 8), tags="overlay_pos")
-                    canvas_video.create_line(fx0, fy0, tip_x, tip_y, fill="#f59e0b", width=3.5, arrow=tk.LAST, arrowshape=(15, 17, 6), tags="overlay_pos")
-                    canvas_video.create_oval(tip_x - 5, tip_y - 5, tip_x + 5, tip_y + 5, outline="#000000", width=3, tags="overlay_pos")
-                    canvas_video.create_oval(tip_x - 5, tip_y - 5, tip_x + 5, tip_y + 5, outline="#38bdf8", width=1.5, tags="overlay_pos")
-                    canvas_video.create_oval(tip_x - 2, tip_y - 2, tip_x + 2, tip_y + 2, fill="#38bdf8", outline="", tags="overlay_pos")
+                    if tipo in ("flecha", "ambos"):
+                        rad = math.radians(float(rot))
+                        dist_flecha = 60
+                        fx0 = px + dist_flecha * math.cos(rad)
+                        fy0 = py + dist_flecha * math.sin(rad)
+                        gap_c = (r_px + 4) if tipo == "ambos" else 0
+                        tip_x = px + gap_c * math.cos(rad)
+                        tip_y = py + gap_c * math.sin(rad)
+
+                        canvas_video.create_line(fx0, fy0, tip_x, tip_y, fill="#000000", width=7, arrow=tk.LAST, arrowshape=(18, 20, 8), tags="overlay_pos")
+                        canvas_video.create_line(fx0, fy0, tip_x, tip_y, fill="#f59e0b", width=3.5, arrow=tk.LAST, arrowshape=(15, 17, 6), tags="overlay_pos")
+                        canvas_video.create_oval(tip_x - 5, tip_y - 5, tip_x + 5, tip_y + 5, outline="#000000", width=3, tags="overlay_pos")
+                        canvas_video.create_oval(tip_x - 5, tip_y - 5, tip_x + 5, tip_y + 5, outline="#38bdf8", width=1.5, tags="overlay_pos")
+                        canvas_video.create_oval(tip_x - 2, tip_y - 2, tip_x + 2, tip_y + 2, fill="#38bdf8", outline="", tags="overlay_pos")
 
                 canvas_video.tag_raise("overlay_pos")
             except Exception:
@@ -4732,22 +4743,7 @@ def iniciar_aplicacion_gui() -> None:
             try:
                 txt_guion_raw = ruta_guion.read_text(encoding="utf-8", errors="replace")
                 txt_guion_box.insert("1.0", txt_guion_raw)
-                en_g = False
-                res_r = []
-                for ln_g in txt_guion_raw.splitlines():
-                    if "[GUION]" in ln_g:
-                        en_g = True
-                        continue
-                    if en_g and "|" in ln_g:
-                        partes_g = [x.strip() for x in ln_g.split("|")]
-                        if len(partes_g) >= 7 and "-" in partes_g[0] and ":" in partes_g[0]:
-                            res_r.append(evaluar_ritmo_bloque(partes_g[0], partes_g[6]))
-                if res_r:
-                    ok_c = sum(1 for r in res_r if r["estado"] == "OK")
-                    lbl_ritmo.configure(
-                        text=f"Ritmo {ok_c}/{len(res_r)} OK",
-                        text_color=GREEN_ACCENT if ok_c == len(res_r) else "#facc15",
-                    )
+
                 tono_leido = txt_guion_box.metadatos_ocultos.get("TONO_VIDEO", "").strip()
                 if tono_leido:
                     if tono_leido.lower() in ("sin_musica", "sin musica", "ninguna", "ninguno", "none"):

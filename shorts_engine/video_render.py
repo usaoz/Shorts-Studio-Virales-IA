@@ -1739,12 +1739,13 @@ async def editar_video_con_guion(
                     )
 
                     # 4) Subtítulos dinámicos ultra llamativos con resplandor neón y pulso reactivo a la voz
+                    y_centro_seg = getattr(seg, "y_subtitulos", 1340) or 1340
                     renderizar_subtitulos_luminosos(
                         lienzo=lienzo,
                         palabras=palabras_sub,
                         t_actual=t_seg,
                         nivel_voz_rms=rms_val,
-                        y_centro=1340,
+                        y_centro=y_centro_seg,
                         palabras_verdes_extra=config.palabras_verdes_extra,
                         palabras_rojas_extra=config.palabras_rojas_extra,
                         palabras_cian_extra=config.palabras_cian_extra,

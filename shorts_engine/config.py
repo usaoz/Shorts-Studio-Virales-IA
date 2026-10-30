@@ -123,6 +123,7 @@ class SegmentoVideoGuion:
     tiene_foto: bool = False
     emoji_nombre: Optional[str] = None
     foto_nombre: Optional[str] = None
+    y_subtitulos: int = 1340
 
     def __post_init__(self) -> None:
         if self.flecha:
@@ -179,6 +180,33 @@ class ObjetivoCirculoIA:
     t_ancla: Optional[float] = None
     etiqueta: str = ""
     formato_legacy: str = "ninguno"
+
+def parsear_altura_subtitulos(altura_val: Any) -> int:
+    """Convierte un valor de altura (ej: '70%', '1340', 'arriba', 'medio', 'abajo') a píxeles Y sobre 1920."""
+    if not altura_val:
+        return 1340
+    raw = str(altura_val).strip().lower()
+    if not raw or raw in ("default", "auto", "normal", "estandar", "estándar", "-"):
+        return 1340
+    if "arriba" in raw or "top" in raw:
+        return 576  # 30%
+    if "medio" in raw or "centro" in raw or "center" in raw:
+        return 960  # 50%
+    if "muy_abajo" in raw or "fondo" in raw:
+        return 1574  # 82%
+    if "abajo" in raw or "bottom" in raw:
+        return 1340  # 70%
+
+    m = re.search(r"(\d+(?:\.\d+)?)", raw)
+    if m:
+        num = float(m.group(1))
+        if "%" in raw or num <= 100.0:
+            y_px = int(round((num / 100.0) * 1920.0))
+        else:
+            y_px = int(round(num))
+        return max(240, min(1740, y_px))
+    return 1340
+
 
 def parsear_directiva_circulo(
     texto_columna_circulo: str,

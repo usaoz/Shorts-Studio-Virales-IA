@@ -112,9 +112,9 @@ def abrir_dialogo_posicion_pantalla(
     from PIL import Image, ImageTk
 
     win_p = ctk.CTkToplevel(parent_win)
-    win_p.title("🎯 Posicionar Círculo y Flechas en Pantalla")
-    win_p.geometry("380x790")
-    win_p.minsize(360, 740)
+    win_p.title("🎯 Posicionar Círculo, Flechas y Altura de Texto")
+    win_p.geometry("390x860")
+    win_p.minsize(360, 780)
     win_p.resizable(False, True)
     win_p.configure(fg_color="#0e111a")
     win_p.transient(parent_win)
@@ -134,6 +134,25 @@ def abrir_dialogo_posicion_pantalla(
     tam_var = ctk.StringVar(value="medio")
     track_var = ctk.BooleanVar(value=True)
     rot_var = ctk.DoubleVar(value=315.0)
+
+    # Altura inicial de subtítulos (por defecto 70%)
+    alt_raw = str(datos_bloque.get("altura", "70%")).strip().lower()
+    alt_val = 70.0
+    if "arriba" in alt_raw:
+        alt_val = 30.0
+    elif "medio" in alt_raw or "centro" in alt_raw:
+        alt_val = 50.0
+    elif "muy_abajo" in alt_raw or "fondo" in alt_raw:
+        alt_val = 82.0
+    elif "abajo" in alt_raw:
+        alt_val = 70.0
+    else:
+        m_a = re.search(r"(\d+(?:\.\d+)?)", alt_raw)
+        if m_a:
+            v_n = float(m_a.group(1))
+            alt_val = (v_n / 1920.0 * 100.0) if v_n > 100.0 else v_n
+    alt_val = max(15.0, min(85.0, alt_val))
+    altura_var = ctk.DoubleVar(value=alt_val)
 
     c_ini = str(datos_bloque.get("circulo", "")).strip()
     f_ini = str(datos_bloque.get("flecha", "")).strip()
@@ -236,6 +255,27 @@ def abrir_dialogo_posicion_pantalla(
         canvas.create_line(0, CH * 0.33, CW, CH * 0.33, fill=dash_col, dash=(2, 3))
         canvas.create_line(0, CH * 0.66, CW, CH * 0.66, fill=dash_col, dash=(2, 3))
 
+        # 3. Guía visual y caja de subtítulos a la altura elegida
+        alt_pct = altura_var.get()
+        lbl_alt_val.configure(text=f"📏 Altura Subtítulos (Y): {alt_pct:.0f}%")
+        sub_y = (alt_pct / 100.0) * CH
+
+        canvas.create_line(0, sub_y, CW, sub_y, fill="#10b981", dash=(4, 3), width=1.5)
+
+        snippet = str(datos_bloque.get("texto", "")).strip()
+        if len(snippet) > 26:
+            snippet = snippet[:24] + "..."
+        if not snippet:
+            snippet = f"Subtítulos ({alt_pct:.0f}%)"
+
+        bw, bh = 210, 24
+        bx0 = (CW - bw) // 2
+        by0 = sub_y - (bh // 2)
+        canvas.create_rectangle(bx0 - 1, by0 - 1, bx0 + bw + 1, by0 + bh + 1, fill="#000000", outline="#10b981", width=1.5)
+        canvas.create_rectangle(bx0, by0, bx0 + bw, by0 + bh, fill="#0a1926", outline="")
+        canvas.create_text(CW // 2, sub_y, text=f"💬 {snippet}", fill="#38bdf8", font=("Segoe UI", 8, "bold"))
+
+        # 4. Círculo y Flecha
         px = (pos_x / 100.0) * CW
         py = (pos_y / 100.0) * CH
 
@@ -243,18 +283,15 @@ def abrir_dialogo_posicion_pantalla(
         tam = tam_var.get()
         r_px = 22 if tam == "chico" else (32 if tam == "medio" else 44)
 
-        # 3. Círculo con doble trazo (alto contraste)
         if t in ("circulo", "ambos"):
             canvas.create_oval(px - r_px - 2, py - r_px - 2, px + r_px + 2, py + r_px + 2, outline="#000000", width=5)
             canvas.create_oval(px - r_px, py - r_px, px + r_px, py + r_px, outline="#ef4444", width=3)
-            # Cruz central y diana
             canvas.create_line(px - 8, py, px + 8, py, fill="#000000", width=3)
             canvas.create_line(px - 8, py, px + 8, py, fill="#38bdf8", width=1.5)
             canvas.create_line(px, py - 8, px, py + 8, fill="#000000", width=3)
             canvas.create_line(px, py - 8, px, py + 8, fill="#38bdf8", width=1.5)
             canvas.create_oval(px - 3, py - 3, px + 3, py + 3, fill="#38bdf8", outline="#000000", width=1)
 
-        # 4. Flecha con doble trazo y diana en la punta
         if t in ("flecha", "ambos"):
             rad = math.radians(rot_var.get())
             dist_flecha = 60
@@ -264,12 +301,8 @@ def abrir_dialogo_posicion_pantalla(
             tip_x = px + gap_c * math.cos(rad)
             tip_y = py + gap_c * math.sin(rad)
 
-            # Sombra negra
             canvas.create_line(fx0, fy0, tip_x, tip_y, fill="#000000", width=7, arrow=tk.LAST, arrowshape=(18, 20, 8))
-            # Flecha dorada
             canvas.create_line(fx0, fy0, tip_x, tip_y, fill="#f59e0b", width=3.5, arrow=tk.LAST, arrowshape=(15, 17, 6))
-
-            # Diana en la punta exacta a señalar
             canvas.create_oval(tip_x - 5, tip_y - 5, tip_x + 5, tip_y + 5, outline="#000000", width=3)
             canvas.create_oval(tip_x - 5, tip_y - 5, tip_x + 5, tip_y + 5, outline="#38bdf8", width=1.5)
             canvas.create_oval(tip_x - 2, tip_y - 2, tip_x + 2, tip_y + 2, fill="#38bdf8", outline="")
@@ -285,10 +318,9 @@ def abrir_dialogo_posicion_pantalla(
 
         lbl_rot_val.configure(text=f"🔄 Ángulo Flecha: {rot_var.get():.0f}°")
 
-        # Reflejo en vivo sobre el reproductor
         if on_preview_live is not None:
             try:
-                on_preview_live(pos_x, pos_y, t, tam, rot_var.get())
+                on_preview_live(pos_x, pos_y, t, tam, rot_var.get(), alt_pct)
             except Exception:
                 pass
 
@@ -302,7 +334,7 @@ def abrir_dialogo_posicion_pantalla(
     canvas.bind("<B1-Motion>", _on_canvas_click)
 
     f_ctrls = ctk.CTkFrame(win_p, fg_color="transparent")
-    f_ctrls.pack(fill="x", padx=16, pady=(6, 4))
+    f_ctrls.pack(fill="x", padx=16, pady=(4, 2))
 
     tipo_seg_ini = "⭕ Círculo" if tipo_var.get() == "circulo" else ("↗️ Flecha" if tipo_var.get() == "flecha" else ("⭕+↗️ Ambos" if tipo_var.get() == "ambos" else "❌ Ninguno"))
     ctk.CTkSegmentedButton(
@@ -313,7 +345,7 @@ def abrir_dialogo_posicion_pantalla(
     ).pack(fill="x", pady=2)
 
     row_opt = ctk.CTkFrame(f_ctrls, fg_color="transparent")
-    row_opt.pack(fill="x", pady=3)
+    row_opt.pack(fill="x", pady=2)
 
     ctk.CTkOptionMenu(
         row_opt, values=["chico", "medio", "grande"], variable=tam_var,
@@ -326,7 +358,7 @@ def abrir_dialogo_posicion_pantalla(
     ).pack(side="left")
 
     f_rot = ctk.CTkFrame(f_ctrls, fg_color="transparent")
-    f_rot.pack(fill="x", pady=(2, 4))
+    f_rot.pack(fill="x", pady=(2, 2))
 
     lbl_rot_val = ctk.CTkLabel(
         f_rot, text=f"🔄 Ángulo Flecha: {rot_var.get():.0f}°",
@@ -338,23 +370,48 @@ def abrir_dialogo_posicion_pantalla(
         f_rot, from_=0.0, to=360.0, number_of_steps=72, variable=rot_var,
         command=lambda _: _redibujar(), height=14, progress_color="#f59e0b", button_color="#f59e0b"
     )
-    slider_rot.pack(fill="x", pady=2)
+    slider_rot.pack(fill="x", pady=1)
 
     row_presets_rot = ctk.CTkFrame(f_rot, fg_color="transparent")
     row_presets_rot.pack(fill="x")
     for nom_btn, deg_val in [("↖", 315.0), ("↑", 270.0), ("↗", 225.0), ("→", 180.0), ("↘", 135.0), ("↓", 90.0), ("↙", 45.0), ("←", 0.0)]:
         ctk.CTkButton(
-            row_presets_rot, text=nom_btn, width=28, height=22, corner_radius=5,
+            row_presets_rot, text=nom_btn, width=28, height=20, corner_radius=5,
             fg_color="#1e2436", hover_color="#2d354d", font=ctk.CTkFont(size=10, weight="bold"),
             command=lambda d=deg_val: (rot_var.set(d), slider_rot.set(d), _redibujar())
         ).pack(side="left", padx=1)
+
+    # Control de Altura de Subtítulos
+    f_alt = ctk.CTkFrame(f_ctrls, fg_color="transparent")
+    f_alt.pack(fill="x", pady=(4, 2))
+
+    lbl_alt_val = ctk.CTkLabel(
+        f_alt, text=f"📏 Altura Subtítulos (Y): {altura_var.get():.0f}%",
+        font=ctk.CTkFont(size=11, weight="bold"), text_color="#10b981"
+    )
+    lbl_alt_val.pack(anchor="w")
+
+    slider_alt = ctk.CTkSlider(
+        f_alt, from_=15.0, to=85.0, number_of_steps=70, variable=altura_var,
+        command=lambda _: _redibujar(), height=14, progress_color="#10b981", button_color="#10b981"
+    )
+    slider_alt.pack(fill="x", pady=1)
+
+    row_presets_alt = ctk.CTkFrame(f_alt, fg_color="transparent")
+    row_presets_alt.pack(fill="x")
+    for nom_btn, alt_p in [("Arriba (30%)", 30.0), ("Medio (50%)", 50.0), ("Abajo (70%)", 70.0), ("Fondo (82%)", 82.0)]:
+        ctk.CTkButton(
+            row_presets_alt, text=nom_btn, height=22, corner_radius=5,
+            fg_color="#1e2436", hover_color="#2d354d", font=ctk.CTkFont(size=10, weight="bold"),
+            command=lambda v=alt_p: (altura_var.set(v), slider_alt.set(v), _redibujar())
+        ).pack(side="left", padx=2, expand=True, fill="x")
 
     _redibujar()
 
     def _al_cerrar():
         if on_preview_live is not None:
             try:
-                on_preview_live(None, None, "", "", 0)
+                on_preview_live(None, None, "", "", 0, None)
             except Exception:
                 pass
         win_p.destroy()
@@ -367,13 +424,14 @@ def abrir_dialogo_posicion_pantalla(
         rot_val = int(round(rot_var.get())) % 360
         res_circulo = f"{pref}{pos_x:.1f},{pos_y:.1f}:{tam}" if t in ("circulo", "ambos") else "ninguno"
         res_flecha = f"{pref}{pos_x:.1f},{pos_y:.1f}@{rot_val}" if t in ("flecha", "ambos") else "ninguna"
-        on_aplicar(res_circulo, res_flecha)
+        res_altura = f"{int(round(altura_var.get()))}%"
+        on_aplicar(res_circulo, res_flecha, res_altura)
         _al_cerrar()
 
     win_p.protocol("WM_DELETE_WINDOW", _al_cerrar)
 
     ctk.CTkButton(
-        win_p, text="Aplicar Posición", command=_guardar_y_cerrar,
+        win_p, text="Aplicar Posición y Altura", command=_guardar_y_cerrar,
         corner_radius=10, height=32, fg_color="#10b981", hover_color="#059669",
         text_color="#052e16", font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold")
     ).pack(fill="x", padx=16, pady=(4, 10))
@@ -453,11 +511,7 @@ class BloqueGuionCard(ctk.CTkFrame):
         )
         self.lbl_duracion.pack(side="left", padx=(6, 4))
 
-        self.lbl_semaforo = ctk.CTkLabel(
-            top_frame, text="", font=ctk.CTkFont(size=11, weight="bold"),
-            fg_color="#1E3A2F", corner_radius=6, padx=8, pady=2
-        )
-        self.lbl_semaforo.pack(side="left", padx=4)
+
 
         # Botones de acción a la derecha
         btn_del = ctk.CTkButton(
@@ -573,7 +627,7 @@ class BloqueGuionCard(ctk.CTkFrame):
 
         btn_pos = ctk.CTkButton(
             row_assets_2,
-            text="🎯 Posicionar Círculo / Flecha (Pantalla)",
+            text="🎯 Posicionar en Pantalla (Clic/Arrastrar)",
             command=self._abrir_selector_posicion,
             height=28,
             fg_color="#1d4ed8",
@@ -590,6 +644,57 @@ class BloqueGuionCard(ctk.CTkFrame):
         )
         self.lbl_pos_status.pack(side="left", padx=4)
 
+        # Fila 3: Editor de altura del texto / subtítulos para esta sección
+        row_alt = ctk.CTkFrame(self.assets_frame, fg_color="transparent")
+        row_alt.pack(fill="x", pady=(3, 2))
+
+        alt_val_ini = 70.0
+        m_a = re.search(r"(\d+(?:\.\d+)?)", str(self.datos.get("altura", "70%")))
+        if m_a:
+            v_a = float(m_a.group(1))
+            alt_val_ini = (v_a / 1920.0 * 100.0) if v_a > 100.0 else v_a
+        alt_val_ini = max(15.0, min(85.0, alt_val_ini))
+        self.altura_card_var = ctk.DoubleVar(value=alt_val_ini)
+
+        self.lbl_alt_card = ctk.CTkLabel(
+            row_alt,
+            text=f"📏 Altura Texto: {alt_val_ini:.0f}%",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color="#10b981",
+        )
+        self.lbl_alt_card.pack(side="left", padx=(4, 6))
+
+        def _on_slider_alt_change(val: float):
+            alt_int = int(round(val))
+            self.datos["altura"] = f"{alt_int}%"
+            self.lbl_alt_card.configure(text=f"📏 Altura Texto: {alt_int}%")
+            self.on_change()
+            if self.on_preview_live is not None:
+                try:
+                    self.on_preview_live(None, None, "altura_only", None, None, alt_int)
+                except Exception:
+                    pass
+
+        slider_alt_card = ctk.CTkSlider(
+            row_alt,
+            from_=15.0, to=85.0, number_of_steps=70,
+            variable=self.altura_card_var,
+            command=_on_slider_alt_change,
+            width=120, height=14,
+            progress_color="#10b981", button_color="#10b981"
+        )
+        slider_alt_card.pack(side="left", padx=(0, 6))
+
+        for nom_p, v_p in [("Arriba (30%)", 30.0), ("Medio (50%)", 50.0), ("Abajo (70%)", 70.0)]:
+            def _preset_click(v=v_p):
+                self.altura_card_var.set(v)
+                _on_slider_alt_change(v)
+            ctk.CTkButton(
+                row_alt, text=nom_p, width=74, height=22, corner_radius=5,
+                fg_color="#1e2436", hover_color="#2d354d", font=ctk.CTkFont(size=10, weight="bold"),
+                command=_preset_click
+            ).pack(side="left", padx=2)
+
     def _generar_texto_badge_pos(self) -> str:
         c = str(self.datos.get("circulo", "")).strip()
         f = str(self.datos.get("flecha", "")).strip()
@@ -604,9 +709,16 @@ class BloqueGuionCard(ctk.CTkFrame):
         return "Sin señalar"
 
     def _abrir_selector_posicion(self):
-        def _on_aplicar(c_val, f_val):
+        def _on_aplicar(c_val, f_val, a_val):
             self.datos["circulo"] = c_val
             self.datos["flecha"] = f_val
+            self.datos["altura"] = a_val
+            if hasattr(self, "altura_card_var"):
+                m_a = re.search(r"(\d+(?:\.\d+)?)", str(a_val))
+                if m_a:
+                    self.altura_card_var.set(float(m_a.group(1)))
+            if hasattr(self, "lbl_alt_card") and self.lbl_alt_card.winfo_exists():
+                self.lbl_alt_card.configure(text=f"📏 Altura Texto: {a_val}")
             if hasattr(self, "lbl_pos_status") and self.lbl_pos_status.winfo_exists():
                 self.lbl_pos_status.configure(text=self._generar_texto_badge_pos())
             self.on_change()
@@ -689,23 +801,6 @@ class BloqueGuionCard(ctk.CTkFrame):
     def _actualizar_semaforo_palabras(self):
         dur = max(0.5, self.datos["t_fin"] - self.datos["t_ini"])
         self.lbl_duracion.configure(text=f"({dur:.1f}s)")
-
-        palabras = [p for p in self.entry_texto.get().strip().split() if p]
-        n_pal = len(palabras)
-        min_p = max(1, int(round(dur * 3.4)))
-        max_p = int(round(dur * 4.0))
-
-        if n_pal < min_p:
-            txt = f"⚠️ {n_pal}/{min_p}-{max_p} pal (Corto)"
-            bg = "#5C4818"
-        elif n_pal > max_p:
-            txt = f"🚨 {n_pal}/{min_p}-{max_p} pal (Largo)"
-            bg = "#63222A"
-        else:
-            txt = f"✅ {n_pal}/{min_p}-{max_p} pal (Ritmo OK)"
-            bg = "#1D4D38"
-
-        self.lbl_semaforo.configure(text=txt, fg_color=bg)
 
     def _sincronizar_estado(self):
         self._guardar_valores_assets_a_datos()
@@ -855,8 +950,13 @@ class VisualScriptEditor(ctk.CTkFrame):
             if l_strip.upper().startswith("TIEMPO") or "|" not in l_strip:
                 continue
 
-            partes = [p.strip() for p in l_strip.split("|", 6)]
-            if len(partes) >= 7:
+            partes = [p.strip() for p in l_strip.split("|")]
+            # Soporta 8 columnas (con ALTURA) o 7 columnas (compatibilidad)
+            def _es_alt(s: str) -> bool:
+                s_c = s.strip().lower()
+                return s_c in ("arriba", "medio", "centro", "abajo", "muy_abajo", "fondo") or bool(re.match(r"^(y:)?\d{1,4}%?$", s_c))
+
+            if len(partes) >= 8 and _es_alt(partes[6]):
                 rango_t = partes[0].split("-")
                 t_ini = mmss_a_seg(rango_t[0]) if len(rango_t) > 0 else 0.0
                 t_fin = mmss_a_seg(rango_t[1]) if len(rango_t) > 1 else t_ini + 4.0
@@ -870,7 +970,25 @@ class VisualScriptEditor(ctk.CTkFrame):
                     "emoji": partes[3],
                     "flecha": partes[4],
                     "circulo": partes[5],
-                    "texto": partes[6]
+                    "altura": partes[6],
+                    "texto": " | ".join(partes[7:]).strip()
+                })
+            elif len(partes) >= 7:
+                rango_t = partes[0].split("-")
+                t_ini = mmss_a_seg(rango_t[0]) if len(rango_t) > 0 else 0.0
+                t_fin = mmss_a_seg(rango_t[1]) if len(rango_t) > 1 else t_ini + 4.0
+                if t_fin <= t_ini:
+                    t_fin = t_ini + 4.0
+                self.bloques.append({
+                    "t_ini": t_ini,
+                    "t_fin": t_fin,
+                    "efecto": partes[1],
+                    "sfx": partes[2],
+                    "emoji": partes[3],
+                    "flecha": partes[4],
+                    "circulo": partes[5],
+                    "altura": "70%",
+                    "texto": " | ".join(partes[6:]).strip()
                 })
 
         # Mostrar el título real viral de YouTube
@@ -916,13 +1034,14 @@ class VisualScriptEditor(ctk.CTkFrame):
 
         lineas.append("")
         lineas.append("[GUION]")
-        lineas.append("TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO")
+        lineas.append("TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | ALTURA | TEXTO")
 
         for b in self.bloques:
             t_str = f"{seg_a_mmss(b['t_ini'])} - {seg_a_mmss(b['t_fin'])}"
+            alt_val = b.get("altura", "70%") or "70%"
             fila = (
                 f"{t_str} | {b['efecto']} | {b['sfx']} | "
-                f"{b['emoji']} | {b['flecha']} | {b['circulo']} | {b['texto']}"
+                f"{b['emoji']} | {b['flecha']} | {b['circulo']} | {alt_val} | {b['texto']}"
             )
             lineas.append(fila)
 
