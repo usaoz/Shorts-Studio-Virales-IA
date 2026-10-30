@@ -1,6 +1,6 @@
-TITULO_SUPERIOR: Pihu_Vision_Negro
-TITULO_YOUTUBE: ¡Perdió la visión a colores por esta extraña razón! 🐶👀 #shorts
-DESCRIPCION_YOUTUBE: Una niña pierde repentinamente la capacidad de ver colores y su perro intenta curarla de la forma más asquerosa posible. ¿Crees que funcionó la medicina perruna? #shorts #viral
+TITULO_SUPERIOR: school_outside_window
+TITULO_YOUTUBE: Vivía tan cerca del colegio que pasaba esto 😱 #shorts
+DESCRIPCION_YOUTUBE: Este estudiante encontró la forma más absurda de ir a la escuela todos los días. ¿Habrías hecho lo mismo en su lugar? #shorts #viral
 ESTADO_PUBLICACION: privado
 SCHEDULE: 2026-10-30 13:00
 PARA_NINOS: no
@@ -9,9 +9,11 @@ TONO_VIDEO: fondo
 ARCHIVO_SALIDA: auto
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:04 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | ¿Por qué de repente toda la visión de esta niña se volvió completamente en blanco y negro?
-00:04 - 00:08 | blanco_negro | suspense_hit | ojos:izquierda | ninguna | ninguno | Ni los animales ni su papá tienen color, ¡todo se transformó en una película antigua!
-00:08 - 00:13 | ninguno | riser_suction | calavera:centro | ninguna | box:[300,300,700,700]@00:10:espejo | Se lava el rostro en el espejo pero nada funciona, su cerebro decidió cancelar la suscripción al color.
-00:13 - 00:17 | flash | kids_yeyy | fiesta:derecha | ninguna | ninguno | ¡Pero a la mañana siguiente ocurre un milagro y el mundo recupera sus tonos vivos!
-00:17 - 00:22 | brillo_epico | good_idea | risa:derecha | ninguna | ninguno | El perro asegura ser un médico cirujano porque le estuvo lamiendo los ojos toda la noche.
-00:22 - 00:28 | temblor | fart+xp_Error | diablo:centro | ninguna | ninguno | Siente tanto asco que corre al baño a desinfectarse la cara, prefiriendo quedarse ciega antes que volver a ver...
+00:00 - 00:04 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | ¡Este alumno sale disparado hacia el colegio pero su llegada será totalmente inesperada!
+00:04 - 00:08 | alerta_roja | riser_suction | diablo:izquierda | izquierda | ninguno | El profesor se pone estricto y le exige que saque su cuaderno inmediatamente.
+00:08 - 00:13 | temblor | punch+xp_Error | risa:derecha | derecha | ninguno | ¡Ay no! ¡Se da cuenta de que olvidó su libreta y debe regresar corriendo a buscarla!
+00:13 - 00:17 | zoom_in | click | enojo:centro | ninguna | ninguno | El maestro furioso le ordena que traiga a su mamá para reclamarle su terrible despiste.
+00:17 - 00:22 | blanco_negro | vine_boom | risa:izquierda | ninguna | ninguno | ¡Menuda sorpresa se lleva el profesor al descubrir que la casa está justo al lado!
+00:22 - 00:26 | zoom_impacto | whoosh | cerebro:derecha | ninguna | ninguno | Ya en clase el wifi no funciona bien y la conexión resulta verdaderamente desesperante.
+00:26 - 00:30 | flash | ding | fuego:derecha | ninguna | ninguno | ¡Qué casualidad! El internet del aula se conecta misteriosamente con la red de su casa.
+00:30 - 00:35 | brillo_epico | cash_ting+party_horn | fiesta:derecha | centro | ninguno | Mientras el profesor se esfuerza explicando, este genio de la vagancia prefiere dormir plácidamente.

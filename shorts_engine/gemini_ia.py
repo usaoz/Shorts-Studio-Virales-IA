@@ -476,6 +476,57 @@ class GeminiPoolOrchestrator:
         vivas = [idx for idx, ok, _ in sorted(results, key=lambda x: x[2]) if ok]
         return vivas
 
+    def auditar_modelos_en_vivo(self) -> List[Dict[str, Any]]:
+        """
+        Prueba cada modelo en paralelo sobre todas las cuentas sin aplicar cooldowns previos,
+        para entregar un diagnóstico en tiempo real de disponibilidad y cuota.
+        """
+        self.cooldown_until.clear()
+        self.unsupported_pairs.clear()
+
+        modelos_test = [
+            ("gemini-4-argon", "Argon 4", "Máxima calidad"),
+            ("gemini-3.8-flash", "Gemini 3.8 Flash", "Razonamiento top"),
+            ("gemini-3.6-flash", "Gemini 3.6 Flash", "Alta calidad (20/día)"),
+            ("gemini-3.5-flash-lite", "Gemini 3.5 Flash Lite", "Cuota amplia"),
+        ]
+
+        resultados = []
+        total_k = len(self.api_keys)
+
+        for m_id, m_nombre, m_desc in modelos_test:
+            vivas = self.fast_probe_accounts(m_id)
+            n_vivas = len(vivas)
+            if n_vivas == total_k and total_k > 0:
+                est = f"{n_vivas}/{total_k} cuentas listas · Disponible (<1s)"
+                color = "#10b981"
+                icono = "🟢"
+            elif n_vivas > 0:
+                est = f"{n_vivas}/{total_k} cuentas listas · Disponible con rotación"
+                color = "#facc15"
+                icono = "🟡"
+            elif any((k, m_id) in self.unsupported_pairs for k in range(total_k)):
+                est = "Requiere facturación paga en AI Studio"
+                color = "#94a3b8"
+                icono = "⚪"
+            else:
+                est = "Sin cuota diaria (429) · Esperando reinicio de Google"
+                color = "#f87171"
+                icono = "🔴"
+
+            resultados.append({
+                "id": m_id,
+                "nombre": m_nombre,
+                "desc": m_desc,
+                "vivas": n_vivas,
+                "total": total_k,
+                "estado_str": est,
+                "color": color,
+                "icono": icono,
+            })
+
+        return resultados
+
     def generar_guion_completo(
         self,
         video_path: Path,
@@ -742,6 +793,15 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
 00:04 - 00:08 | alerta_roja | riser_suction | diablo:izquierda | izquierda | ninguno | [12 a 15 palabras aumentando intriga]
 00:08 - 00:13 | temblor | punch+xp_Error | risa:derecha | derecha | ninguno | [15 a 18 palabras narrando el clímax con máxima energía]
 00:13 - 00:17 | brillo_epico | cash_ting+party_horn | fiesta:derecha | centro | ninguno | [12 a 15 palabras conectando en loop con el inicio]"""
+
+
+def auditar_estado_pool_en_vivo() -> List[Dict[str, Any]]:
+    """Función pública para verificar el estado de cuotas de todos los modelos en vivo."""
+    keys = obtener_gemini_api_keys()
+    if not keys:
+        return []
+    orch = GeminiPoolOrchestrator(api_keys=keys)
+    return orch.auditar_modelos_en_vivo()
 
 
 def generar_guion_con_gemini_flash(
