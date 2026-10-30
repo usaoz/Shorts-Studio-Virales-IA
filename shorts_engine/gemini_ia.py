@@ -690,19 +690,82 @@ class GeminiPoolOrchestrator:
         modelos_ordenados = [m for m in modelos_ordenados if "2.5" not in m]
 
         total_cuentas = len(self.api_keys)
-        errores_503_video = 0
         ultimo_err = None
+
+        # ── FASE 1: Probar todas las cuentas y modelos del pool con el video completo ──
+        if video_part is not None:
+            for idx_m, model in enumerate(modelos_ordenados):
+                if cancelar_check and cancelar_check():
+                    raise InterruptedError("Generación de guion cancelada por el usuario.")
+                nom_mod = NOMBRES_UI.get(model, model)
+                _notif(0.12 + (idx_m * 0.05), f"Comprobando disponibilidad en {nom_mod} ({total_cuentas} cuentas)...")
+
+                cuentas_vivas = self.fast_probe_accounts(model)
+                if not cuentas_vivas:
+                    continue
+
+                for key_idx in cuentas_vivas:
+                    if cancelar_check and cancelar_check():
+                        raise InterruptedError("Generación de guion cancelada por el usuario.")
+                    client = self.clients[key_idx]
+                    etiqueta_cuenta = f"Cuenta API {key_idx + 1}" + (f" de {total_cuentas}" if total_cuentas > 1 else "")
+
+                    try:
+                        _notif(0.30, f"Analizando video con {nom_mod} ({etiqueta_cuenta})...")
+                        contenido = [video_part, prompt_maestro]
+                        http_timeout = int(timeout_video_seg * 1000)
+
+                        response = _llamar_gemini_cancelable(
+                            lambda: client.models.generate_content(
+                                model=model,
+                                contents=contenido,
+                                config=types.GenerateContentConfig(
+                                    temperature=0.35,
+                                    http_options=types.HttpOptions(timeout=http_timeout),
+                                ),
+                            ),
+                            cancelar_check=cancelar_check,
+                        )
+
+                        if response and response.text and len(response.text.strip()) > 80:
+                            _notif(0.85, f"Validando cadencia y catálogo de efectos ({nom_mod})...")
+                            guion_limpio, advertencias = sanitizar_y_auditar_guion(response.text, dur_seg)
+
+                            if len(advertencias) >= 2:
+                                guion_limpio = self._reparar_conteo_palabras(client, model, guion_limpio, advertencias)
+
+                            _notif(1.0, f"✔ Guion completado con {nom_mod} ({etiqueta_cuenta}).")
+                            return guion_limpio
+
+                    except InterruptedError:
+                        raise
+                    except APIError as e:
+                        code = getattr(e, "code", 500) or 500
+                        self._mark_error(key_idx, model, code)
+                        ultimo_err = e
+                        _notif(0.35, f"{nom_mod} ({etiqueta_cuenta}) saturado o con cuota agotada ({code}). Probando otra cuenta...")
+                        continue
+                    except Exception as e:
+                        ultimo_err = e
+                        _notif(0.35, f"{nom_mod} no respondió en {etiqueta_cuenta}. Probando siguiente cuenta...")
+                        continue
+
+        # ── FASE 2: Si ninguna API se bancó el video completo, conmutar a Mosaico ──
+        _notif(0.40, "APIs saturadas con video completo. Conmutando a Mosaico...")
+        if mosaico_part is None:
+            _notif(0.42, "Generando Mosaico JPEG para análisis ágil...")
+            jpg_bytes, _ = generar_mosaico_video(video_path)
+            mosaico_part = types.Part.from_bytes(data=jpg_bytes, mime_type="image/jpeg")
+
+        nota_mosaico = "\n[NOTA: Se adjunta mosaico cronológico del video con segundo exacto estampado]."
+        contenido_mosaico = [mosaico_part, prompt_maestro + nota_mosaico]
 
         for idx_m, model in enumerate(modelos_ordenados):
             if cancelar_check and cancelar_check():
                 raise InterruptedError("Generación de guion cancelada por el usuario.")
             nom_mod = NOMBRES_UI.get(model, model)
-            _notif(0.12 + (idx_m * 0.05), f"Verificando cuotas para {nom_mod} ({total_cuentas} cuentas)...")
-
-            # 1. Probing paralelo ultrarrápido (<800ms)
             cuentas_vivas = self.fast_probe_accounts(model)
             if not cuentas_vivas:
-                _notif(0.15 + (idx_m * 0.05), f"{nom_mod} sin cuota/disponibilidad. Probando siguiente...")
                 continue
 
             for key_idx in cuentas_vivas:
@@ -710,46 +773,29 @@ class GeminiPoolOrchestrator:
                     raise InterruptedError("Generación de guion cancelada por el usuario.")
                 client = self.clients[key_idx]
                 etiqueta_cuenta = f"Cuenta API {key_idx + 1}" + (f" de {total_cuentas}" if total_cuentas > 1 else "")
-                usar_mosaico = (video_part is None) or (errores_503_video >= 2)
 
                 try:
-                    t_start = time.perf_counter()
-                    if not usar_mosaico:
-                        _notif(0.30, f"Analizando video con {nom_mod} ({etiqueta_cuenta})...")
-                        contenido = [video_part, prompt_maestro]
-                        http_timeout = int(timeout_video_seg * 1000)
-                    else:
-                        if mosaico_part is None:
-                            _notif(0.35, "Generando Mosaico JPEG para análisis ágil...")
-                            jpg_bytes, _ = generar_mosaico_video(video_path)
-                            mosaico_part = types.Part.from_bytes(data=jpg_bytes, mime_type="image/jpeg")
-                        _notif(0.40, f"Analizando storyboard con {nom_mod} ({etiqueta_cuenta})...")
-                        nota_mosaico = "\n[NOTA: Se adjunta mosaico cronológico del video con segundo exacto estampado]."
-                        contenido = [mosaico_part, prompt_maestro + nota_mosaico]
-                        http_timeout = 25000
-
+                    _notif(0.50, f"Analizando storyboard con {nom_mod} ({etiqueta_cuenta})...")
                     response = _llamar_gemini_cancelable(
                         lambda: client.models.generate_content(
                             model=model,
-                            contents=contenido,
+                            contents=contenido_mosaico,
                             config=types.GenerateContentConfig(
                                 temperature=0.35,
-                                http_options=types.HttpOptions(timeout=http_timeout),
+                                http_options=types.HttpOptions(timeout=25000),
                             ),
                         ),
                         cancelar_check=cancelar_check,
                     )
 
                     if response and response.text and len(response.text.strip()) > 80:
-                        elapsed = time.perf_counter() - t_start
                         _notif(0.85, f"Validando cadencia y catálogo de efectos ({nom_mod})...")
                         guion_limpio, advertencias = sanitizar_y_auditar_guion(response.text, dur_seg)
 
-                        # Auto-reparación ligera determinista si hay líneas fuera de ritmo (1.5s solo texto)
                         if len(advertencias) >= 2:
                             guion_limpio = self._reparar_conteo_palabras(client, model, guion_limpio, advertencias)
 
-                        _notif(1.0, f"✔ Guion completado con {nom_mod} ({etiqueta_cuenta}) en {elapsed:.1f}s.")
+                        _notif(1.0, f"✔ Guion completado vía Mosaico con {nom_mod} ({etiqueta_cuenta}).")
                         return guion_limpio
 
                 except InterruptedError:
@@ -758,37 +804,9 @@ class GeminiPoolOrchestrator:
                     code = getattr(e, "code", 500) or 500
                     self._mark_error(key_idx, model, code)
                     ultimo_err = e
-
-                    if code in (500, 503, 504) and not usar_mosaico:
-                        errores_503_video += 1
-                        _notif(0.45, f"{nom_mod} saturado (503). Conmutando a Mosaico ({etiqueta_cuenta})...")
-                        try:
-                            if mosaico_part is None:
-                                jpg_bytes, _ = generar_mosaico_video(video_path)
-                                mosaico_part = types.Part.from_bytes(data=jpg_bytes, mime_type="image/jpeg")
-                            resp_fb = _llamar_gemini_cancelable(
-                                lambda: client.models.generate_content(
-                                    model=model,
-                                    contents=[mosaico_part, prompt_maestro],
-                                    config=types.GenerateContentConfig(temperature=0.35),
-                                ),
-                                cancelar_check=cancelar_check,
-                            )
-                            if resp_fb and resp_fb.text and len(resp_fb.text.strip()) > 80:
-                                guion_limpio, _ = sanitizar_y_auditar_guion(resp_fb.text, dur_seg)
-                                _notif(1.0, f"✔ Guion completado vía Mosaico con {nom_mod} ({etiqueta_cuenta}).")
-                                return guion_limpio
-                        except InterruptedError:
-                            raise
-                        except Exception as ex_m:
-                            ultimo_err = ex_m
                     continue
-
                 except Exception as e:
                     ultimo_err = e
-                    if not usar_mosaico:
-                        errores_503_video += 1
-                    _notif(0.35, f"{nom_mod} no respondió en {etiqueta_cuenta}. Rotando...")
                     continue
 
         det_err = str(ultimo_err) if ultimo_err else "Sin respuesta"

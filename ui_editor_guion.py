@@ -97,6 +97,13 @@ def abrir_dialogo_posicion_pantalla(parent_win, datos_bloque: Dict, on_aplicar: 
     pos_x = 50.0
     pos_y = 45.0
 
+    if f_ini and f_ini not in ("ninguna", "ninguno") and (not c_ini or c_ini in ("ninguno", "ninguna")):
+        tipo_var.set("flecha")
+    elif f_ini and f_ini not in ("ninguna", "ninguno") and c_ini and c_ini not in ("ninguno", "ninguna"):
+        tipo_var.set("ambos")
+    else:
+        tipo_var.set("circulo")
+
     m_c = re.search(r"(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)", c_ini or f_ini)
     if m_c:
         pos_x = float(m_c.group(1))
@@ -105,7 +112,7 @@ def abrir_dialogo_posicion_pantalla(parent_win, datos_bloque: Dict, on_aplicar: 
         tam_var.set("chico")
     elif ":grande" in c_ini:
         tam_var.set("grande")
-    if "fijo:" in c_ini or "static:" in c_ini or "fijo:" in f_ini:
+    if "fijo:" in c_ini or "static:" in c_ini or "fijo:" in f_ini or "static:" in f_ini:
         track_var.set(False)
 
     lbl_coord = ctk.CTkLabel(
@@ -159,9 +166,10 @@ def abrir_dialogo_posicion_pantalla(parent_win, datos_bloque: Dict, on_aplicar: 
     f_ctrls = ctk.CTkFrame(win_p, fg_color="transparent")
     f_ctrls.pack(fill="x", padx=18, pady=(8, 4))
 
+    tipo_seg_ini = "⭕ Círculo" if tipo_var.get() == "circulo" else ("↗️ Flecha" if tipo_var.get() == "flecha" else "⭕+↗️ Ambos")
     ctk.CTkSegmentedButton(
         f_ctrls, values=["⭕ Círculo", "↗️ Flecha", "⭕+↗️ Ambos"],
-        variable=ctk.StringVar(value="⭕ Círculo"),
+        variable=ctk.StringVar(value=tipo_seg_ini),
         command=lambda v: (tipo_var.set("circulo" if "Círculo" in v else ("flecha" if "Flecha" in v else "ambos")), _redibujar()),
         height=26, corner_radius=8, font=ctk.CTkFont(size=11, weight="bold")
     ).pack(fill="x", pady=2)
@@ -294,6 +302,18 @@ class BloqueGuionCard(ctk.CTkFrame):
         )
         btn_up.pack(side="right", padx=2)
 
+        btn_pos_rapido = ctk.CTkButton(
+            top_frame,
+            text="🎯 Posicionar",
+            width=88,
+            height=24,
+            fg_color="#1d4ed8",
+            hover_color="#1e40af",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            command=self._abrir_selector_posicion,
+        )
+        btn_pos_rapido.pack(side="right", padx=(2, 4))
+
         self.btn_toggle_card_assets = ctk.CTkButton(
             top_frame,
             text="▲ Ocultar" if self.mostrar_assets else "🎛️ Assets",
@@ -304,7 +324,7 @@ class BloqueGuionCard(ctk.CTkFrame):
             font=ctk.CTkFont(size=11),
             command=self._toggle_assets_local
         )
-        self.btn_toggle_card_assets.pack(side="right", padx=4)
+        self.btn_toggle_card_assets.pack(side="right", padx=2)
 
         # ---------------- FILA 2: CONTENEDOR DE ASSETS (LAZY LOAD) ----------------
         if self.mostrar_assets:
@@ -350,7 +370,7 @@ class BloqueGuionCard(ctk.CTkFrame):
             pass
 
     def _asegurar_assets_frame(self):
-        """Instancia los 6 selectores solo cuando el usuario abre los assets."""
+        """Instancia los selectores organizados en 2 filas compactas para visibilidad total sin desborde."""
         if self._assets_creados:
             return
         self._assets_creados = True
@@ -358,8 +378,12 @@ class BloqueGuionCard(ctk.CTkFrame):
         self.assets_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.assets_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=4)
 
+        # Fila 1: Efecto, SFX 1, SFX 2, Emoji
+        row_assets_1 = ctk.CTkFrame(self.assets_frame, fg_color="transparent")
+        row_assets_1.pack(fill="x", pady=(0, 4))
+
         self.opt_efecto = self._crear_selector(
-            self.assets_frame, "🎥 Efecto", LISTA_EFECTOS, self.datos.get("efecto", "ninguno"), width=118
+            row_assets_1, "🎥 Efecto", LISTA_EFECTOS, self.datos.get("efecto", "ninguno"), width=118
         )
 
         sfx_partes = [s.strip() for s in str(self.datos.get("sfx", "")).split("+") if s.strip()]
@@ -367,51 +391,55 @@ class BloqueGuionCard(ctk.CTkFrame):
         sfx2_val = sfx_partes[1] if len(sfx_partes) >= 2 else "ninguno"
 
         self.opt_sfx1 = self._crear_selector(
-            self.assets_frame, "🔊 SFX 1", LISTA_SFX, sfx1_val, width=118
+            row_assets_1, "🔊 SFX 1", LISTA_SFX, sfx1_val, width=118
         )
         self.opt_sfx2 = self._crear_selector(
-            self.assets_frame, "🔊 SFX 2", LISTA_SFX, sfx2_val, width=118
+            row_assets_1, "🔊 SFX 2", LISTA_SFX, sfx2_val, width=118
         )
         self.opt_emoji = self._crear_selector(
-            self.assets_frame, "🎭 Emoji", LISTA_EMOJIS, self.datos.get("emoji", "ninguno"), width=130
-        )
-        self.opt_flecha = self._crear_selector(
-            self.assets_frame, "↗️ Flecha (9 Pos)", LISTA_FLECHAS, self.datos.get("flecha", "ninguna"), width=120
-        )
-        self.opt_circulo = self._crear_selector(
-            self.assets_frame, "⭕ Círculo (9 Pos)", LISTA_CIRCULOS, self.datos.get("circulo", "ninguno"), width=130
+            row_assets_1, "🎭 Emoji", LISTA_EMOJIS, self.datos.get("emoji", "ninguno"), width=130
         )
 
-        f_btn_pos = ctk.CTkFrame(self.assets_frame, fg_color="transparent")
-        f_btn_pos.pack(side="left", padx=(6, 2), pady=(14, 0))
+        # Fila 2: Flecha, Círculo y Botón Posicionar en Pantalla (Interact.)
+        row_assets_2 = ctk.CTkFrame(self.assets_frame, fg_color="transparent")
+        row_assets_2.pack(fill="x", pady=(0, 2))
+
+        self.opt_flecha = self._crear_selector(
+            row_assets_2, "↗️ Flecha (9 Pos)", LISTA_FLECHAS, self.datos.get("flecha", "ninguna"), width=120
+        )
+        self.opt_circulo = self._crear_selector(
+            row_assets_2, "⭕ Círculo (9 Pos)", LISTA_CIRCULOS, self.datos.get("circulo", "ninguno"), width=130
+        )
+
+        f_btn_pos = ctk.CTkFrame(row_assets_2, fg_color="transparent")
+        f_btn_pos.pack(side="left", padx=(12, 2), pady=(14, 0))
         btn_pos = ctk.CTkButton(
             f_btn_pos,
-            text="🎯 Posicionar",
+            text="🎯 Posicionar en Pantalla (Clic/Arrastrar)",
             command=self._abrir_selector_posicion,
-            width=110,
             height=26,
-            fg_color="#1e3a5f",
-            hover_color="#2b5387",
+            fg_color="#1d4ed8",
+            hover_color="#1e40af",
             font=ctk.CTkFont(size=11, weight="bold"),
         )
         btn_pos.pack()
 
     def _abrir_selector_posicion(self):
         def _on_aplicar(c_val, f_val):
-            if c_val != "ninguno":
-                self.datos["circulo"] = c_val
-                if hasattr(self, "opt_circulo"):
-                    val_c = list(self.opt_circulo.cget("values"))
-                    if c_val not in val_c:
-                        self.opt_circulo.configure(values=val_c + [c_val])
-                    self.opt_circulo.set(c_val)
-            if f_val != "ninguna":
-                self.datos["flecha"] = f_val
-                if hasattr(self, "opt_flecha"):
-                    val_f = list(self.opt_flecha.cget("values"))
-                    if f_val not in val_f:
-                        self.opt_flecha.configure(values=val_f + [f_val])
-                    self.opt_flecha.set(f_val)
+            self.datos["circulo"] = c_val
+            if hasattr(self, "opt_circulo"):
+                val_c = list(self.opt_circulo.cget("values"))
+                if c_val not in val_c:
+                    self.opt_circulo.configure(values=val_c + [c_val])
+                self.opt_circulo.set(c_val)
+
+            self.datos["flecha"] = f_val
+            if hasattr(self, "opt_flecha"):
+                val_f = list(self.opt_flecha.cget("values"))
+                if f_val not in val_f:
+                    self.opt_flecha.configure(values=val_f + [f_val])
+                self.opt_flecha.set(f_val)
+
             self.on_change()
 
         abrir_dialogo_posicion_pantalla(self.winfo_toplevel(), self.datos, _on_aplicar)

@@ -1736,7 +1736,7 @@ async def editar_video_con_guion(
             # 6. Renderizar Outro automático de 0.7 segundos (Freeze-Frame + Desenfoque + Flecha al Like + Subtítulo Luminoso)
             if ultimo_frame_lienzo is not None and total_frames_outro > 0:
                 _notificar_prog(0.97, "Renderizando outro dinámico (campana de like y flecha animada a 60 FPS)...")
-                print("[*] Renderizando Outro de 0.7 segundos (Freeze-frame + desenfoque + flecha al Like)...")
+                print("[*] Renderizando Outro final (Freeze-frame + desenfoque + flecha al Like)...")
                 if isinstance(ultimo_frame_lienzo, np.ndarray):
                     bg_blur = cv2.GaussianBlur(ultimo_frame_lienzo, (31, 31), 16)
                     lienzo_base_outro = cv2.multiply(bg_blur, 0.65).astype(np.uint8)
@@ -1866,7 +1866,7 @@ async def editar_video_con_guion(
         if encoder != "libx264":
             print(f"[!] Falló la GPU ({encoder}): {e}")
             print("[*] Reintentando renderizado automáticamente con Procesador CPU equilibrado (libx264 fast CRF 18)...")
-            _notificar_prog(0.40, "GPU sin memoria (posible juego abierto). Reintentando por CPU equilibrada...")
+            _notificar_prog(0.40, "GPU sin memoria suficiente. Reintentando por CPU equilibrada...")
             if ruta_mp4_final.exists():
                 try:
                     ruta_mp4_final.unlink()
