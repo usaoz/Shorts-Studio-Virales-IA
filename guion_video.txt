@@ -1,6 +1,6 @@
-TITULO_SUPERIOR: EscapeHamster
-TITULO_YOUTUBE: ¡LA ESCAPADA MÁS ÉPICA DEL HÁMSTER Y EL GATO! 🐭💥 #shorts
-DESCRIPCION_YOUTUBE: Un hámster toy desafía todos los obstáculos de una pista increíble para escapar de un gato malvado. ¿Logrará cruzar la meta sin ser atrapado? #shorts #viral
+TITULO_SUPERIOR: primer_dia_servicio_restaurante
+TITULO_YOUTUBE: ¡Su primer día atendiendo clientes terminó ASÍ! 😱🍜 #shorts
+DESCRIPCION_YOUTUBE: Tratar de atender a los clientes en tu primer día de trabajo nunca fue tan caótico. ¿Habrías logrado sobrevivir a esta jornada? #shorts #viral
 ESTADO_PUBLICACION: privado
 SCHEDULE: 2026-10-31 19:30
 PARA_NINOS: no
@@ -9,9 +9,9 @@ TONO_VIDEO: fondo
 ARCHIVO_SALIDA: auto
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:04 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | ¡Este gato cree que va a atrapar al pequeño hámster en este circuito peligroso!
-00:04 - 00:09 | zoom_in | whoosh | ojos:izquierda | ninguna | box:[610,340,770,560]@00:06:raton | ¡Pero mira con qué velocidad se desliza el ratón dejando a su perseguidor totalmente desorientado!
-00:09 - 00:14 | alerta_roja | riser_suction+cartoon_laugh | risa:derecha | ninguna | ninguno | ¡Miren cómo sube por el ascensor jirafa mientras el gato gordo no cabe por la puerta!
-00:14 - 00:19 | temblor | suspense_hit | diablo:izquierda | ninguna | ninguno | ¡El mono lo impulsa hacia abajo pero la verdadera trampa mortal recién está por comenzar aquí!
-00:19 - 00:23 | flash | punch+good_idea | sorprendido:centro | ninguna | ninguno | ¡El cocodrilo casi se lo traga, pero el elefante lo rescata milagrosamente justo a tiempo!
-00:23 - 00:26 | brillo_epico | cash_ting+party_horn | fiesta:derecha | ninguna | ninguno | ¡El hámster llega a su meta sano y salvo porque jamás...
+00:00 - 00:04 | zoom_impacto | crowd_shocked | sorprendido:centro | centro | ninguno | ¡Mira a este empleado intentando sobrevivir en su primer día de trabajo sin colapsar!
+00:04 - 00:09 | alerta_roja | riser_suction | risa:derecha | ninguna | ninguno | ¡Intenta llevar todos los pedidos con elegancia, pero parece que la física decidió renunciar hoy mismo!
+00:09 - 00:14 | temblor | vine_boom | diablo:izquierda | abajo | box:[700,750,900,920]@00:11:rampa | Pero afuera están armando un obstáculo ridículo que pone a prueba cualquier sentido común básico.
+00:14 - 00:19 | spotlight | ding | ojos:derecha | ninguna | ninguno | Fíjate cómo ajusta la madera en la calle con la precisión de un profesional distraído.
+00:19 - 00:24 | brillo_epico | good_idea | fiesta:derecha | ninguna | ninguno | La clienta llega sonriendo para ingresar al local sin imaginar la extraña bienvenida que recibirá.
+00:24 - 00:28 | zoom_in | suspense_hit | calavera:centro | ninguna | ninguno | ¡Y desde adentro observan atentos la escena justo en el preciso instante en que...!
