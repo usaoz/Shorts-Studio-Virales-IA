@@ -1,16 +1,19 @@
-TITULO_SUPERIOR: BromasEnFamilia_LimpiezaCara
-TITULO_YOUTUBE: ¡Creyó que la estaba LIMPIANDO! 😱 #shorts
-DESCRIPCION_YOUTUBE: Esta chica confió ciegamente en su hermano para que le limpie el rostro. ¡El resultado final te dejará en shock absoluto! ¿Tú también habrías caído en semejante trampa? #shorts #viral
+TITULO_SUPERIOR: Abuela_Receta_Error
+MODO_ENCUADRE: full
+VOLUMEN_VIDEO_ORIGINAL: 0
+ARCHIVO_SALIDA: auto
+TITULO_YOUTUBE: ¡Confundió las instrucciones y terminó sazonándola! 😂 #shorts
+DESCRIPCION_YOUTUBE: Esta chica entendió todo mal mientras le lavaba el cabello a su abuela. ¿Qué habrías hecho tú en su lugar? #shorts #viral
 ESTADO_PUBLICACION: privado
 SCHEDULE: 2026-10-31 11:30
 PARA_NINOS: no
-MODO_ENCUADRE: full
 TONO_VIDEO: fondo
-ARCHIVO_SALIDA: auto
+
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:04 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | ¡Este hermano prometió limpiarle la cara a su hermana, pero escondía una terrible trampa!
-00:04 - 00:09 | zoom_in | riser_suction | risa:derecha | izquierda | ninguno | Ella confía ciegamente en él, mientras el bromista le llena el otro cachete de pintura negra.
-00:09 - 00:15 | alerta_roja | vine_boom+cartoon_laugh | diablo:centro | arriba | box:[0,0,100,100]@00:11:cara | Con esa inocencia, es un verdadero milagro que haya sobrevivido hasta hoy sin sospechar jamás de la falsa bondad de su hermano.
-00:15 - 00:20 | temblor | punch+xp_Error | calavera:izquierda | derecha | ninguno | Le refriega la mano sobre toda la cara y se la deja completamente cubierta de color negro.
-00:20 - 00:25 | brillo_epico | cash_ting+party_horn | fiesta:centro | ninguna | ninguno | ¡Y ella sonríe súper feliz pensando que la dejaron reluciente, sin saber que este hermano...!
+00:00 - 00:04 | zoom_impacto | crowd_shocked | sorprendido:arriba_der | ninguna | box:[200,350,550,650]@00:02:abuela | ¡Esta chica está lavándole el cabello a su abuela utilizando salsa de soya pura!
+00:04 - 00:09 | zoom_in | vine_boom | ojos:derecha | ninguna | ninguno | La abuela pide más ingredientes por teléfono y ella no duda en echarle otra botella entera.
+00:09 - 00:15 | alerta_roja | riser_suction | diablo:izquierda | ninguno | ninguno | ¡Pero la locura no termina ahí! Ahora le agrega salsa picante como si su cabeza fuera un platillo gourmet.
+00:15 - 00:21.5 | temblor | error | cerebro:derecha | ninguna | ninguno | Sin dudarlo un segundo, la nieta le sigue llenando de ingredientes en la cabeza sin sospechar el terrible error que cometía.
+00:21.5 - 00:26.5 | flash | punch+xp_Error | risa:centro | ninguna | ninguno | Y para rematar este extraño tratamiento, agarra una cubeta llena de agua y se la vacía encima sin asco.
+00:26.5 - 00:32.5 | blanco_negro | record_scratch | calavera:centro | ninguna | ninguno | ¡La abuela le daba la receta de ramen a su hija y la nieta creyó que le estaba pidiendo un tratamiento capilar!
