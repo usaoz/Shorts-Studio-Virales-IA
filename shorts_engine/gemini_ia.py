@@ -491,9 +491,9 @@ class GeminiPoolOrchestrator:
 
         modelos_test = [
             ("gemini-4-argon", "Argon 4", "Argon"),
-            ("gemini-3.8-flash", "Gemini 3.8 Flash", "3.8 Flash"),
-            ("gemini-3.6-flash", "Gemini 3.6 Flash", "3.6 Flash"),
-            ("gemini-3.5-flash-lite", "Gemini 3.5 Flash Lite", "3.5 Lite"),
+            ("gemini-3.8-flash", "Gemini 3.8 Flash", "3.8"),
+            ("gemini-3.6-flash", "Gemini 3.6 Flash", "3.6"),
+            ("gemini-3.5-flash-lite", "Gemini 3.5 Flash Lite", "3.5"),
         ]
 
         resultados = []
@@ -502,11 +502,19 @@ class GeminiPoolOrchestrator:
         for m_id, m_nombre, m_corto in modelos_test:
             vivas = self.fast_probe_accounts(m_id)
             n_vivas = len(vivas)
+            mejor_lat = min((self.key_latency.get(idx, 999.0) for idx in vivas), default=999.0)
 
             es_tier_pago = (
                 any((k, m_id) in self.paid_tier_only for k in range(total_k))
                 or (m_id == "gemini-4-argon" and n_vivas == 0 and any((k, m_id) in self.unsupported_pairs for k in range(total_k)))
             )
+
+            # Regla de disponibilidad:
+            # - Cuota es VERDE: si al menos 1 cuenta tiene cuota suficiente para procesar videos -> VERDE.
+            # - NARANJA es únicamente por demora alta / cola del servidor de Google (lat >= 1.35s).
+            # - ROJO: Agotado (0 cuentas disponibles, todas 429).
+            # - PÚRPURA: Modelo que requiere facturación paga en AI Studio.
+            tiene_demora = n_vivas > 0 and (mejor_lat >= 1.35)
 
             if total_k == 0:
                 tipo = "sin_claves"
@@ -516,6 +524,7 @@ class GeminiPoolOrchestrator:
                 bg = "#182030"
                 pill_bg = "#243048"
                 txt_col = "#94a3b8"
+                label_box = m_corto
             elif es_tier_pago:
                 tipo = "tier_pago"
                 tag = "PLAN PAGO"
@@ -524,22 +533,25 @@ class GeminiPoolOrchestrator:
                 bg = "#16182e"
                 pill_bg = "#252849"
                 txt_col = "#a5b4fc"
-            elif n_vivas == total_k:
-                tipo = "disponible"
-                tag = "DISPONIBLE"
-                desc = f"{n_vivas}/{total_k} listas (<1s)"
-                borde = "#10b981"
-                bg = "#072419"
-                pill_bg = "#0c3827"
-                txt_col = "#34d399"
+                label_box = m_corto
             elif n_vivas > 0:
-                tipo = "mucho_trafico"
-                tag = "MUCHO TRÁFICO"
-                desc = f"{n_vivas}/{total_k} con rotación"
-                borde = "#f59e0b"
-                bg = "#281b09"
-                pill_bg = "#3d2b0e"
-                txt_col = "#fbbf24"
+                if tiene_demora:
+                    tipo = "con_demora"
+                    tag = "CON DEMORA"
+                    desc = f"{n_vivas}/{total_k} con demora ({mejor_lat:.1f}s)"
+                    borde = "#f59e0b"
+                    bg = "#281b09"
+                    pill_bg = "#3d2b0e"
+                    txt_col = "#fbbf24"
+                else:
+                    tipo = "disponible"
+                    tag = "DISPONIBLE"
+                    desc = f"{n_vivas}/{total_k} listas (<1s)"
+                    borde = "#10b981"
+                    bg = "#072419"
+                    pill_bg = "#0c3827"
+                    txt_col = "#34d399"
+                label_box = f"{m_corto} ({n_vivas}/{total_k})" if total_k > 1 else m_corto
             else:
                 tipo = "agotado"
                 tag = "AGOTADO"
@@ -548,11 +560,12 @@ class GeminiPoolOrchestrator:
                 bg = "#280d12"
                 pill_bg = "#3d161d"
                 txt_col = "#f87171"
+                label_box = f"{m_corto} (0/{total_k})" if total_k > 1 else m_corto
 
             resultados.append({
                 "id": m_id,
                 "nombre": m_nombre,
-                "nombre_corto": m_corto,
+                "nombre_corto": label_box,
                 "vivas": n_vivas,
                 "total": total_k,
                 "tipo": tipo,

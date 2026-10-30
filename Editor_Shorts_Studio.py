@@ -2051,7 +2051,7 @@ def iniciar_aplicacion_gui() -> None:
         def _mostrar_ayuda_cuotas():
             win_h = ctk.CTkToplevel(win)
             win_h.title("Guía de Colores y Cuotas")
-            win_h.geometry("520x330")
+            win_h.geometry("550x340")
             win_h.resizable(False, False)
             aplicar_icono_ventana(win_h)
             win_h.transient(win)
@@ -2059,8 +2059,8 @@ def iniciar_aplicacion_gui() -> None:
 
             try:
                 win_h.update_idletasks()
-                x = win.winfo_x() + (win.winfo_width() // 2) - 260
-                y = win.winfo_y() + (win.winfo_height() // 2) - 165
+                x = win.winfo_x() + (win.winfo_width() // 2) - 275
+                y = win.winfo_y() + (win.winfo_height() // 2) - 170
                 win_h.geometry(f"+{max(0, x)}+{max(0, y)}")
             except Exception:
                 pass
@@ -2076,10 +2076,10 @@ def iniciar_aplicacion_gui() -> None:
             ).pack(anchor="w", padx=16, pady=(12, 10))
 
             items = [
-                ("🟢 Verde (Disponible):", "Todas las cuentas vinculadas tienen cuota activa y responden de inmediato (<1s).", "#34d399"),
-                ("🟠 Naranja (Mucho tráfico):", "Cuentas en rotación activa o con demoras/cola en los servidores de Google.", "#fbbf24"),
-                ("🔴 Rojo (Agotado):", "Todas las cuentas vinculadas agotaron el cupo diario de solicitudes (429).", "#f87171"),
-                ("🟣 Púrpura (Plan Pago):", "Modelo que requiere plan con facturación en Google AI Studio (sin Free Tier).", "#a5b4fc"),
+                ("🟢 Verde (Disponible):", "Al menos 1 cuenta tiene cuota activa para videos (ej: 3.5 (4/4) o 3.8 (1/4)).", "#34d399"),
+                ("🟠 Naranja (Con demora):", "Hay cuota disponible pero Google presenta demora alta o congestión de servidores.", "#fbbf24"),
+                ("🔴 Rojo (Agotado):", "Todas las cuentas del pool agotaron el cupo diario de solicitudes (0/4 con 429).", "#f87171"),
+                ("🟣 Púrpura (Plan Pago):", "Modelo que requiere plan con facturación en Google AI Studio (sin cuota gratuita).", "#a5b4fc"),
             ]
             for tit, desc, col in items:
                 r = ctk.CTkFrame(f_c, fg_color="transparent")
