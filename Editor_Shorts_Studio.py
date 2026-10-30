@@ -2264,35 +2264,37 @@ def iniciar_aplicacion_gui() -> None:
         from shorts_engine.gemini_ia import obtener_modelos_plantilla
         _render_resultado_modelos(obtener_modelos_plantilla())
 
-        # 4. Carpetas Output y Assets
-        card_tools = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
-        card_tools.pack(fill="x", padx=24, pady=(0, 12))
-
-        grid_t = ctk.CTkFrame(card_tools, fg_color="transparent")
-        grid_t.pack(fill="x", padx=14, pady=(10, 10))
-        grid_t.grid_columnconfigure((0, 1), weight=1, uniform="tools")
+        # 4. Carpetas Output y Assets (estilo píldoras inferiores lado a lado)
+        row_pildoras_carpetas = ctk.CTkFrame(win, fg_color="transparent")
+        row_pildoras_carpetas.pack(fill="x", padx=24, pady=(0, 14))
 
         ctk.CTkButton(
-            grid_t,
+            row_pildoras_carpetas,
             text="Abrir Carpeta Assets",
             command=abrir_carpeta_assets,
             corner_radius=14,
-            height=36,
-            fg_color="#1e2436",
-            hover_color="#2d354d",
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-        ).grid(row=0, column=0, padx=4, pady=2, sticky="ew")
+            height=38,
+            fg_color=INPUT_BG,
+            hover_color="#1e2538",
+            border_width=1,
+            border_color="#2a3147",
+            text_color="#ffffff",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+        ).pack(side="left", fill="both", expand=True, padx=(0, 6))
 
         ctk.CTkButton(
-            grid_t,
-            text="Abrir Carpeta Output de Shorts",
+            row_pildoras_carpetas,
+            text="Abrir Carpeta Output",
             command=abrir_carpeta_salida,
             corner_radius=14,
-            height=36,
-            fg_color="#1e2436",
-            hover_color="#2d354d",
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-        ).grid(row=0, column=1, padx=4, pady=2, sticky="ew")
+            height=38,
+            fg_color=INPUT_BG,
+            hover_color="#1e2538",
+            border_width=1,
+            border_color="#2a3147",
+            text_color="#ffffff",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+        ).pack(side="right", fill="both", expand=True, padx=(6, 0))
 
         aplicar_icono_ventana(win)
         win.update_idletasks()
