@@ -2048,6 +2048,85 @@ def iniciar_aplicacion_gui() -> None:
             text_color=TEXT_MAIN,
         ).pack(side="left")
 
+        def _mostrar_ayuda_cuotas():
+            win_h = ctk.CTkToplevel(win)
+            win_h.title("Guía de Colores y Cuotas")
+            win_h.geometry("520x330")
+            win_h.resizable(False, False)
+            aplicar_icono_ventana(win_h)
+            win_h.transient(win)
+            win_h.grab_set()
+
+            try:
+                win_h.update_idletasks()
+                x = win.winfo_x() + (win.winfo_width() // 2) - 260
+                y = win.winfo_y() + (win.winfo_height() // 2) - 165
+                win_h.geometry(f"+{max(0, x)}+{max(0, y)}")
+            except Exception:
+                pass
+
+            f_c = ctk.CTkFrame(win_h, fg_color="#101524", corner_radius=16, border_width=1, border_color="#222b42")
+            f_c.pack(fill="both", expand=True, padx=14, pady=14)
+
+            ctk.CTkLabel(
+                f_c,
+                text="Significado de Colores y Cuotas",
+                font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+                text_color=TEXT_MAIN,
+            ).pack(anchor="w", padx=16, pady=(12, 10))
+
+            items = [
+                ("🟢 Verde (Disponible):", "Todas las cuentas vinculadas tienen cuota activa y responden de inmediato (<1s).", "#34d399"),
+                ("🟠 Naranja (Mucho tráfico):", "Cuentas en rotación activa o con demoras/cola en los servidores de Google.", "#fbbf24"),
+                ("🔴 Rojo (Agotado):", "Todas las cuentas vinculadas agotaron el cupo diario de solicitudes (429).", "#f87171"),
+                ("🟣 Púrpura (Plan Pago):", "Modelo que requiere plan con facturación en Google AI Studio (sin Free Tier).", "#a5b4fc"),
+            ]
+            for tit, desc, col in items:
+                r = ctk.CTkFrame(f_c, fg_color="transparent")
+                r.pack(fill="x", padx=16, pady=3)
+                ctk.CTkLabel(r, text=tit, font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"), text_color=col, width=175, anchor="w").pack(side="left")
+                ctk.CTkLabel(r, text=desc, font=ctk.CTkFont(family="Segoe UI", size=10), text_color="#cbd5e1", anchor="w", justify="left").pack(side="left", fill="x", expand=True)
+
+            f_info = ctk.CTkFrame(f_c, fg_color="#151b2e", corner_radius=10, border_width=1, border_color="#2a3350")
+            f_info.pack(fill="x", padx=16, pady=(10, 10))
+
+            ctk.CTkLabel(
+                f_info,
+                text="⏰ Reinicio diario: Google reinicia las cuotas a medianoche Pacífico (04:00 AM hora de Argentina / UTC-3).\n👥 Multi-cuenta: La prueba analiza todas las cuentas del pool en paralelo.",
+                font=ctk.CTkFont(family="Segoe UI", size=10),
+                text_color="#94a3b8",
+                justify="left",
+                anchor="w",
+            ).pack(fill="x", padx=10, pady=8)
+
+            ctk.CTkButton(
+                f_c,
+                text="Entendido",
+                command=win_h.destroy,
+                corner_radius=10,
+                height=28,
+                width=100,
+                fg_color=PURPLE_MAIN,
+                hover_color=PURPLE_HOVER,
+                font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            ).pack(pady=(0, 6))
+
+        btn_ayuda = ctk.CTkButton(
+            row_probe_top,
+            text="?",
+            command=_mostrar_ayuda_cuotas,
+            corner_radius=11,
+            width=22,
+            height=22,
+            fg_color="#1e293b",
+            hover_color="#334155",
+            border_width=1,
+            border_color="#334155",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color=CYAN_ACCENT,
+        )
+        btn_ayuda.pack(side="left", padx=(8, 0))
+
         frame_filas_modelos = ctk.CTkFrame(frame_probe, fg_color="transparent")
         frame_filas_modelos.pack(fill="x", padx=10, pady=(0, 12))
         frame_filas_modelos.grid_columnconfigure((0, 1, 2, 3), weight=1, uniform="model_box")
@@ -2066,38 +2145,17 @@ def iniciar_aplicacion_gui() -> None:
                     border_color=item.get("color_borde", "#334155"),
                     border_width=2,
                     corner_radius=12,
+                    height=42,
                 )
                 c_box.grid(row=0, column=idx, padx=4, pady=2, sticky="nsew")
+                c_box.pack_propagate(False)
 
                 ctk.CTkLabel(
                     c_box,
                     text=item.get("nombre_corto", item.get("nombre", "")),
-                    font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+                    font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
                     text_color="#ffffff",
-                ).pack(padx=6, pady=(8, 2))
-
-                pill = ctk.CTkFrame(
-                    c_box,
-                    fg_color=item.get("color_pill_bg", "#1e293b"),
-                    border_color=item.get("color_borde", "#334155"),
-                    border_width=1,
-                    corner_radius=8,
-                )
-                pill.pack(padx=6, pady=2)
-
-                ctk.CTkLabel(
-                    pill,
-                    text=item.get("tag", item.get("estado_str", "")),
-                    font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
-                    text_color=item.get("color_texto", item.get("color", "#cbd5e1")),
-                ).pack(padx=8, pady=2)
-
-                ctk.CTkLabel(
-                    c_box,
-                    text=item.get("desc", ""),
-                    font=ctk.CTkFont(family="Segoe UI", size=9),
-                    text_color="#94a3b8",
-                ).pack(padx=4, pady=(2, 8))
+                ).pack(expand=True, fill="both")
 
         def _ejecutar_diagnostico_ia():
             btn_probe_ia.configure(state="disabled", text="Verificando...")
@@ -2112,7 +2170,7 @@ def iniciar_aplicacion_gui() -> None:
                 font=ctk.CTkFont(family="Segoe UI", size=11),
                 text_color=CYAN_ACCENT,
             )
-            lbl_cargando.grid(row=0, column=0, columnspan=4, pady=16)
+            lbl_cargando.grid(row=0, column=0, columnspan=4, pady=10)
 
             def _worker():
                 from shorts_engine.gemini_ia import auditar_estado_pool_en_vivo
