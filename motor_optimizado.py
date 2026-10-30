@@ -168,3 +168,33 @@ def realzar_frame_viral(frame: np.ndarray) -> np.ndarray:
         return cv2.LUT(frame, _LUT_CONTRASTE, dst=frame)
     except Exception:
         return _LUT_CONTRASTE[frame]
+
+
+# =====================================================================
+# 5. BLENDING VECTORIZADO ZERO-COPY POR ROI (SUBTÍTULOS Y PLACAS)
+# =====================================================================
+def pegar_placa_rgba_rapida(frame_rgb: np.ndarray, placa_rgba: np.ndarray, y_top: int = 0) -> np.ndarray:
+    """
+    Aplica alpha-blending vectorizado en NumPy únicamente sobre la franja (ROI)
+    donde existe el subtítulo, evitando convertir todo el frame 1080x1920 a PIL.
+    """
+    h_f, w_f, _ = frame_rgb.shape
+    h_p, w_p, _ = placa_rgba.shape
+    y1 = max(0, y_top)
+    y2 = min(h_f, y1 + h_p)
+    x2 = min(w_f, w_p)
+    if y2 <= y1 or x2 <= 0:
+        return frame_rgb
+
+    sub_placa = placa_rgba[:(y2 - y1), :x2]
+    alpha = sub_placa[:, :, 3:4].astype(np.float32) * (1.0 / 255.0)
+    # Si toda la franja es transparente, salir en 0ms
+    if not np.any(alpha > 0.01):
+        return frame_rgb
+
+    out = frame_rgb.copy()
+    roi = out[y1:y2, :x2].astype(np.float32)
+    fg = sub_placa[:, :, :3].astype(np.float32)
+    out[y1:y2, :x2] = (fg * alpha + roi * (1.0 - alpha)).astype(np.uint8)
+    return out
+
