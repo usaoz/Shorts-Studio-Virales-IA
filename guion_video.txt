@@ -1,17 +1,21 @@
-TITULO_SUPERIOR: Le pint la cara con arcoris sin avisar  
-TITULO_YOUTUBE: ¡Le pintó la cara con arcoíris sin avisar! 🌈😱 #shorts
+TITULO_SUPERIOR: Intent borrorle el tatuaje a su hermana 
+TITULO_YOUTUBE: ¡Intentó borrorle el tatuaje a su hermana y pasó esto! 😱✨ #shorts
 MODO_ENCUADRE: full
 VOLUMEN_VIDEO_ORIGINAL: 0
 ARCHIVO_SALIDA: auto
-DESCRIPCION_YOUTUBE: Un hermano decide ayudar a su hermana con un extraño maquillaje de colores. ¡Mira la reacción imperdible cuando descubre el desastre! ¿Le harías esto a un familiar? #shorts #viral
+DESCRIPCION_YOUTUBE: Trató de limpiar el dibujo de su hermana pensando que era plumón, pero descubrió un increíble secreto. ¿Alguna vez probaste tatuajes de brillantina? #shorts #viral
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-31 19:30
+SCHEDULE: 2026-10-30 20:30
 PARA_NINOS: no
 TONO_VIDEO: fondo
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:04 | zoom_impacto | crowd_shocked | sorprendido:centro | centro | box:[300,500,600,800]@00:01:pintura | ¡Este bromista usa un maquillaje de arcoíris prometiendo arreglar la cara gorda de su hermana!
-00:04 - 00:08 | zoom_in | riser_suction | diablo:izquierda | ninguna | ninguno | ¡Ella no se ve muy convencida por el primer trazo así que le da un segundo!
-00:08 - 00:13 | temblor | punch+xp_Error | risa:derecha | ninguna | ninguno | ¡La gordita no sabe como evitar los trazos gays en su cara y se lleva uno más en la frente!
-00:13 - 00:18 | alerta_roja | cartoon_laugh | enojo:centro | ninguna | ninguno | ¡Ella explota del enojo al descubrir que terminó como un payaso tribal gay justo cuando tenía una cita importante!
+00:00 - 00:04 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | ¡Creyó que su hermana se había tatuado la mano y quizo robarle el colorido diseño!
+00:04 - 00:08 | alerta_roja | riser_suction | enojo:izquierda | derecha | ninguno | Le frotó con toallitas húmedas y agua, pero el dibujo no se borraba.
+00:08 - 00:13 | temblor | punch+xp_Error | risa:derecha | derecha | ninguno | ¡Su envidia era tan grande que no paró de intenar y por poco le corta la mano para sacarselo!
+00:13 - 00:17 | brillo_epico | cash_ting | sorprendido:centro | centro | ninguno | Pero la hermana le explica que son stickers especiales hechos para durar bajo todas condiciones
+00:17 - 00:22 | zoom_in | good_idea | ojos:derecha | auto | ninguno | Le muestra muchos diseños para que ella elija el que más le gusta y asi tener tatuajes temporales las dos
+00:22 - 00:27 | ninguno | pop+ding | fiesta:derecha | ninguno | ninguno | Una vez que eligió su diseño favorito se lo preparó para aplicárselo en la mano
+00:27 - 00:32 | flash | whoosh | risa:centro | ninguno | ninguno | Un poco de presión más un paño humedo es todo lo que se necesita para  adherir el tatuaje
+00:32 - 00:38 | spotlight | party_horn+whoosh | fiesta:centro | ninguno | ninguno | El truco definitivo era usar cinta transparente para despegarlo completito en un segundo, dejando la piel limpia. ¿Te comprarías uno?

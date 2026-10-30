@@ -79,10 +79,12 @@ def mmss_a_seg(texto: str) -> float:
 def abrir_dialogo_posicion_pantalla(parent_win, datos_bloque: Dict, on_aplicar: Callable):
     import tkinter as tk
     import re
+    import math
     win_p = ctk.CTkToplevel(parent_win)
     win_p.title("🎯 Posicionar Círculo y Flechas en Pantalla")
-    win_p.geometry("440x600")
-    win_p.resizable(False, False)
+    win_p.geometry("380x750")
+    win_p.minsize(360, 720)
+    win_p.resizable(False, True)
     win_p.configure(fg_color="#0e111a")
     win_p.transient(parent_win)
     win_p.grab_set()
@@ -90,6 +92,7 @@ def abrir_dialogo_posicion_pantalla(parent_win, datos_bloque: Dict, on_aplicar: 
     tipo_var = ctk.StringVar(value="circulo")
     tam_var = ctk.StringVar(value="medio")
     track_var = ctk.BooleanVar(value=True)
+    rot_var = ctk.DoubleVar(value=315.0)
 
     c_ini = str(datos_bloque.get("circulo", "")).strip()
     f_ini = str(datos_bloque.get("flecha", "")).strip()
@@ -97,10 +100,15 @@ def abrir_dialogo_posicion_pantalla(parent_win, datos_bloque: Dict, on_aplicar: 
     pos_x = 50.0
     pos_y = 45.0
 
-    if f_ini and f_ini not in ("ninguna", "ninguno") and (not c_ini or c_ini in ("ninguno", "ninguna")):
-        tipo_var.set("flecha")
-    elif f_ini and f_ini not in ("ninguna", "ninguno") and c_ini and c_ini not in ("ninguno", "ninguna"):
+    tiene_c = c_ini and c_ini.lower() not in ("ninguno", "ninguna", "none", "no")
+    tiene_f = f_ini and f_ini.lower() not in ("ninguno", "ninguna", "none", "no")
+
+    if tiene_c and tiene_f:
         tipo_var.set("ambos")
+    elif tiene_f:
+        tipo_var.set("flecha")
+    elif tiene_c:
+        tipo_var.set("circulo")
     else:
         tipo_var.set("circulo")
 
@@ -115,14 +123,22 @@ def abrir_dialogo_posicion_pantalla(parent_win, datos_bloque: Dict, on_aplicar: 
     if "fijo:" in c_ini or "static:" in c_ini or "fijo:" in f_ini or "static:" in f_ini:
         track_var.set(False)
 
+    m_rot = re.search(r"@(\d+(?:\.\d+)?)", f_ini)
+    if m_rot:
+        try:
+            rot_var.set(float(m_rot.group(1)) % 360.0)
+        except Exception:
+            pass
+
     lbl_coord = ctk.CTkLabel(
-        win_p, text=f"🎯 Posición: X: {pos_x:.1f}% | Y: {pos_y:.1f}%",
+        win_p, text=f"🎯 Objetivo: X: {pos_x:.1f}% | Y: {pos_y:.1f}%",
         font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         text_color="#38bdf8"
     )
-    lbl_coord.pack(pady=(12, 6))
+    lbl_coord.pack(pady=(10, 4))
 
-    CW, CH = 216, 384
+    # Canvas de 270x480 (Exactamente idéntico al reproductor de video 9:16)
+    CW, CH = 270, 480
     canvas = tk.Canvas(win_p, width=CW, height=CH, bg="#050811", highlightthickness=1, highlightbackground="#252B3D")
     canvas.pack(pady=4)
 
@@ -140,46 +156,59 @@ def abrir_dialogo_posicion_pantalla(parent_win, datos_bloque: Dict, on_aplicar: 
 
         t = tipo_var.get()
         tam = tam_var.get()
-        r_px = 18 if tam == "chico" else (26 if tam == "medio" else 36)
+        r_px = 22 if tam == "chico" else (32 if tam == "medio" else 44)
 
         if t in ("circulo", "ambos"):
             canvas.create_oval(px - r_px, py - r_px, px + r_px, py + r_px, outline="#ef4444", width=3)
             canvas.create_oval(px - 3, py - 3, px + 3, py + 3, fill="#ef4444", outline="")
 
         if t in ("flecha", "ambos"):
-            fx0 = px + 42
-            fy0 = py - 42
-            canvas.create_line(fx0, fy0, px + (r_px if t == "ambos" else 4), py - (r_px if t == "ambos" else 4), fill="#f59e0b", width=3, arrow=tk.LAST, arrowshape=(10, 12, 4))
+            rad = math.radians(rot_var.get())
+            dist_flecha = 55
+            fx0 = px + dist_flecha * math.cos(rad)
+            fy0 = py + dist_flecha * math.sin(rad)
+            gap_c = (r_px + 4) if t == "ambos" else 0
+            tip_x = px + gap_c * math.cos(rad)
+            tip_y = py + gap_c * math.sin(rad)
+            canvas.create_line(fx0, fy0, tip_x, tip_y, fill="#f59e0b", width=4, arrow=tk.LAST, arrowshape=(14, 16, 6))
+            if t == "flecha":
+                # Marca luminosa en la punta exacta a la que apunta la flecha
+                canvas.create_oval(px - 3, py - 3, px + 3, py + 3, fill="#38bdf8", outline="")
 
-        lbl_coord.configure(text=f"🎯 Posición: X: {pos_x:.1f}% | Y: {pos_y:.1f}%")
+        if t == "circulo":
+            lbl_coord.configure(text=f"🎯 Centro Círculo (Objetivo): X: {pos_x:.1f}% | Y: {pos_y:.1f}%")
+        elif t == "flecha":
+            lbl_coord.configure(text=f"🎯 Punta Flecha (Objetivo): X: {pos_x:.1f}% | Y: {pos_y:.1f}%")
+        else:
+            lbl_coord.configure(text=f"🎯 Objetivo (Centro/Punta): X: {pos_x:.1f}% | Y: {pos_y:.1f}%")
+        lbl_rot_val.configure(text=f"🔄 Ángulo Flecha: {rot_var.get():.0f}°")
 
     def _on_canvas_click(event):
         nonlocal pos_x, pos_y
         pos_x = max(5.0, min(95.0, (event.x / float(CW)) * 100.0))
-        pos_y = max(8.0, min(92.0, (event.y / float(CH)) * 100.0))
+        pos_y = max(6.0, min(94.0, (event.y / float(CH)) * 100.0))
         _redibujar()
 
     canvas.bind("<Button-1>", _on_canvas_click)
     canvas.bind("<B1-Motion>", _on_canvas_click)
-    _redibujar()
 
     f_ctrls = ctk.CTkFrame(win_p, fg_color="transparent")
-    f_ctrls.pack(fill="x", padx=18, pady=(8, 4))
+    f_ctrls.pack(fill="x", padx=16, pady=(6, 4))
 
-    tipo_seg_ini = "⭕ Círculo" if tipo_var.get() == "circulo" else ("↗️ Flecha" if tipo_var.get() == "flecha" else "⭕+↗️ Ambos")
+    tipo_seg_ini = "⭕ Círculo" if tipo_var.get() == "circulo" else ("↗️ Flecha" if tipo_var.get() == "flecha" else ("⭕+↗️ Ambos" if tipo_var.get() == "ambos" else "❌ Ninguno"))
     ctk.CTkSegmentedButton(
-        f_ctrls, values=["⭕ Círculo", "↗️ Flecha", "⭕+↗️ Ambos"],
+        f_ctrls, values=["⭕ Círculo", "↗️ Flecha", "⭕+↗️ Ambos", "❌ Ninguno"],
         variable=ctk.StringVar(value=tipo_seg_ini),
-        command=lambda v: (tipo_var.set("circulo" if "Círculo" in v else ("flecha" if "Flecha" in v else "ambos")), _redibujar()),
+        command=lambda v: (tipo_var.set("circulo" if "Círculo" in v else ("flecha" if "Flecha" in v else ("ambos" if "Ambos" in v else "ninguno"))), _redibujar()),
         height=26, corner_radius=8, font=ctk.CTkFont(size=11, weight="bold")
     ).pack(fill="x", pady=2)
 
     row_opt = ctk.CTkFrame(f_ctrls, fg_color="transparent")
-    row_opt.pack(fill="x", pady=4)
+    row_opt.pack(fill="x", pady=3)
 
     ctk.CTkOptionMenu(
         row_opt, values=["chico", "medio", "grande"], variable=tam_var,
-        command=lambda _: _redibujar(), width=95, height=26, corner_radius=6, font=ctk.CTkFont(size=11)
+        command=lambda _: _redibujar(), width=90, height=24, corner_radius=6, font=ctk.CTkFont(size=11)
     ).pack(side="left", padx=(0, 8))
 
     ctk.CTkCheckBox(
@@ -187,13 +216,40 @@ def abrir_dialogo_posicion_pantalla(parent_win, datos_bloque: Dict, on_aplicar: 
         font=ctk.CTkFont(size=11, weight="bold"), checkbox_width=18, checkbox_height=18, corner_radius=4
     ).pack(side="left")
 
+    f_rot = ctk.CTkFrame(f_ctrls, fg_color="transparent")
+    f_rot.pack(fill="x", pady=(2, 4))
+
+    lbl_rot_val = ctk.CTkLabel(
+        f_rot, text=f"🔄 Ángulo Flecha: {rot_var.get():.0f}°",
+        font=ctk.CTkFont(size=11, weight="bold"), text_color="#fbbf24"
+    )
+    lbl_rot_val.pack(anchor="w")
+
+    slider_rot = ctk.CTkSlider(
+        f_rot, from_=0.0, to=360.0, number_of_steps=72, variable=rot_var,
+        command=lambda _: _redibujar(), height=14, progress_color="#f59e0b", button_color="#f59e0b"
+    )
+    slider_rot.pack(fill="x", pady=2)
+
+    row_presets_rot = ctk.CTkFrame(f_rot, fg_color="transparent")
+    row_presets_rot.pack(fill="x")
+    for nom_btn, deg_val in [("↖", 315.0), ("↑", 270.0), ("↗", 225.0), ("→", 180.0), ("↘", 135.0), ("↓", 90.0), ("↙", 45.0), ("←", 0.0)]:
+        ctk.CTkButton(
+            row_presets_rot, text=nom_btn, width=28, height=22, corner_radius=5,
+            fg_color="#1e2436", hover_color="#2d354d", font=ctk.CTkFont(size=10, weight="bold"),
+            command=lambda d=deg_val: (rot_var.set(d), slider_rot.set(d), _redibujar())
+        ).pack(side="left", padx=1)
+
+    _redibujar()
+
     def _guardar_y_cerrar():
         t = tipo_var.get()
         tam = tam_var.get()
         tracking = track_var.get()
         pref = "" if tracking else "fijo:"
+        rot_val = int(round(rot_var.get())) % 360
         res_circulo = f"{pref}{pos_x:.1f},{pos_y:.1f}:{tam}" if t in ("circulo", "ambos") else "ninguno"
-        res_flecha = f"{pref}{pos_x:.1f},{pos_y:.1f}" if t in ("flecha", "ambos") else "ninguna"
+        res_flecha = f"{pref}{pos_x:.1f},{pos_y:.1f}@{rot_val}" if t in ("flecha", "ambos") else "ninguna"
         on_aplicar(res_circulo, res_flecha)
         win_p.destroy()
 
@@ -201,7 +257,7 @@ def abrir_dialogo_posicion_pantalla(parent_win, datos_bloque: Dict, on_aplicar: 
         win_p, text="Aplicar Posición", command=_guardar_y_cerrar,
         corner_radius=10, height=32, fg_color="#10b981", hover_color="#059669",
         text_color="#052e16", font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold")
-    ).pack(fill="x", padx=18, pady=(4, 12))
+    ).pack(fill="x", padx=16, pady=(4, 10))
 
 
 class BloqueGuionCard(ctk.CTkFrame):
@@ -302,29 +358,17 @@ class BloqueGuionCard(ctk.CTkFrame):
         )
         btn_up.pack(side="right", padx=2)
 
-        btn_pos_rapido = ctk.CTkButton(
-            top_frame,
-            text="🎯 Posicionar",
-            width=88,
-            height=24,
-            fg_color="#1d4ed8",
-            hover_color="#1e40af",
-            font=ctk.CTkFont(size=11, weight="bold"),
-            command=self._abrir_selector_posicion,
-        )
-        btn_pos_rapido.pack(side="right", padx=(2, 4))
-
         self.btn_toggle_card_assets = ctk.CTkButton(
             top_frame,
             text="▲ Ocultar" if self.mostrar_assets else "🎛️ Assets",
-            width=68,
+            width=76,
             height=24,
             fg_color="#3B4261" if self.mostrar_assets else "#22283A",
             hover_color="#333D59",
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=11, weight="bold"),
             command=self._toggle_assets_local
         )
-        self.btn_toggle_card_assets.pack(side="right", padx=2)
+        self.btn_toggle_card_assets.pack(side="right", padx=4)
 
         # ---------------- FILA 2: CONTENEDOR DE ASSETS (LAZY LOAD) ----------------
         if self.mostrar_assets:
@@ -400,46 +444,48 @@ class BloqueGuionCard(ctk.CTkFrame):
             row_assets_1, "🎭 Emoji", LISTA_EMOJIS, self.datos.get("emoji", "ninguno"), width=130
         )
 
-        # Fila 2: Flecha, Círculo y Botón Posicionar en Pantalla (Interact.)
+        # Fila 2: Botón único para posicionar y badge de estado
         row_assets_2 = ctk.CTkFrame(self.assets_frame, fg_color="transparent")
-        row_assets_2.pack(fill="x", pady=(0, 2))
+        row_assets_2.pack(fill="x", pady=(2, 2))
 
-        self.opt_flecha = self._crear_selector(
-            row_assets_2, "↗️ Flecha (9 Pos)", LISTA_FLECHAS, self.datos.get("flecha", "ninguna"), width=120
-        )
-        self.opt_circulo = self._crear_selector(
-            row_assets_2, "⭕ Círculo (9 Pos)", LISTA_CIRCULOS, self.datos.get("circulo", "ninguno"), width=130
-        )
-
-        f_btn_pos = ctk.CTkFrame(row_assets_2, fg_color="transparent")
-        f_btn_pos.pack(side="left", padx=(12, 2), pady=(14, 0))
         btn_pos = ctk.CTkButton(
-            f_btn_pos,
-            text="🎯 Posicionar en Pantalla (Clic/Arrastrar)",
+            row_assets_2,
+            text="🎯 Posicionar Círculo / Flecha (Pantalla)",
             command=self._abrir_selector_posicion,
-            height=26,
+            height=28,
             fg_color="#1d4ed8",
             hover_color="#1e40af",
             font=ctk.CTkFont(size=11, weight="bold"),
         )
-        btn_pos.pack()
+        btn_pos.pack(side="left", padx=(4, 8))
+
+        self.lbl_pos_status = ctk.CTkLabel(
+            row_assets_2,
+            text=self._generar_texto_badge_pos(),
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color="#38bdf8",
+        )
+        self.lbl_pos_status.pack(side="left", padx=4)
+
+    def _generar_texto_badge_pos(self) -> str:
+        c = str(self.datos.get("circulo", "")).strip()
+        f = str(self.datos.get("flecha", "")).strip()
+        tiene_c = c and c.lower() not in ("ninguno", "ninguna", "none", "no")
+        tiene_f = f and f.lower() not in ("ninguno", "ninguna", "none", "no")
+        if tiene_c and tiene_f:
+            return f"⭕ Círculo + ↗️ Flecha activos"
+        elif tiene_c:
+            return f"⭕ Círculo: {c}"
+        elif tiene_f:
+            return f"↗️ Flecha: {f}"
+        return "Sin señalar"
 
     def _abrir_selector_posicion(self):
         def _on_aplicar(c_val, f_val):
             self.datos["circulo"] = c_val
-            if hasattr(self, "opt_circulo"):
-                val_c = list(self.opt_circulo.cget("values"))
-                if c_val not in val_c:
-                    self.opt_circulo.configure(values=val_c + [c_val])
-                self.opt_circulo.set(c_val)
-
             self.datos["flecha"] = f_val
-            if hasattr(self, "opt_flecha"):
-                val_f = list(self.opt_flecha.cget("values"))
-                if f_val not in val_f:
-                    self.opt_flecha.configure(values=val_f + [f_val])
-                self.opt_flecha.set(f_val)
-
+            if hasattr(self, "lbl_pos_status") and self.lbl_pos_status.winfo_exists():
+                self.lbl_pos_status.configure(text=self._generar_texto_badge_pos())
             self.on_change()
 
         abrir_dialogo_posicion_pantalla(self.winfo_toplevel(), self.datos, _on_aplicar)

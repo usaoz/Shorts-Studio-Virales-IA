@@ -410,9 +410,11 @@ class GestorEfectosYAssets:
         t_seg: float,
         dur_seg: float,
         t_inicio_callout: float = 0.04,
+        angulo_forzado: Optional[float] = None,
     ) -> None:
         """
         Dibuja la flecha roja animada apuntando hacia `target_xy` directamente in-place sobre `lienzo`.
+        Soporta rotación libre en grados (angulo_forzado) según la dirección de aproximación.
         """
         if not activo or self.flecha_base_np is None:
             return
@@ -422,14 +424,19 @@ class GestorEfectosYAssets:
             return
 
         tx, ty = target_xy
-        if tx < WIDTH * 0.48:
-            ux, uy = 0.82, -0.57
-        elif tx > WIDTH * 0.52:
-            ux, uy = -0.82, -0.57
+        if angulo_forzado is not None:
+            rad = math.radians(angulo_forzado)
+            ux = math.cos(rad)
+            uy = math.sin(rad)
+            angulo_grados = -math.degrees(math.atan2(uy, ux))
         else:
-            ux, uy = 0.78, -0.62
-
-        angulo_grados = -math.degrees(math.atan2(uy, ux))
+            if tx < WIDTH * 0.48:
+                ux, uy = 0.82, -0.57
+            elif tx > WIDTH * 0.52:
+                ux, uy = -0.82, -0.57
+            else:
+                ux, uy = 0.78, -0.62
+            angulo_grados = -math.degrees(math.atan2(uy, ux))
 
         if t_seg < 0.20:
             p_in = (t_seg - 0.04) / 0.16
@@ -459,8 +466,8 @@ class GestorEfectosYAssets:
                 borderValue=(0, 0, 0, 0),
             )
 
-        gap_objetivo = (radio_circulo_activo + 10.0) if radio_circulo_activo > 10.0 else 24.0
-        rebote = 16.0 * (1.0 - math.cos(t_seg * math.pi * 2.2)) * 0.5
+        gap_objetivo = (radio_circulo_activo + 8.0) if radio_circulo_activo > 10.0 else 6.0
+        rebote = 10.0 * (1.0 - math.cos(t_seg * math.pi * 2.2)) * 0.5
         dist_centro_a_punta = tam_flecha * 0.472
         dist_total = gap_objetivo + rebote + dist_centro_a_punta
 
@@ -1091,10 +1098,8 @@ def _limitar_circulos_guion(
             f"{', '.join(str(i + 1) for i in sorted(conservar))}."
         )
 
-    # Si un segmento ya tiene círculo rojo, quitarle la flecha para no superponer ambos
-    for s in segmentos:
-        if s.circulo and s.flecha:
-            s.flecha = None
+    # Ambos (círculo y flecha) pueden coexistir apuntando al mismo foco de atención
+    pass
 
     # Limitar la frecuencia de flechas rojas (espaciadas, evitando segmentos consecutivos)
     con_flecha = [i for i, s in enumerate(segmentos) if s.flecha]
@@ -1212,10 +1217,13 @@ async def editar_video_con_guion(
         f"[*] Video base: '{ruta_video.name}' ({w_orig}x{h_orig} a {fps_orig:.1f} FPS | Duración exacta: {dur_video_origen:.2f}s)"
     )
 
+    cortes_detectados_video: List[float] = []
     # 0. Escaneo inteligente de cortes de cámara e imantación de bloques (Snap a cortes reales)
     try:
         detector_cortes = DetectorCortesEscena(fps_escaneo=12.0)
         cortes_reales = detector_cortes.detectar_cortes(str(ruta_video))
+        if cortes_reales:
+            cortes_detectados_video = list(cortes_reales)
         if cortes_reales:
             tiempos_brutos = [(float(s.t_inicio_video or 0.0), float(s.t_fin_video or dur_video_origen)) for s in config.segmentos]
             tiempos_ajustados = detector_cortes.ajustar_bloques_guion_a_cortes(
@@ -1382,6 +1390,44 @@ async def editar_video_con_guion(
         wf_master.setframerate(44100)
         for b in bloques_pcm:
             wf_master.writeframes(b)
+
+    # 3.1 Inyección de SFX 'whoosh' dinámico en cada corte de escena detectado (estilo reels virales)
+    if cortes_detectados_video:
+        try:
+            whoosh_pcm = gestor_sfx.obtener_pcm("whoosh")
+            if whoosh_pcm is not None and len(whoosh_pcm) > 0:
+                with wave.open(str(ruta_voz_maestra), "r") as wf_in:
+                    audio_bytes = wf_in.readframes(wf_in.getnframes())
+                master_pcm = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+                sr_m = 44100
+
+                whooshes_aplicados = 0
+                ultimo_t = -999.0
+                for t_corte in cortes_detectados_video:
+                    if t_corte < 0.35 or t_corte > (dur_video_origen - 0.6):
+                        continue
+                    if (t_corte - ultimo_t) < 0.75:
+                        continue
+                    ultimo_t = t_corte
+                    # Sincronizar cresta acústica del whoosh con el fotograma de corte (~70ms antes)
+                    idx_ini = max(0, int(round((t_corte - 0.07) * sr_m)))
+                    idx_fin = min(len(master_pcm), idx_ini + len(whoosh_pcm))
+                    n_samp = idx_fin - idx_ini
+                    if n_samp > 0:
+                        master_pcm[idx_ini:idx_fin] += whoosh_pcm[:n_samp] * 0.42
+                        whooshes_aplicados += 1
+
+                if whooshes_aplicados > 0:
+                    master_pcm = np.clip(master_pcm, -0.98, 0.98)
+                    pcm_out_bytes = (master_pcm * 32767).astype(np.int16).tobytes()
+                    with wave.open(str(ruta_voz_maestra), "w") as wf_out:
+                        wf_out.setnchannels(1)
+                        wf_out.setsampwidth(2)
+                        wf_out.setframerate(sr_m)
+                        wf_out.writeframes(pcm_out_bytes)
+                    print(f"[*] Efecto Whoosh de reels añadido con éxito en {whooshes_aplicados} corte(s) de escena detectado(s).")
+        except Exception as e_whoosh:
+            print(f"[!] Aviso al superponer whoosh en cortes de escena: {e_whoosh}")
 
     # 3.5 Selección y mezcla inteligente de Música de Fondo desde /musica según el tono del Short
     ruta_audio_final = TEMP_DIR / "audio_final_combinado.wav"
@@ -1641,8 +1687,17 @@ async def editar_video_con_guion(
                         t_inicio_callout=t_ini_callout_circulo,
                     )
 
-                    # 2) Flecha Roja siguiendo al objetivo
+                    # 2) Flecha Roja siguiendo al objetivo (con soporte de rotación personalizada @deg)
                     radio_para_flecha = radio_circulo if mismo_objetivo else 0.0
+                    ang_flecha = None
+                    if seg.flecha:
+                        m_ang = re.search(r"@(\d+(?:\.\d+)?)", str(seg.flecha))
+                        if m_ang:
+                            try:
+                                ang_flecha = float(m_ang.group(1))
+                            except Exception:
+                                pass
+
                     gestor_assets.dibujar_flecha_roja(
                         lienzo=lienzo,
                         activo=bool(seg.flecha),
@@ -1651,6 +1706,7 @@ async def editar_video_con_guion(
                         t_seg=t_seg,
                         dur_seg=dur_seg_exacta,
                         t_inicio_callout=t_ini_callout_flecha,
+                        angulo_forzado=ang_flecha,
                     )
 
                     # 3) Emoji animado (evitando superponerse con el objetivo rastreado)

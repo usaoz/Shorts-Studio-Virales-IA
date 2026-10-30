@@ -1648,16 +1648,7 @@ def iniciar_aplicacion_gui() -> None:
             except Exception:
                 tiempo_txt = str(s_str)
 
-            if modo_c_act in ("todas", "grupo") and len(c_plan_obj) > 1:
-                if strat_c_act == "cross_posting":
-                    nom_cuentas_corta = " + ".join(str(c.get("nombre") or c.get("id"))[:10] for c in c_plan_obj)
-                    partes_prev.append(f"#{idx_s + 1} [{nom_cuentas_corta}] {tiempo_txt}")
-                else:
-                    c_asig = c_plan_obj[idx_s % len(c_plan_obj)]
-                    nom_a = str(c_asig.get("nombre") or c_asig.get("id"))[:12]
-                    partes_prev.append(f"#{idx_s + 1} [{nom_a}] {tiempo_txt}")
-            else:
-                partes_prev.append(f"#{idx_s + 1} {tiempo_txt}")
+            partes_prev.append(f"#{idx_s + 1} {tiempo_txt}")
 
         resumen_str = "  ·  ".join(partes_prev)
         if modo_c_act in ("todas", "grupo") and strat_c_act == "rotacion" and len(c_plan_obj) > 1 and len(slots) < len(c_plan_obj):

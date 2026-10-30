@@ -373,6 +373,18 @@ def sanitizar_y_auditar_guion(raw_text: str, duracion_total: float) -> Tuple[str
         except Exception:
             dur_bloque = 4.0
 
+        # Sanitizar texto: prohibir oraciones truncadas con '...' o conjunciones colgantes
+        texto_limpio = texto.strip()
+        texto_limpio = re.sub(r'[\.\s\u2026]+[!\?]*$', '', texto_limpio).strip()
+        colgantes = {'cuando', 'porque', 'pero', 'y', 'o', 'ya que', 'donde', 'si', 'sin', 'asi que', 'así que', 'que', 'para', 'de', 'con', 'a', 'jamas', 'jamás', 'nunca', 'repente'}
+        palabras_temp = texto_limpio.split()
+        while palabras_temp and palabras_temp[-1].lower().rstrip(',;:¡!¿?') in colgantes:
+            palabras_temp.pop()
+            texto_limpio = ' '.join(palabras_temp).rstrip(',;:')
+        if texto_limpio and not texto_limpio.endswith(('.', '!', '?')):
+            texto_limpio += '!'
+        texto = texto_limpio
+
         palabras = [w for w in texto.split() if w]
         min_p = int(round(dur_bloque * 2.8))
         max_p = int(round(dur_bloque * 4.0))
@@ -855,6 +867,7 @@ Tu única misión es VER Y ANALIZAR segundo a segundo el video y redactar un gui
 🚫 REGLAS DE ORO INQUEBRANTABLES:
 - PROHIBIDO INCLUIR LLAMADAS A LA ACCIÓN (CTA): Jamás digas "suscríbete", "dale like", "comenta", "comparte" ni despedidas.
 - PROHIBIDO INVENTAR ASSETS: Solo puedes usar los EFECTOS, SFX, EMOJIS, FLECHAS y CÍRCULOS listados estrictamente abajo.
+- PROHIBIDO TERMINAR EN PUNTOS SUSPENSIVOS "..." O DEJAR ORACIONES INCOMPLETAS: Cada frase debe estar 100% terminada sintácticamente con signo de exclamación (!) o punto final. NUNCA cortes la última oración dejando palabras a medias como "porque jamás...", "cuando descubrió que..." o "y todo por...". La última oración debe cerrar con un remate ingenioso y completo.
 - PROHIBIDO DEJAR BLOQUES SIN NARRACIÓN: La voz en español debe hablar de corrido en todos los bloques sin silencios.
 
 ================================================================================
@@ -878,10 +891,10 @@ Tu única misión es VER Y ANALIZAR segundo a segundo el video y redactar un gui
 - Los tramos MM:SS - MM:SS son DINÁMICOS: ajústalos a los cortes reales de acción del video (bloques de entre 3.0s y 6.0s según si la escena es rápida o lenta).
 
 ================================================================================
-🎭 TOQUE DE HUMOR SARCÁSTICO Y HUMOR NEGRO (1 O 2 CHISTES POR VIDEO)
+🎭 HUMOR NEGRO, CHISTES SORPRENDENTES Y PICARDÍA (MUY DIVERTIDO Y MÁXIMA RETENCIÓN)
 ================================================================================
-- Incluye 1 o 2 comentarios ingeniosos de ironía, sarcasmo o humor negro inteligente sobre la situación de los protagonistas (ej: ironizar sobre el karma, la falta de sentido común, burlas ácidas al desenlace o 'selección natural').
-- REGLA DE ORO DE DOSIFICACIÓN: Máximo 1 o 2 remates de este estilo en todo el Short. NO satures cada línea con chistes; deben sentirse como un golpe de efecto cómico/mordaz en el momento justo sin romper el dinamismo de la historia.
+- El guion DEBE ser muy entretenido, con humor negro, chistes que sorprendan, comentarios mordaces, sarcásticos y un poco groseros o atrevidos burlándose del karma, de los errores y de las ridiculeces de los protagonistas en escena.
+- Remates cómicos contundentes y desopilantes que hagan reír o asombren al espectador por lo directos y ocurrentes.
 
 ================================================================================
 ⏱️ MATEMÁTICA EXACTA DE TIEMPOS (1x) Y CONTEO DE PALABRAS (3.0 - 3.7 pal/seg)

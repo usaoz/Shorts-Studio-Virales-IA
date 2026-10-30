@@ -530,10 +530,11 @@ class RastreadorObjetivosVideo:
             return None
 
         spec_clean = _quitar_acentos(str(especificacion).strip().lower())
+        spec_track = re.sub(r"@\d+(?:\.\d+)?", "", spec_clean).strip()
 
         # Caso Fijo / Sin Tracking: posición estática manual
-        if "fijo:" in spec_clean or "static:" in spec_clean:
-            spec_sin_fijo = spec_clean.replace("fijo:", "").replace("static:", "").strip()
+        if "fijo:" in spec_track or "static:" in spec_track:
+            spec_sin_fijo = spec_track.replace("fijo:", "").replace("static:", "").strip()
             m_fijo = re.search(r"(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)", spec_sin_fijo)
             if m_fijo:
                 xf_pct = float(m_fijo.group(1))
@@ -542,14 +543,12 @@ class RastreadorObjetivosVideo:
                 y_px = (yf_pct / 100.0) * HEIGHT
                 return [(float(x_px), float(y_px))] * n_frames
 
-        # Caso Coordenada Fija para Flechas (ej: 50.0,40.0)
-        m_coord_pura = re.match(r"^(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)$", spec_clean)
-        if m_coord_pura:
-            xf_pct = float(m_coord_pura.group(1))
-            yf_pct = float(m_coord_pura.group(2))
-            x_px = (xf_pct / 100.0) * WIDTH
-            y_px = (yf_pct / 100.0) * HEIGHT
-            return [(float(x_px), float(y_px))] * n_frames
+        # Caso Coordenada Manual con Tracking Activo (ej: 50.0,40.0 o 50.0,45.0:medio)
+        m_coord = re.search(r"^(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)(?::(chico|medio|grande))?$", spec_track)
+        if m_coord and "box:" not in spec_track:
+            xf_pct = float(m_coord.group(1))
+            yf_pct = float(m_coord.group(2))
+            return cls._rastrear_punto_usuario(frames_rgb, xf_pct, yf_pct)
 
         # Caso 0: Detección semántica de objeto (Grounding de Gemini)
         if "box:" in spec_clean or "box:[" in spec_clean or ("," in spec_clean and "->" not in spec_clean):
@@ -756,4 +755,88 @@ class RastreadorObjetivosVideo:
         ys_full = np.clip(ys_smooth * cls.ESC_TRACK, 65.0, HEIGHT - 180.0)
 
         print(f"[+] Círculo rojo anclado con éxito en '{info_c.etiqueta}' (ancla t={info_c.t_ancla:.1f}s, {len(pts_semilla)} puntos firmes).")
+        return list(zip(xs_full.tolist(), ys_full.tolist()))
+
+    @classmethod
+    def _rastrear_punto_usuario(
+        cls,
+        frames_rgb: List[np.ndarray],
+        xc_pct: float,
+        yc_pct: float,
+    ) -> List[Tuple[float, float]]:
+        """
+        Rastrea un punto fijado por el usuario usando Flujo Óptico Lucas-Kanade.
+        Si el objeto seleccionado se mueve en el video, la trayectoria lo sigue fielmente.
+        """
+        n_frames = len(frames_rgb)
+        if n_frames == 0:
+            return []
+
+        frames_gris = [cls._preprocesar_gris(f) for f in frames_rgb]
+        h_t, w_t = frames_gris[0].shape[:2]
+
+        xc_tr = float(np.clip((xc_pct / 100.0) * w_t, 12.0, w_t - 12.0))
+        yc_tr = float(np.clip((yc_pct / 100.0) * h_t, 12.0, h_t - 12.0))
+
+        # Adquirir puntos Shi-Tomasi en el vecindario del clic del usuario
+        mascara = np.zeros((h_t, w_t), dtype=np.uint8)
+        rad_busca = int(round(min(w_t, h_t) * 0.12))
+        cv2.circle(mascara, (int(round(xc_tr)), int(round(yc_tr))), rad_busca, 255, -1)
+
+        pts = cv2.goodFeaturesToTrack(
+            frames_gris[0],
+            maxCorners=40,
+            qualityLevel=0.012,
+            minDistance=3,
+            mask=mascara,
+            blockSize=5,
+        )
+
+        # Si hay pocas esquinas naturales, añadir cuadrícula de anclaje alrededor del punto
+        if pts is None or len(pts) < 4:
+            offsets = [
+                (0, 0), (-8, -8), (8, -8), (-8, 8), (8, 8),
+                (-14, 0), (14, 0), (0, -14), (0, 14),
+            ]
+            grid_pts = np.array([[[xc_tr + dx, yc_tr + dy]] for dx, dy in offsets], dtype=np.float32)
+            pts = grid_pts if pts is None else np.vstack([pts, grid_pts])
+
+        lk_params = dict(
+            winSize=(21, 21),
+            maxLevel=3,
+            criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01),
+        )
+
+        trayectoria: List[Tuple[float, float]] = [(xc_tr, yc_tr)] * n_frames
+        pts_actuales = pts.copy()
+        curr_cx, curr_cy = xc_tr, yc_tr
+
+        for i in range(1, n_frames):
+            pts_nuevos = cls._paso_lk_forward_backward(
+                frames_gris[i - 1], frames_gris[i], pts_actuales, lk_params, umbral_fb=2.0
+            )
+            if len(pts_nuevos) >= 3:
+                desplazamiento = np.median(
+                    pts_nuevos.reshape(-1, 2) - pts_actuales[:len(pts_nuevos)].reshape(-1, 2), axis=0
+                )
+                curr_cx += float(desplazamiento[0])
+                curr_cy += float(desplazamiento[1])
+                pts_actuales = pts_nuevos
+                if len(pts_actuales) < 6:
+                    mascara_local = np.zeros((h_t, w_t), dtype=np.uint8)
+                    cv2.circle(mascara_local, (int(round(curr_cx)), int(round(curr_cy))), rad_busca, 255, -1)
+                    reseed = cv2.goodFeaturesToTrack(
+                        frames_gris[i], maxCorners=25, qualityLevel=0.02, minDistance=3, mask=mascara_local
+                    )
+                    if reseed is not None and len(reseed) >= 4:
+                        pts_actuales = reseed
+            trayectoria[i] = (curr_cx, curr_cy)
+
+        xs = np.array([p[0] for p in trayectoria], dtype=np.float32)
+        ys = np.array([p[1] for p in trayectoria], dtype=np.float32)
+        xs_smooth = cls._suavizar_serie_1d(xs, sigma=2.0)
+        ys_smooth = cls._suavizar_serie_1d(ys, sigma=2.0)
+
+        xs_full = np.clip(xs_smooth * cls.ESC_TRACK, 50.0, WIDTH - 50.0)
+        ys_full = np.clip(ys_smooth * cls.ESC_TRACK, 60.0, HEIGHT - 160.0)
         return list(zip(xs_full.tolist(), ys_full.tolist()))
