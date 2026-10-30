@@ -705,8 +705,10 @@ def iniciar_aplicacion_gui() -> None:
         width=28,
         height=28,
         corner_radius=14,
-        fg_color=PURPLE_MAIN,
-        hover_color=PURPLE_HOVER,
+        fg_color=INPUT_BG,
+        hover_color="#1e2538",
+        border_width=1,
+        border_color="#2a3147",
         text_color="#ffffff",
         font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
     )
@@ -835,8 +837,11 @@ def iniciar_aplicacion_gui() -> None:
         corner_radius=16,
         height=40,
         width=135,
-        fg_color=PURPLE_MAIN,
-        hover_color=PURPLE_HOVER,
+        fg_color=INPUT_BG,
+        hover_color="#1e2538",
+        border_width=1,
+        border_color="#2a3147",
+        text_color="#ffffff",
         font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
     btn_add_canal.pack(side="right", anchor="center")
@@ -1178,8 +1183,10 @@ def iniciar_aplicacion_gui() -> None:
             corner_radius=18,
             height=42,
             width=42,
-            fg_color=PURPLE_MAIN,
-            hover_color=PURPLE_HOVER,
+            fg_color=INPUT_BG,
+            hover_color="#1e2538",
+            border_width=1,
+            border_color="#2a3147",
             text_color="#ffffff",
             font=ctk.CTkFont(size=15, weight="bold"),
         )
@@ -1944,14 +1951,78 @@ def iniciar_aplicacion_gui() -> None:
         card_api.pack(fill="x", padx=24, pady=(0, 10))
 
         top_api = ctk.CTkFrame(card_api, fg_color="transparent")
-        top_api.pack(fill="x", padx=18, pady=(12, 4))
+        top_api.pack(fill="x", padx=18, pady=(12, 8))
 
         ctk.CTkLabel(
             top_api,
-            text="Claves API de Gemini / Argon 4 (Multi-Cuenta)",
+            text="Claves API",
             font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(side="left")
+
+        def _mostrar_ayuda_api():
+            win_h = ctk.CTkToplevel(win)
+            win_h.title("Guía de Claves API")
+            win_h.geometry("490x240")
+            win_h.resizable(False, False)
+            aplicar_icono_ventana(win_h)
+            win_h.transient(win)
+            win_h.grab_set()
+
+            try:
+                win_h.update_idletasks()
+                x = win.winfo_x() + (win.winfo_width() // 2) - 245
+                y = win.winfo_y() + (win.winfo_height() // 2) - 120
+                win_h.geometry(f"+{max(0, x)}+{max(0, y)}")
+            except Exception:
+                pass
+
+            f_c = ctk.CTkFrame(win_h, fg_color="#101524", corner_radius=16, border_width=1, border_color="#222b42")
+            f_c.pack(fill="both", expand=True, padx=14, pady=14)
+
+            ctk.CTkLabel(
+                f_c,
+                text="Claves API de Gemini / Argon 4",
+                font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+                text_color=TEXT_MAIN,
+            ).pack(anchor="w", padx=16, pady=(12, 8))
+
+            ctk.CTkLabel(
+                f_c,
+                text="• Podés ingresar 1 o varias claves (una por línea o separadas por coma).\n\n• La app rota automáticamente entre cuentas si alguna agota su cuota diaria (429).\n\n• Podés obtener claves gratuitas en Google AI Studio con cualquier cuenta de Google.",
+                font=ctk.CTkFont(family="Segoe UI", size=11),
+                text_color="#cbd5e1",
+                justify="left",
+                anchor="w",
+            ).pack(fill="x", padx=16, pady=(0, 14))
+
+            ctk.CTkButton(
+                f_c,
+                text="Entendido",
+                command=win_h.destroy,
+                corner_radius=10,
+                height=28,
+                width=100,
+                fg_color=PURPLE_MAIN,
+                hover_color=PURPLE_HOVER,
+                font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            ).pack(pady=(0, 6))
+
+        btn_ayuda_api = ctk.CTkButton(
+            top_api,
+            text="?",
+            command=_mostrar_ayuda_api,
+            corner_radius=11,
+            width=22,
+            height=22,
+            fg_color="#1e293b",
+            hover_color="#334155",
+            border_width=1,
+            border_color="#334155",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color=CYAN_ACCENT,
+        )
+        btn_ayuda_api.pack(side="left", padx=(8, 0))
 
         ctk.CTkButton(
             top_api,
@@ -1965,15 +2036,6 @@ def iniciar_aplicacion_gui() -> None:
             text_color=CYAN_ACCENT,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         ).pack(side="right")
-
-        ctk.CTkLabel(
-            card_api,
-            text="Ingresá 1 o varias claves (una por línea o separadas por coma). La app rotará cuentas si una agota su cuota (429).",
-            font=ctk.CTkFont(family="Segoe UI", size=11),
-            text_color=TEXT_MUTED,
-            anchor="w",
-            justify="left",
-        ).pack(fill="x", padx=18, pady=(0, 6))
 
         keys_existentes = obtener_gemini_api_keys()
         txt_k = ctk.CTkTextbox(
@@ -2202,23 +2264,24 @@ def iniciar_aplicacion_gui() -> None:
         from shorts_engine.gemini_ia import obtener_modelos_plantilla
         _render_resultado_modelos(obtener_modelos_plantilla())
 
-        # 4. Carpeta Output
+        # 4. Carpetas Output y Assets
         card_tools = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
         card_tools.pack(fill="x", padx=24, pady=(0, 12))
 
         grid_t = ctk.CTkFrame(card_tools, fg_color="transparent")
-        grid_t.pack(fill="x", padx=16, pady=(10, 10))
+        grid_t.pack(fill="x", padx=14, pady=(10, 10))
+        grid_t.grid_columnconfigure((0, 1), weight=1, uniform="tools")
 
         ctk.CTkButton(
             grid_t,
-            text="Abrir Carpeta de Recursos y Efectos (Assets)",
+            text="Abrir Carpeta Assets",
             command=abrir_carpeta_assets,
             corner_radius=14,
             height=36,
             fg_color="#1e2436",
             hover_color="#2d354d",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-        ).pack(fill="x", padx=4, pady=(0, 6))
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        ).grid(row=0, column=0, padx=4, pady=2, sticky="ew")
 
         ctk.CTkButton(
             grid_t,
@@ -2228,8 +2291,8 @@ def iniciar_aplicacion_gui() -> None:
             height=36,
             fg_color="#1e2436",
             hover_color="#2d354d",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-        ).pack(fill="x", padx=4)
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        ).grid(row=0, column=1, padx=4, pady=2, sticky="ew")
 
         aplicar_icono_ventana(win)
         win.update_idletasks()
@@ -2289,13 +2352,28 @@ def iniciar_aplicacion_gui() -> None:
         pop.grid_columnconfigure(0, weight=1)
         pop.grid_rowconfigure(3, weight=1)
 
+        top_header_pop = ctk.CTkFrame(pop, fg_color="transparent")
+        top_header_pop.grid(row=0, column=0, sticky="ew", padx=22, pady=(16, 10))
+
         lbl_tit_pop = ctk.CTkLabel(
-            pop,
+            top_header_pop,
             text="Elegir Cuenta de Subida",
-            font=ctk.CTkFont(family="Segoe UI", size=20, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
             text_color=TEXT_MAIN,
         )
-        lbl_tit_pop.grid(row=0, column=0, sticky="w", padx=22, pady=(16, 10))
+        lbl_tit_pop.pack(side="left")
+
+        ctk.CTkButton(
+            top_header_pop,
+            text="+ Vincular Nueva Cuenta",
+            command=lambda: (pop.destroy(), vincular_nueva_cuenta_gui(root)),
+            corner_radius=12,
+            height=30,
+            fg_color="#1e293b",
+            hover_color="#334155",
+            text_color=CYAN_ACCENT,
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        ).pack(side="right")
 
         try:
             from subir_a_youtube import listar_cuentas_vinculadas
@@ -2464,10 +2542,45 @@ def iniciar_aplicacion_gui() -> None:
                     text_color=CYAN_ACCENT if es_activa else TEXT_MUTED,
                 ).pack(anchor="w")
 
+                def _aplicar_cambios_inmediatos() -> None:
+                    m_f = mapa_modo_seg.get(seg_modo_var.get(), "una")
+                    estr_f = mapa_strat_seg.get(seg_strat_var.get(), "cross_posting")
+                    estado_seleccion_cuentas["estrategia"] = estr_f
+                    if m_f == "todas":
+                        cid_prev = str(estado_seleccion_cuentas.get("cuenta_id") or "")
+                        if cid_prev:
+                            canales_por_cuenta[cid_prev] = list(lista_canales)
+                        estado_seleccion_cuentas["modo"] = "todas"
+                    elif m_f == "grupo":
+                        elegidos_g = [k for k, v in vars_checks_grupo.items() if v.get()]
+                        if not elegidos_g and cuentas_disp:
+                            elegidos_g = [str(cuentas_disp[0].get("id") or "principal")]
+                        cid_prev = str(estado_seleccion_cuentas.get("cuenta_id") or "")
+                        if cid_prev:
+                            canales_por_cuenta[cid_prev] = list(lista_canales)
+                        estado_seleccion_cuentas["modo"] = "grupo"
+                        estado_seleccion_cuentas["grupo_ids"] = elegidos_g
+                    else:
+                        nuevo_cid = cid_temp.get() or (str(cuentas_disp[0].get("id") or "principal") if cuentas_disp else "principal")
+                        _sincronizar_canales_de_cuenta_activa(nuevo_cid, guardar_previo=True)
+                        estado_seleccion_cuentas["modo"] = "una"
+                        estado_seleccion_cuentas["cuenta_id"] = nuevo_cid
+
+                    refrescar_selector_cuentas_ui()
+                    refrescar_plan_ui()
+                    _guardar_memoria()
+
                 if m_sel == "una":
                     def _marcar_esta(cid_x=c_id):
                         cid_temp.set(cid_x)
+                        estado_seleccion_cuentas["modo"] = "una"
+                        estado_seleccion_cuentas["cuenta_id"] = cid_x
+                        _sincronizar_canales_de_cuenta_activa(cid_x, guardar_previo=True)
+                        _aplicar_cambios_inmediatos()
                         _render_lista_popup("1 Cuenta")
+
+                    item_f.bind("<Button-1>", lambda _e, cx=c_id: _marcar_esta(cx))
+                    info_col.bind("<Button-1>", lambda _e, cx=c_id: _marcar_esta(cx))
 
                     ctk.CTkButton(
                         item_f,
@@ -2486,10 +2599,23 @@ def iniciar_aplicacion_gui() -> None:
                         vars_checks_grupo[c_id] = tk.BooleanVar(
                             value=(c_id in grupo_actual) or (not grupo_actual and c_id == cid_actual)
                         )
+
+                    def _al_cambiar_check_grupo():
+                        _aplicar_cambios_inmediatos()
+
+                    def _toggle_click_fila(cid_x=c_id):
+                        if cid_x in vars_checks_grupo:
+                            vars_checks_grupo[cid_x].set(not vars_checks_grupo[cid_x].get())
+                            _aplicar_cambios_inmediatos()
+
+                    item_f.bind("<Button-1>", lambda _e, cx=c_id: _toggle_click_fila(cx))
+                    info_col.bind("<Button-1>", lambda _e, cx=c_id: _toggle_click_fila(cx))
+
                     ctk.CTkCheckBox(
                         item_f,
                         text="",
                         variable=vars_checks_grupo[c_id],
+                        command=_al_cambiar_check_grupo,
                         width=24,
                         checkbox_width=22,
                         checkbox_height=22,
@@ -2505,11 +2631,36 @@ def iniciar_aplicacion_gui() -> None:
                         text_color=GREEN_ACCENT,
                     ).pack(side="right", padx=14)
 
+        def _al_cambiar_modo_toggle(val_modo: str) -> None:
+            m_f = mapa_modo_seg.get(val_modo, "una")
+            estado_seleccion_cuentas["modo"] = m_f
+            if m_f == "todas":
+                cid_prev = str(estado_seleccion_cuentas.get("cuenta_id") or "")
+                if cid_prev:
+                    canales_por_cuenta[cid_prev] = list(lista_canales)
+            elif m_f == "grupo":
+                cid_prev = str(estado_seleccion_cuentas.get("cuenta_id") or "")
+                if cid_prev:
+                    canales_por_cuenta[cid_prev] = list(lista_canales)
+                elegidos_g = [k for k, v in vars_checks_grupo.items() if v.get()]
+                if not elegidos_g and cuentas_disp:
+                    elegidos_g = [str(cuentas_disp[0].get("id") or "principal")]
+                estado_seleccion_cuentas["grupo_ids"] = elegidos_g
+            else:
+                nuevo_cid = cid_temp.get() or (str(cuentas_disp[0].get("id") or "principal") if cuentas_disp else "principal")
+                _sincronizar_canales_de_cuenta_activa(nuevo_cid, guardar_previo=True)
+                estado_seleccion_cuentas["cuenta_id"] = nuevo_cid
+
+            refrescar_selector_cuentas_ui()
+            refrescar_plan_ui()
+            _guardar_memoria()
+            _render_lista_popup(val_modo)
+
         seg_modo = ctk.CTkSegmentedButton(
             pop,
             values=["1 Cuenta", "Todas", "Grupo"],
             variable=seg_modo_var,
-            command=_render_lista_popup,
+            command=_al_cambiar_modo_toggle,
             corner_radius=14,
             height=34,
             selected_color=PURPLE_MAIN,
@@ -2522,57 +2673,15 @@ def iniciar_aplicacion_gui() -> None:
 
         ctk.CTkButton(
             bot_bar,
-            text="+ Vincular Nueva Cuenta",
-            command=lambda: (pop.destroy(), vincular_nueva_cuenta_gui(root)),
+            text="Listo",
+            command=pop.destroy,
             corner_radius=14,
             height=36,
-            fg_color="#1e293b",
-            hover_color="#334155",
-            text_color=CYAN_ACCENT,
+            fg_color="#1e2436",
+            hover_color="#2d354d",
+            text_color="#ffffff",
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-        ).pack(side="left", fill="x", expand=True, padx=(0, 6))
-
-        def _aplicar_cierre_popup() -> None:
-            m_f = mapa_modo_seg.get(seg_modo_var.get(), "una")
-            estr_f = mapa_strat_seg.get(seg_strat_var.get(), "cross_posting")
-            estado_seleccion_cuentas["estrategia"] = estr_f
-            if m_f == "todas":
-                # Guardar canales de la cuenta que estaba activa
-                cid_prev = str(estado_seleccion_cuentas.get("cuenta_id") or "")
-                if cid_prev:
-                    canales_por_cuenta[cid_prev] = list(lista_canales)
-                estado_seleccion_cuentas["modo"] = "todas"
-            elif m_f == "grupo":
-                elegidos_g = [k for k, v in vars_checks_grupo.items() if v.get()]
-                if not elegidos_g and cuentas_disp:
-                    elegidos_g = [str(cuentas_disp[0].get("id") or "principal")]
-                cid_prev = str(estado_seleccion_cuentas.get("cuenta_id") or "")
-                if cid_prev:
-                    canales_por_cuenta[cid_prev] = list(lista_canales)
-                estado_seleccion_cuentas["modo"] = "grupo"
-                estado_seleccion_cuentas["grupo_ids"] = elegidos_g
-            else:
-                # Modo 1 Cuenta: aplicar la cuenta elegida en cid_temp
-                nuevo_cid = cid_temp.get() or (str(cuentas_disp[0].get("id") or "principal") if cuentas_disp else "principal")
-                _sincronizar_canales_de_cuenta_activa(nuevo_cid, guardar_previo=True)
-                estado_seleccion_cuentas["modo"] = "una"
-
-            refrescar_selector_cuentas_ui()
-            refrescar_plan_ui()
-            _guardar_memoria()
-            pop.destroy()
-
-        ctk.CTkButton(
-            bot_bar,
-            text="Aplicar Selección",
-            command=_aplicar_cierre_popup,
-            corner_radius=14,
-            height=36,
-            fg_color=GREEN_ACCENT,
-            hover_color="#059669",
-            text_color="#052e16",
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-        ).pack(side="right", fill="x", expand=True, padx=(6, 0))
+        ).pack(fill="x")
 
         _render_lista_popup()
 
