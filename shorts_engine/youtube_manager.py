@@ -275,6 +275,42 @@ def registrar_video_usado(video_id_o_url: str, cuenta_id: Optional[str] = None) 
         pass
 
 
+def descartar_video_para_siempre(video_id_o_url: str) -> None:
+    """
+    Registra el video en todas las cuentas de historial_usados.json para que
+    la app nunca más vuelva a seleccionarlo ni subirlo en ninguna cuenta.
+    """
+    vid = video_id_o_url.strip()
+    m = re.search(r"(?:shorts/|v=|youtu\.be/)([A-Za-z0-9_-]{11})", vid)
+    v_clean = m.group(1) if m else vid
+    if not v_clean:
+        return
+
+    datos: Dict[str, List[str]] = {}
+    if HISTORIAL_USADOS_FILE.exists():
+        try:
+            raw = json.loads(HISTORIAL_USADOS_FILE.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                datos = {k: list(v) for k, v in raw.items() if isinstance(v, list)}
+            elif isinstance(raw, list):
+                datos = {"default": list(raw)}
+        except Exception:
+            datos = {}
+
+    claves = set(datos.keys()) | {"default", "principal"}
+    for k in claves:
+        if k not in datos:
+            datos[k] = []
+        if v_clean not in datos[k]:
+            datos[k].append(v_clean)
+            datos[k].sort()
+
+    try:
+        HISTORIAL_USADOS_FILE.write_text(json.dumps(datos, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def _fecha_cuota_pacifico_iso() -> str:
     """
     La cuota de YouTube Data API v3 se reinicia todos los días a las 00:00 Pacific Time (UTC-7/UTC-8).

@@ -530,6 +530,26 @@ class RastreadorObjetivosVideo:
 
         spec_clean = _quitar_acentos(str(especificacion).strip().lower())
 
+        # Caso Fijo / Sin Tracking: posición estática manual
+        if "fijo:" in spec_clean or "static:" in spec_clean:
+            spec_sin_fijo = spec_clean.replace("fijo:", "").replace("static:", "").strip()
+            m_fijo = re.search(r"(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)", spec_sin_fijo)
+            if m_fijo:
+                xf_pct = float(m_fijo.group(1))
+                yf_pct = float(m_fijo.group(2))
+                x_px = (xf_pct / 100.0) * WIDTH
+                y_px = (yf_pct / 100.0) * HEIGHT
+                return [(float(x_px), float(y_px))] * n_frames
+
+        # Caso Coordenada Fija para Flechas (ej: 50.0,40.0)
+        m_coord_pura = re.match(r"^(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)$", spec_clean)
+        if m_coord_pura:
+            xf_pct = float(m_coord_pura.group(1))
+            yf_pct = float(m_coord_pura.group(2))
+            x_px = (xf_pct / 100.0) * WIDTH
+            y_px = (yf_pct / 100.0) * HEIGHT
+            return [(float(x_px), float(y_px))] * n_frames
+
         # Caso 0: Detección semántica de objeto (Grounding de Gemini)
         if "box:" in spec_clean or "box:[" in spec_clean or ("," in spec_clean and "->" not in spec_clean):
             info_c = parsear_directiva_circulo(especificacion, t_inicio_seg, t_fin_seg)

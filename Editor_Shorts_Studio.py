@@ -2113,7 +2113,7 @@ def iniciar_aplicacion_gui() -> None:
         def _mostrar_ayuda_cuotas():
             win_h = ctk.CTkToplevel(win)
             win_h.title("Guía de Colores y Cuotas")
-            win_h.geometry("550x340")
+            win_h.geometry("580x360")
             win_h.resizable(False, False)
             aplicar_icono_ventana(win_h)
             win_h.transient(win)
@@ -2121,8 +2121,8 @@ def iniciar_aplicacion_gui() -> None:
 
             try:
                 win_h.update_idletasks()
-                x = win.winfo_x() + (win.winfo_width() // 2) - 275
-                y = win.winfo_y() + (win.winfo_height() // 2) - 170
+                x = win.winfo_x() + (win.winfo_width() // 2) - 290
+                y = win.winfo_y() + (win.winfo_height() // 2) - 180
                 win_h.geometry(f"+{max(0, x)}+{max(0, y)}")
             except Exception:
                 pass
@@ -2138,15 +2138,15 @@ def iniciar_aplicacion_gui() -> None:
             ).pack(anchor="w", padx=16, pady=(12, 10))
 
             items = [
-                ("🟢 Verde (Disponible):", "Al menos 1 cuenta tiene cuota activa para videos (ej: 3.5 (4/4) o 3.8 (1/4)).", "#34d399"),
-                ("🟠 Naranja (Con demora):", "Hay cuota disponible pero Google presenta demora alta o congestión de servidores.", "#fbbf24"),
-                ("🔴 Rojo (Agotado):", "Todas las cuentas del pool agotaron el cupo diario de solicitudes (0/4 con 429).", "#f87171"),
-                ("🟣 Púrpura (Plan Pago):", "Modelo que requiere plan con facturación en Google AI Studio (sin cuota gratuita).", "#a5b4fc"),
+                ("🟢 Borde Verde (Disponible):", "Cuentas listas con cuota activa. Si consumiste alguna cuenta por cuota diaria (429), muestra ej. 3/4 en verde porque las restantes están listas para trabajar.", "#34d399"),
+                ("🟠 Borde Naranja (Tráfico):", "La cuenta que se perdió falló por congestión, saturación temporal o timeout de Google (503 / >1.6s), no por falta de cuota.", "#fbbf24"),
+                ("🔴 Borde Rojo (Agotado):", "Todas las cuentas del pool agotaron el cupo diario de solicitudes (0/4 con 429).", "#f87171"),
+                ("🟣 Borde Púrpura (Plan Pago):", "Modelo que requiere plan con facturación en Google AI Studio (sin cuota gratuita).", "#a5b4fc"),
             ]
             for tit, desc, col in items:
                 r = ctk.CTkFrame(f_c, fg_color="transparent")
                 r.pack(fill="x", padx=16, pady=3)
-                ctk.CTkLabel(r, text=tit, font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"), text_color=col, width=175, anchor="w").pack(side="left")
+                ctk.CTkLabel(r, text=tit, font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"), text_color=col, width=180, anchor="w").pack(side="left")
                 ctk.CTkLabel(r, text=desc, font=ctk.CTkFont(family="Segoe UI", size=10), text_color="#cbd5e1", anchor="w", justify="left").pack(side="left", fill="x", expand=True)
 
             f_info = ctk.CTkFrame(f_c, fg_color="#151b2e", corner_radius=10, border_width=1, border_color="#2a3350")
@@ -2154,7 +2154,7 @@ def iniciar_aplicacion_gui() -> None:
 
             ctk.CTkLabel(
                 f_info,
-                text="⏰ Reinicio diario: Google reinicia las cuotas a medianoche Pacífico (04:00 AM hora de Argentina / UTC-3).\n👥 Multi-cuenta: La prueba analiza todas las cuentas del pool en paralelo.",
+                text="⏰ Reinicio diario: Google reinicia las cuotas a las 00:00 Pacífico (04:00 AM hora de Argentina / UTC-3).\n👥 Multi-cuenta: Comprueba todas las cuentas vinculadas en paralelo. Si todas están sanas muestra solo el nombre (ej: 3.8); si consumiste cuota o hay fallas, indica las cuentas activas (ej: 3/4).",
                 font=ctk.CTkFont(family="Segoe UI", size=10),
                 text_color="#94a3b8",
                 justify="left",
@@ -4537,6 +4537,26 @@ def iniciar_aplicacion_gui() -> None:
                 command=_copiar_url_clip,
             )
             btn_copiar_url.pack(side="right", padx=(2, 0), pady=3)
+
+            def _descartar_para_siempre() -> None:
+                try:
+                    from shorts_engine.youtube_manager import descartar_video_para_siempre
+                    descartar_video_para_siempre(url_video_orig.strip())
+                except Exception:
+                    pass
+                _responder("descartar")
+
+            btn_descartar_perm = ctk.CTkButton(
+                col_izq,
+                text="🗑 Descartar short para siempre",
+                command=_descartar_para_siempre,
+                height=28, corner_radius=8,
+                fg_color="#1f1418", hover_color="#7f1d1d",
+                border_width=1, border_color="#451a22",
+                font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                text_color="#f87171",
+            )
+            btn_descartar_perm.pack(fill="x", padx=16, pady=(0, 10))
 
         # ── Columna derecha ────────────────────────────────────────────────
         col_der = ctk.CTkFrame(panel_principal, fg_color="transparent")

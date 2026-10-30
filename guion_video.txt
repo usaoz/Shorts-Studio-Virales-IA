@@ -1,19 +1,17 @@
-TITULO_SUPERIOR: school_outside_window
-TITULO_YOUTUBE: Vivía tan cerca del colegio que pasaba esto 😱 #shorts
-DESCRIPCION_YOUTUBE: Este estudiante encontró la forma más absurda de ir a la escuela todos los días. ¿Habrías hecho lo mismo en su lugar? #shorts #viral
+TITULO_SUPERIOR: EscapeHamster
+TITULO_YOUTUBE: ¡LA ESCAPADA MÁS ÉPICA DEL HÁMSTER Y EL GATO! 🐭💥 #shorts
+DESCRIPCION_YOUTUBE: Un hámster toy desafía todos los obstáculos de una pista increíble para escapar de un gato malvado. ¿Logrará cruzar la meta sin ser atrapado? #shorts #viral
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-30 13:00
+SCHEDULE: 2026-10-31 19:30
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
 ARCHIVO_SALIDA: auto
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:04 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | ¡Este alumno sale disparado hacia el colegio pero su llegada será totalmente inesperada!
-00:04 - 00:08 | alerta_roja | riser_suction | diablo:izquierda | izquierda | ninguno | El profesor se pone estricto y le exige que saque su cuaderno inmediatamente.
-00:08 - 00:13 | temblor | punch+xp_Error | risa:derecha | derecha | ninguno | ¡Ay no! ¡Se da cuenta de que olvidó su libreta y debe regresar corriendo a buscarla!
-00:13 - 00:17 | zoom_in | click | enojo:centro | ninguna | ninguno | El maestro furioso le ordena que traiga a su mamá para reclamarle su terrible despiste.
-00:17 - 00:22 | blanco_negro | vine_boom | risa:izquierda | ninguna | ninguno | ¡Menuda sorpresa se lleva el profesor al descubrir que la casa está justo al lado!
-00:22 - 00:26 | zoom_impacto | whoosh | cerebro:derecha | ninguna | ninguno | Ya en clase el wifi no funciona bien y la conexión resulta verdaderamente desesperante.
-00:26 - 00:30 | flash | ding | fuego:derecha | ninguna | ninguno | ¡Qué casualidad! El internet del aula se conecta misteriosamente con la red de su casa.
-00:30 - 00:35 | brillo_epico | cash_ting+party_horn | fiesta:derecha | centro | ninguno | Mientras el profesor se esfuerza explicando, este genio de la vagancia prefiere dormir plácidamente.
+00:00 - 00:04 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | ¡Este gato cree que va a atrapar al pequeño hámster en este circuito peligroso!
+00:04 - 00:09 | zoom_in | whoosh | ojos:izquierda | ninguna | box:[610,340,770,560]@00:06:raton | ¡Pero mira con qué velocidad se desliza el ratón dejando a su perseguidor totalmente desorientado!
+00:09 - 00:14 | alerta_roja | riser_suction+cartoon_laugh | risa:derecha | ninguna | ninguno | ¡Miren cómo sube por el ascensor jirafa mientras el gato gordo no cabe por la puerta!
+00:14 - 00:19 | temblor | suspense_hit | diablo:izquierda | ninguna | ninguno | ¡El mono lo impulsa hacia abajo pero la verdadera trampa mortal recién está por comenzar aquí!
+00:19 - 00:23 | flash | punch+good_idea | sorprendido:centro | ninguna | ninguno | ¡El cocodrilo casi se lo traga, pero el elefante lo rescata milagrosamente justo a tiempo!
+00:23 - 00:26 | brillo_epico | cash_ting+party_horn | fiesta:derecha | ninguna | ninguno | ¡El hámster llega a su meta sano y salvo porque jamás...

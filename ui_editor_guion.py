@@ -76,6 +76,126 @@ def mmss_a_seg(texto: str) -> float:
     return 0.0
 
 
+def abrir_dialogo_posicion_pantalla(parent_win, datos_bloque: Dict, on_aplicar: Callable):
+    import tkinter as tk
+    import re
+    win_p = ctk.CTkToplevel(parent_win)
+    win_p.title("🎯 Posicionar Círculo y Flechas en Pantalla")
+    win_p.geometry("440x600")
+    win_p.resizable(False, False)
+    win_p.configure(fg_color="#0e111a")
+    win_p.transient(parent_win)
+    win_p.grab_set()
+
+    tipo_var = ctk.StringVar(value="circulo")
+    tam_var = ctk.StringVar(value="medio")
+    track_var = ctk.BooleanVar(value=True)
+
+    c_ini = str(datos_bloque.get("circulo", "")).strip()
+    f_ini = str(datos_bloque.get("flecha", "")).strip()
+
+    pos_x = 50.0
+    pos_y = 45.0
+
+    m_c = re.search(r"(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)", c_ini or f_ini)
+    if m_c:
+        pos_x = float(m_c.group(1))
+        pos_y = float(m_c.group(2))
+    if ":chico" in c_ini:
+        tam_var.set("chico")
+    elif ":grande" in c_ini:
+        tam_var.set("grande")
+    if "fijo:" in c_ini or "static:" in c_ini or "fijo:" in f_ini:
+        track_var.set(False)
+
+    lbl_coord = ctk.CTkLabel(
+        win_p, text=f"🎯 Posición: X: {pos_x:.1f}% | Y: {pos_y:.1f}%",
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+        text_color="#38bdf8"
+    )
+    lbl_coord.pack(pady=(12, 6))
+
+    CW, CH = 216, 384
+    canvas = tk.Canvas(win_p, width=CW, height=CH, bg="#050811", highlightthickness=1, highlightbackground="#252B3D")
+    canvas.pack(pady=4)
+
+    def _redibujar():
+        canvas.delete("all")
+        canvas.create_line(CW * 0.33, 0, CW * 0.33, CH, fill="#151b28", dash=(2, 2))
+        canvas.create_line(CW * 0.66, 0, CW * 0.66, CH, fill="#151b28", dash=(2, 2))
+        canvas.create_line(0, CH * 0.33, CW, CH * 0.33, fill="#151b28", dash=(2, 2))
+        canvas.create_line(0, CH * 0.66, CW, CH * 0.66, fill="#151b28", dash=(2, 2))
+        canvas.create_line(CW * 0.50, 0, CW * 0.50, CH, fill="#1e2638", dash=(4, 4))
+        canvas.create_line(0, CH * 0.50, CW, CH * 0.50, fill="#1e2638", dash=(4, 4))
+
+        px = (pos_x / 100.0) * CW
+        py = (pos_y / 100.0) * CH
+
+        t = tipo_var.get()
+        tam = tam_var.get()
+        r_px = 18 if tam == "chico" else (26 if tam == "medio" else 36)
+
+        if t in ("circulo", "ambos"):
+            canvas.create_oval(px - r_px, py - r_px, px + r_px, py + r_px, outline="#ef4444", width=3)
+            canvas.create_oval(px - 3, py - 3, px + 3, py + 3, fill="#ef4444", outline="")
+
+        if t in ("flecha", "ambos"):
+            fx0 = px + 42
+            fy0 = py - 42
+            canvas.create_line(fx0, fy0, px + (r_px if t == "ambos" else 4), py - (r_px if t == "ambos" else 4), fill="#f59e0b", width=3, arrow=tk.LAST, arrowshape=(10, 12, 4))
+
+        lbl_coord.configure(text=f"🎯 Posición: X: {pos_x:.1f}% | Y: {pos_y:.1f}%")
+
+    def _on_canvas_click(event):
+        nonlocal pos_x, pos_y
+        pos_x = max(5.0, min(95.0, (event.x / float(CW)) * 100.0))
+        pos_y = max(8.0, min(92.0, (event.y / float(CH)) * 100.0))
+        _redibujar()
+
+    canvas.bind("<Button-1>", _on_canvas_click)
+    canvas.bind("<B1-Motion>", _on_canvas_click)
+    _redibujar()
+
+    f_ctrls = ctk.CTkFrame(win_p, fg_color="transparent")
+    f_ctrls.pack(fill="x", padx=18, pady=(8, 4))
+
+    ctk.CTkSegmentedButton(
+        f_ctrls, values=["⭕ Círculo", "↗️ Flecha", "⭕+↗️ Ambos"],
+        variable=ctk.StringVar(value="⭕ Círculo"),
+        command=lambda v: (tipo_var.set("circulo" if "Círculo" in v else ("flecha" if "Flecha" in v else "ambos")), _redibujar()),
+        height=26, corner_radius=8, font=ctk.CTkFont(size=11, weight="bold")
+    ).pack(fill="x", pady=2)
+
+    row_opt = ctk.CTkFrame(f_ctrls, fg_color="transparent")
+    row_opt.pack(fill="x", pady=4)
+
+    ctk.CTkOptionMenu(
+        row_opt, values=["chico", "medio", "grande"], variable=tam_var,
+        command=lambda _: _redibujar(), width=95, height=26, corner_radius=6, font=ctk.CTkFont(size=11)
+    ).pack(side="left", padx=(0, 8))
+
+    ctk.CTkCheckBox(
+        row_opt, text="Seguir objeto (Tracking IA)", variable=track_var,
+        font=ctk.CTkFont(size=11, weight="bold"), checkbox_width=18, checkbox_height=18, corner_radius=4
+    ).pack(side="left")
+
+    def _guardar_y_cerrar():
+        t = tipo_var.get()
+        tam = tam_var.get()
+        tracking = track_var.get()
+        pref = "" if tracking else "fijo:"
+        res_circulo = f"{pref}{pos_x:.1f},{pos_y:.1f}:{tam}" if t in ("circulo", "ambos") else "ninguno"
+        res_flecha = f"{pref}{pos_x:.1f},{pos_y:.1f}" if t in ("flecha", "ambos") else "ninguna"
+        on_aplicar(res_circulo, res_flecha)
+        win_p.destroy()
+
+    ctk.CTkButton(
+        win_p, text="Aplicar Posición", command=_guardar_y_cerrar,
+        corner_radius=10, height=32, fg_color="#10b981", hover_color="#059669",
+        text_color="#052e16", font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold")
+    ).pack(fill="x", padx=18, pady=(4, 12))
+
+
 class BloqueGuionCard(ctk.CTkFrame):
     """Tarjeta interactiva con edición de tiempos manual sincronizada y controles de reordenamiento."""
 
@@ -193,18 +313,14 @@ class BloqueGuionCard(ctk.CTkFrame):
         # ---------------- FILA 3: VOICEOVER / TEXTO DE NARRACIÓN ----------------
         vo_frame = ctk.CTkFrame(self, fg_color="transparent")
         vo_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(4, 8))
-        vo_frame.grid_columnconfigure(1, weight=1)
-
-        ctk.CTkLabel(
-            vo_frame, text="🎙️ Voz:", font=ctk.CTkFont(size=12, weight="bold")
-        ).grid(row=0, column=0, padx=(0, 6), sticky="w")
+        vo_frame.grid_columnconfigure(0, weight=1)
 
         self.entry_texto = ctk.CTkEntry(
             vo_frame, height=32, font=ctk.CTkFont(size=13),
-            placeholder_text="Escribe aquí el texto del voiceover con signos ¡!..."
+            placeholder_text="Escribe aquí el texto del guion con signos ¡!..."
         )
         self.entry_texto.insert(0, str(self.datos.get("texto", "")))
-        self.entry_texto.grid(row=0, column=1, sticky="ew")
+        self.entry_texto.grid(row=0, column=0, sticky="ew")
         self.entry_texto.bind("<KeyRelease>", self._on_texto_edit)
 
     def _on_fin_edited(self, _event=None):
@@ -265,6 +381,40 @@ class BloqueGuionCard(ctk.CTkFrame):
         self.opt_circulo = self._crear_selector(
             self.assets_frame, "⭕ Círculo (9 Pos)", LISTA_CIRCULOS, self.datos.get("circulo", "ninguno"), width=130
         )
+
+        f_btn_pos = ctk.CTkFrame(self.assets_frame, fg_color="transparent")
+        f_btn_pos.pack(side="left", padx=(6, 2), pady=(14, 0))
+        btn_pos = ctk.CTkButton(
+            f_btn_pos,
+            text="🎯 Posicionar",
+            command=self._abrir_selector_posicion,
+            width=110,
+            height=26,
+            fg_color="#1e3a5f",
+            hover_color="#2b5387",
+            font=ctk.CTkFont(size=11, weight="bold"),
+        )
+        btn_pos.pack()
+
+    def _abrir_selector_posicion(self):
+        def _on_aplicar(c_val, f_val):
+            if c_val != "ninguno":
+                self.datos["circulo"] = c_val
+                if hasattr(self, "opt_circulo"):
+                    val_c = list(self.opt_circulo.cget("values"))
+                    if c_val not in val_c:
+                        self.opt_circulo.configure(values=val_c + [c_val])
+                    self.opt_circulo.set(c_val)
+            if f_val != "ninguna":
+                self.datos["flecha"] = f_val
+                if hasattr(self, "opt_flecha"):
+                    val_f = list(self.opt_flecha.cget("values"))
+                    if f_val not in val_f:
+                        self.opt_flecha.configure(values=val_f + [f_val])
+                    self.opt_flecha.set(f_val)
+            self.on_change()
+
+        abrir_dialogo_posicion_pantalla(self.winfo_toplevel(), self.datos, _on_aplicar)
 
     def _destruir_assets_frame(self):
         """Libera la memoria de Tkinter destruyendo los OptionMenus de la tarjeta."""
@@ -396,17 +546,13 @@ class VisualScriptEditor(ctk.CTkFrame):
     def _build_header(self):
         header = ctk.CTkFrame(self, fg_color="#141824", corner_radius=10, border_width=1, border_color="#252B3D")
         header.grid(row=0, column=0, sticky="ew", padx=4, pady=(0, 6))
-        header.grid_columnconfigure(1, weight=1)
-
-        ctk.CTkLabel(
-            header, text="🎬 TÍTULO YOUTUBE:", font=ctk.CTkFont(size=12, weight="bold"), text_color="#94a3b8"
-        ).grid(row=0, column=0, padx=(10, 6), pady=8, sticky="w")
+        header.grid_columnconfigure(0, weight=1)
 
         self.entry_titulo = ctk.CTkEntry(
             header, height=30, font=ctk.CTkFont(size=12, weight="bold"),
-            placeholder_text="Título viral para YouTube con emojis y #shorts..."
+            placeholder_text="Título para YouTube (#shorts)..."
         )
-        self.entry_titulo.grid(row=0, column=1, padx=4, pady=8, sticky="ew")
+        self.entry_titulo.grid(row=0, column=0, padx=(10, 6), pady=8, sticky="ew")
         self.entry_titulo.bind("<KeyRelease>", lambda _: self._actualizar_raw_interno())
 
         btn_add = ctk.CTkButton(
@@ -415,15 +561,7 @@ class VisualScriptEditor(ctk.CTkFrame):
             font=ctk.CTkFont(size=11, weight="bold"),
             command=self._agregar_bloque_arriba
         )
-        btn_add.grid(row=0, column=2, padx=4, pady=8)
-
-        self.btn_toggle_modo = ctk.CTkButton(
-            header, text="🎙️ Solo Voz (Todos)", width=140, height=28,
-            fg_color="#1e3a5f", hover_color="#2a5285",
-            font=ctk.CTkFont(size=11, weight="bold"),
-            command=self._toggle_modo_profundo
-        )
-        self.btn_toggle_modo.grid(row=0, column=3, padx=4, pady=8)
+        btn_add.grid(row=0, column=1, padx=4, pady=8)
 
         self.btn_toggle_raw = ctk.CTkButton(
             header, text="📝 Texto Crudo", width=105, height=28,
@@ -431,7 +569,7 @@ class VisualScriptEditor(ctk.CTkFrame):
             font=ctk.CTkFont(size=11),
             command=self._toggle_vista
         )
-        self.btn_toggle_raw.grid(row=0, column=4, padx=8, pady=8)
+        self.btn_toggle_raw.grid(row=0, column=2, padx=8, pady=8)
 
     def _build_body(self):
         self.scroll_cards = ctk.CTkScrollableFrame(self, fg_color="#0e111a", corner_radius=8)

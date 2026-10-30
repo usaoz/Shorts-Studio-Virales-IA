@@ -427,10 +427,14 @@ class GeminiPoolOrchestrator:
         if status_code in (404, 400):
             self.unsupported_pairs.add((key_idx, model))
             logger.info(f"{self._mask_key(key_idx)} no soporta '{model}' ({status_code}). Descartado en sesión.")
-        elif status_code in (401, 403):
+        elif status_code == 401:
             for m in self.models:
                 self.unsupported_pairs.add((key_idx, m))
-            logger.error(f"{self._mask_key(key_idx)} sin permisos ({status_code}).")
+            logger.error(f"{self._mask_key(key_idx)} clave inválida ({status_code}).")
+        elif status_code == 403:
+            # 403 suele ser por modelo restringido o que requiere billing, no deshabilitar otros modelos
+            self.unsupported_pairs.add((key_idx, model))
+            logger.error(f"{self._mask_key(key_idx)} sin permisos en '{model}' ({status_code}).")
         elif status_code == 429:
             self.cooldown_until[(key_idx, model)] = time.time() + 65.0
             logger.info(f"{self._mask_key(key_idx)} sin cuota en '{model}' (429). Cooldown 65s.")
@@ -438,9 +442,15 @@ class GeminiPoolOrchestrator:
             self.cooldown_until[(key_idx, model)] = time.time() + 20.0
             logger.info(f"Servidor saturado ({status_code}) en {self._mask_key(key_idx)} con '{model}'.")
 
-    async def _probe_single_key(self, key_idx: int, model: str) -> Tuple[int, bool, float]:
-        if not self._is_available(key_idx, model):
-            return key_idx, False, 999.0
+    async def _probe_single_key(
+        self, key_idx: int, model: str, timeout_sec: float = 3.0, ignorar_cooldown: bool = False
+    ) -> Tuple[int, bool, float, str]:
+        """
+        Retorna (key_idx, ok, latencia, estado_detalle).
+        estado_detalle: 'ok', 'cuota' (429), 'trafico' (503/timeout/500), 'tier_pago' (limit:0), 'error'.
+        """
+        if not ignorar_cooldown and not self._is_available(key_idx, model):
+            return key_idx, False, 999.0, "cooldown"
 
         client = self.clients[key_idx]
         t0 = time.perf_counter()
@@ -454,28 +464,40 @@ class GeminiPoolOrchestrator:
                         temperature=0.0,
                     ),
                 ),
-                timeout=1.6,
+                timeout=timeout_sec,
             )
             lat = time.perf_counter() - t0
             self.key_latency[key_idx] = lat
-            return key_idx, True, lat
+            return key_idx, True, lat, "ok"
+        except asyncio.TimeoutError:
+            self._mark_error(key_idx, model, 504)
+            return key_idx, False, 999.0, "trafico"
         except APIError as e:
             code = getattr(e, "code", 500) or 500
             msg = str(e).lower()
             if "limit: 0" in msg or ("free" in msg and "limit: 0" in msg):
                 self.paid_tier_only.add((key_idx, model))
+                self._mark_error(key_idx, model, code)
+                return key_idx, False, 999.0, "tier_pago"
             self._mark_error(key_idx, model, code)
-            return key_idx, False, 999.0
-        except Exception:
-            return key_idx, False, 999.0
+            if code == 429 or "quota" in msg or "resource_exhausted" in msg:
+                return key_idx, False, 999.0, "cuota"
+            elif code in (500, 502, 503, 504) or "unavailable" in msg or "overloaded" in msg:
+                return key_idx, False, 999.0, "trafico"
+            else:
+                return key_idx, False, 999.0, "error"
+        except Exception as e:
+            msg = str(e).lower()
+            if "timeout" in msg:
+                return key_idx, False, 999.0, "trafico"
+            return key_idx, False, 999.0, "error"
 
     def fast_probe_accounts(self, target_model: str) -> List[int]:
         """
-        Ejecuta un micro-ping paralelo en <800ms sobre todas las cuentas para `target_model`.
+        Ejecuta un micro-ping paralelo sobre todas las cuentas para `target_model`.
         Devuelve la lista de índices de cuentas VIVAS ordenadas por menor latencia.
         Usa caché de 180s para evitar re-probar cuentas que ya respondieron OK recientemente.
         """
-        # Retorno rápido en caché si el último probe exitoso fue hace menos de 180s
         cached = self.last_probe_cache.get(target_model)
         if cached:
             ts_cache, lista_previa = cached
@@ -485,7 +507,7 @@ class GeminiPoolOrchestrator:
                     return vivas_ahora
 
         async def _run_probes():
-            tasks = [self._probe_single_key(idx, target_model) for idx in range(len(self.api_keys))]
+            tasks = [self._probe_single_key(idx, target_model, timeout_sec=2.5) for idx in range(len(self.api_keys))]
             return await asyncio.gather(*tasks)
 
         try:
@@ -498,7 +520,7 @@ class GeminiPoolOrchestrator:
             except Exception:
                 pass
 
-        vivas = [idx for idx, ok, _ in sorted(results, key=lambda x: x[2]) if ok]
+        vivas = [idx for idx, ok, _, _ in sorted(results, key=lambda x: x[2]) if ok]
         if vivas:
             self.last_probe_cache[target_model] = (time.time(), vivas)
         return vivas
@@ -506,7 +528,7 @@ class GeminiPoolOrchestrator:
     def auditar_modelos_en_vivo(self) -> List[Dict[str, Any]]:
         """
         Prueba cada modelo en paralelo sobre todas las cuentas sin aplicar cooldowns previos,
-        para entregar un diagnóstico en tiempo real de disponibilidad y cuota.
+        para entregar un diagnóstico en tiempo real de disponibilidad, cuota y tráfico de Google.
         """
         self.cooldown_until.clear()
         self.unsupported_pairs.clear()
@@ -524,21 +546,34 @@ class GeminiPoolOrchestrator:
         total_k = len(self.api_keys)
 
         for m_id, m_nombre, m_corto in modelos_test:
-            vivas = self.fast_probe_accounts(m_id)
-            n_vivas = len(vivas)
-            mejor_lat = min((self.key_latency.get(idx, 999.0) for idx in vivas), default=999.0)
+            async def _run_test_model(mod=m_id):
+                tasks = [self._probe_single_key(idx, mod, timeout_sec=3.5, ignorar_cooldown=True) for idx in range(total_k)]
+                return await asyncio.gather(*tasks)
 
+            res_keys: List[Tuple[int, bool, float, str]] = []
+            if total_k > 0:
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    res_keys = loop.run_until_complete(_run_test_model())
+                finally:
+                    try:
+                        loop.close()
+                    except Exception:
+                        pass
+
+            vivas = [idx for idx, ok, _, _ in res_keys if ok]
+            caidas = [res for res in res_keys if not res[1]]
+            n_vivas = len(vivas)
+            mejor_lat = min((lat for idx, ok, lat, _ in res_keys if ok), default=999.0)
+
+            # Clasificación de fallas
+            estados_caidas = [res[3] for res in caidas]
+            hay_trafico = any(st in ("trafico", "timeout") for st in estados_caidas) or (n_vivas > 0 and mejor_lat >= 1.6)
             es_tier_pago = (
                 any((k, m_id) in self.paid_tier_only for k in range(total_k))
-                or (m_id == "gemini-4-argon" and n_vivas == 0 and any((k, m_id) in self.unsupported_pairs for k in range(total_k)))
+                or (m_id == "gemini-4-argon" and n_vivas == 0 and any(st in ("tier_pago", "error") for st in estados_caidas))
             )
-
-            # Regla de disponibilidad:
-            # - Cuota es VERDE: si al menos 1 cuenta tiene cuota suficiente para procesar videos -> VERDE.
-            # - NARANJA es únicamente por demora alta / cola del servidor de Google (lat >= 1.35s).
-            # - ROJO: Agotado (0 cuentas disponibles, todas 429).
-            # - PÚRPURA: Modelo que requiere facturación paga en AI Studio.
-            tiene_demora = n_vivas > 0 and (mejor_lat >= 1.35)
 
             if total_k == 0:
                 tipo = "sin_claves"
@@ -558,25 +593,7 @@ class GeminiPoolOrchestrator:
                 pill_bg = "#252849"
                 txt_col = "#a5b4fc"
                 label_box = m_corto
-            elif n_vivas > 0:
-                if tiene_demora:
-                    tipo = "con_demora"
-                    tag = "CON DEMORA"
-                    desc = f"{n_vivas}/{total_k} con demora ({mejor_lat:.1f}s)"
-                    borde = "#f59e0b"
-                    bg = "#281b09"
-                    pill_bg = "#3d2b0e"
-                    txt_col = "#fbbf24"
-                else:
-                    tipo = "disponible"
-                    tag = "DISPONIBLE"
-                    desc = f"{n_vivas}/{total_k} listas (<1s)"
-                    borde = "#10b981"
-                    bg = "#072419"
-                    pill_bg = "#0c3827"
-                    txt_col = "#34d399"
-                label_box = f"{m_corto} ({n_vivas}/{total_k})" if total_k > 1 else m_corto
-            else:
+            elif n_vivas == 0:
                 tipo = "agotado"
                 tag = "AGOTADO"
                 desc = "Sin cuota diaria (429)"
@@ -585,6 +602,26 @@ class GeminiPoolOrchestrator:
                 pill_bg = "#3d161d"
                 txt_col = "#f87171"
                 label_box = f"{m_corto} (0/{total_k})" if total_k > 1 else m_corto
+            elif hay_trafico:
+                # El usuario pierde cuentas o tiene demora por congestión de servidores de Google
+                tipo = "con_demora"
+                tag = "MUCHO TRÁFICO"
+                desc = f"{n_vivas}/{total_k} con congestión ({mejor_lat:.1f}s)"
+                borde = "#f59e0b"
+                bg = "#281b09"
+                pill_bg = "#3d2b0e"
+                txt_col = "#fbbf24"
+                label_box = f"{m_corto} ({n_vivas}/{total_k})" if total_k > 1 else m_corto
+            else:
+                # Cuentas vivas con cuota activa; si se gastó alguna fue por cuota diaria 429
+                tipo = "disponible"
+                tag = "DISPONIBLE"
+                desc = f"{n_vivas}/{total_k} listas (<1s)"
+                borde = "#10b981"
+                bg = "#072419"
+                pill_bg = "#0c3827"
+                txt_col = "#34d399"
+                label_box = f"{m_corto} ({n_vivas}/{total_k})" if (total_k > 1 and n_vivas < total_k) else m_corto
 
             resultados.append({
                 "id": m_id,
