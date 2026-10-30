@@ -2460,6 +2460,7 @@ def iniciar_aplicacion_gui() -> None:
         lista_scroll.grid(row=3, column=0, sticky="nsew", padx=22, pady=(0, 10))
 
         vars_checks_grupo: Dict[str, tk.BooleanVar] = {}
+        bot_bar: Optional[ctk.CTkFrame] = None
 
         def _render_lista_popup(*_args: object) -> None:
             for w in lista_scroll.winfo_children():
@@ -2468,8 +2469,12 @@ def iniciar_aplicacion_gui() -> None:
             m_sel = mapa_modo_seg.get(m_txt, "una")
             if m_sel in ("todas", "grupo"):
                 frame_strat.grid()
+                if bot_bar is not None:
+                    bot_bar.grid()
             else:
                 frame_strat.grid_remove()
+                if bot_bar is not None:
+                    bot_bar.grid_remove()
 
             if m_sel == "todas":
                 ctk.CTkLabel(
@@ -2505,15 +2510,18 @@ def iniciar_aplicacion_gui() -> None:
                 )
                 item_f.pack(fill="x", padx=8, pady=4)
 
+                lbl_av = None
                 av_img = _cargar_imagen_avatar_ctk(c_av, size_px=34)
                 if av_img:
-                    ctk.CTkLabel(item_f, text="", image=av_img).pack(side="left", padx=(10, 8), pady=8)
+                    lbl_av = ctk.CTkLabel(item_f, text="", image=av_img)
+                    lbl_av.pack(side="left", padx=(10, 8), pady=8)
                 else:
-                    ctk.CTkLabel(
+                    lbl_av = ctk.CTkLabel(
                         item_f,
                         text="Canal",
                         font=ctk.CTkFont(size=18),
-                    ).pack(side="left", padx=(12, 8), pady=8)
+                    )
+                    lbl_av.pack(side="left", padx=(12, 8), pady=8)
 
                 info_col = ctk.CTkFrame(item_f, fg_color="transparent")
                 info_col.pack(side="left", fill="x", expand=True, pady=6)
@@ -2521,19 +2529,21 @@ def iniciar_aplicacion_gui() -> None:
                 s_val = int(c_it.get("subscribers") or 0)
                 s_txt = f"  ·  {formatear_subs(s_val)}" if s_val > 0 else ""
 
-                ctk.CTkLabel(
+                lbl_nom = ctk.CTkLabel(
                     info_col,
                     text=f"{c_nom}{s_txt}",
                     font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
                     text_color="#ffffff" if es_activa else TEXT_MAIN,
-                ).pack(anchor="w")
+                )
+                lbl_nom.pack(anchor="w")
 
-                ctk.CTkLabel(
+                lbl_can = ctk.CTkLabel(
                     info_col,
                     text=f"{n_can} canal(es) fuente guardados",
                     font=ctk.CTkFont(family="Segoe UI", size=12),
                     text_color=CYAN_ACCENT if es_activa else TEXT_MUTED,
-                ).pack(anchor="w")
+                )
+                lbl_can.pack(anchor="w")
 
                 def _aplicar_cambios_inmediatos() -> None:
                     m_f = mapa_modo_seg.get(seg_modo_var.get(), "una")
@@ -2564,21 +2574,28 @@ def iniciar_aplicacion_gui() -> None:
                     _guardar_memoria()
 
                 if m_sel == "una":
-                    def _marcar_esta(cid_x=c_id):
+                    def _marcar_esta(_e=None, cid_x=c_id):
                         cid_temp.set(cid_x)
                         estado_seleccion_cuentas["modo"] = "una"
                         estado_seleccion_cuentas["cuenta_id"] = cid_x
                         _sincronizar_canales_de_cuenta_activa(cid_x, guardar_previo=True)
                         _aplicar_cambios_inmediatos()
-                        _render_lista_popup("1 Cuenta")
+                        pop.destroy()
 
-                    item_f.bind("<Button-1>", lambda _e, cx=c_id: _marcar_esta(cx))
-                    info_col.bind("<Button-1>", lambda _e, cx=c_id: _marcar_esta(cx))
+                    partes_clic = [item_f, info_col, lbl_nom, lbl_can]
+                    if lbl_av is not None:
+                        partes_clic.append(lbl_av)
+                    for w_part in partes_clic:
+                        w_part.bind("<Button-1>", lambda _e, cx=c_id: _marcar_esta(_e, cx))
+                        try:
+                            w_part.configure(cursor="hand2")
+                        except Exception:
+                            pass
 
                     ctk.CTkButton(
                         item_f,
                         text="Seleccionada" if es_activa else "Seleccionar",
-                        command=_marcar_esta,
+                        command=lambda cx=c_id: _marcar_esta(None, cx),
                         corner_radius=12,
                         height=30,
                         width=100,
@@ -2596,13 +2613,20 @@ def iniciar_aplicacion_gui() -> None:
                     def _al_cambiar_check_grupo():
                         _aplicar_cambios_inmediatos()
 
-                    def _toggle_click_fila(cid_x=c_id):
+                    def _toggle_click_fila(_e=None, cid_x=c_id):
                         if cid_x in vars_checks_grupo:
                             vars_checks_grupo[cid_x].set(not vars_checks_grupo[cid_x].get())
                             _aplicar_cambios_inmediatos()
 
-                    item_f.bind("<Button-1>", lambda _e, cx=c_id: _toggle_click_fila(cx))
-                    info_col.bind("<Button-1>", lambda _e, cx=c_id: _toggle_click_fila(cx))
+                    partes_clic = [item_f, info_col, lbl_nom, lbl_can]
+                    if lbl_av is not None:
+                        partes_clic.append(lbl_av)
+                    for w_part in partes_clic:
+                        w_part.bind("<Button-1>", lambda _e, cx=c_id: _toggle_click_fila(_e, cx))
+                        try:
+                            w_part.configure(cursor="hand2")
+                        except Exception:
+                            pass
 
                     ctk.CTkCheckBox(
                         item_f,
