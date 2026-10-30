@@ -1004,10 +1004,11 @@ def detectar_encoder_video(forzar_cpu: bool = False) -> Tuple[str, List[str]]:
     y funcional en la GPU/sistema actual mediante una prueba real de 1 frame.
     Si forzar_cpu=True, utiliza libx264 equilibrado sin tocar la GPU (ideal al jugar).
     """
-    hilos_cpu = max(4, min(8, CPU_THREADS // 2))
+    hilos_cpu = min(16, CPU_THREADS)
     args_cpu = [
-        "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
         "-threads", str(hilos_cpu), "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
     ]
     if forzar_cpu:
         return ("libx264", args_cpu)
@@ -1018,7 +1019,7 @@ def detectar_encoder_video(forzar_cpu: bool = False) -> Tuple[str, List[str]]:
 
     candidatos: List[Tuple[str, List[str]]] = [
         # NVIDIA NVENC (preset p6 alta calidad, 16M bitrate para 1080p)
-        ("h264_nvenc", ["-c:v", "h264_nvenc", "-preset", "p6", "-tune", "hq", "-b:v", "16M", "-maxrate", "20M", "-bufsize", "32M", "-pix_fmt", "yuv420p"]),
+        ("h264_nvenc", ["-c:v", "h264_nvenc", "-preset", "p2", "-cq", "19", "-b:v", "16M", "-maxrate", "20M", "-bufsize", "32M", "-pix_fmt", "yuv420p"]),
         # AMD Radeon AMF (modo calidad, 16M bitrate para 1080p)
         ("h264_amf", ["-c:v", "h264_amf", "-quality", "quality", "-rc", "vbr_peak", "-b:v", "16M", "-maxrate", "20M", "-pix_fmt", "yuv420p"]),
         # Intel Quick Sync Video
@@ -1047,7 +1048,7 @@ def detectar_encoder_video(forzar_cpu: bool = False) -> Tuple[str, List[str]]:
         except Exception:
             continue
 
-    # Fallback equilibrado por CPU (libx264 preset fast CRF 18)
+    # Fallback CPU ultrafast (libx264 ultrafast CRF 18, todos los hilos)
     _ENCODER_SELECCIONADO = ("libx264", args_cpu)
     return _ENCODER_SELECCIONADO
 

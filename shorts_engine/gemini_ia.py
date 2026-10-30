@@ -270,6 +270,16 @@ def generar_video_compacto_ia(ruta_video: Path) -> Tuple[Optional[bytes], float]
     Permite enviarlo inline a la API (Part.from_bytes) en memoria RAM sin File API.
     """
     dur_seg, w_v, h_v, _ = obtener_info_video(ruta_video)
+
+    # Bypass: si el video original ya pesa menos de 12 MB, no re-codificar.
+    # El 95% de los Shorts de 15-40s pesan 3-9 MB, evitamos 3-5 segundos de FFmpeg innecesario.
+    try:
+        peso_original = ruta_video.stat().st_size
+        if peso_original <= 12 * 1024 * 1024:
+            return ruta_video.read_bytes(), dur_seg
+    except Exception:
+        pass
+
     TEMP_DIR.mkdir(parents=True, exist_ok=True)
     ruta_low = TEMP_DIR / "video_analisis_ia.mp4"
     if ruta_low.exists():
@@ -284,7 +294,7 @@ def generar_video_compacto_ia(ruta_video: Path) -> Tuple[Optional[bytes], float]
             "ffmpeg", "-y",
             "-i", str(ruta_video),
             "-vf", filtro_escala,
-            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "32",
+            "-c:v", "libx264", "-preset", "ultrafast", "-threads", "0", "-crf", "32",
             "-c:a", "aac", "-b:a", "48k",
             str(ruta_low),
         ],
