@@ -1135,11 +1135,12 @@ def _limitar_circulos_guion(
 
 def seleccionar_musica_fondo(tono: Optional[str] = None) -> Optional[Path]:
     """
-    Selecciona la pista de música de fondo apropiada según el tono del video:
+    Selecciona la pista de musica de fondo apropiada segun el tono o nombre elegido:
+    - 'sin_musica' / 'ninguna' -> None (sin musica de fondo)
+    - nombre exacto de la pista en /musica (ej. 'Fondo 1', 'Fondo 2', 'Inspiracional', etc.) -> pista exacta
     - 'triste' / 'sad' / 'drama' -> busca Triste.* en la carpeta /musica
     - 'inspiracional' / 'emotivo' / 'superacion' -> busca Inspiracional.* en la carpeta /musica
-    - cualquier otro tono (o por defecto) -> elige aleatoriamente entre los fondos
-      (Fondo 1, Fondo 2, Fondo 3, Fondo 4 u otros temas generales en /musica).
+    - cualquier otro tono (o por defecto) -> elige aleatoriamente entre los fondos.
     """
     MUSICA_DIR.mkdir(parents=True, exist_ok=True)
     archivos = [
@@ -1151,19 +1152,33 @@ def seleccionar_musica_fondo(tono: Optional[str] = None) -> Optional[Path]:
 
     t_clean = (tono or "").strip().lower()
 
+    # 0. Sin Musica explicito
+    if t_clean in ("sin_musica", "sin musica", "ninguna", "ninguno", "none", "off", "silencio", "mute"):
+        return None
+
+    # 0.5 Coincidencia exacta o parcial por nombre de archivo / stem (ej: 'Fondo 1', 'Inspiracional')
+    if t_clean and t_clean not in ("auto", "fondo", "neutral"):
+        for p in archivos:
+            stem_low = p.stem.lower()
+            if t_clean == stem_low or t_clean == stem_low.replace(" ", "_"):
+                return p
+        for p in archivos:
+            if t_clean in p.stem.lower():
+                return p
+
     # 1. Tono Triste
     if any(k in t_clean for k in ("trist", "sad", "dram", "pena", "llor", "depre")):
         pistas_tristes = [p for p in archivos if "trist" in p.stem.lower() or "sad" in p.stem.lower()]
         if pistas_tristes:
             return random.choice(pistas_tristes)
 
-    # 2. Tono Inspiracional / Emotivo / Superación
+    # 2. Tono Inspiracional / Emotivo / Superacion
     if any(k in t_clean for k in ("inspirac", "motivac", "emotiv", "superac", "epico_final", "triumph")):
         pistas_insp = [p for p in archivos if "inspirac" in p.stem.lower() or "insp" in p.stem.lower()]
         if pistas_insp:
             return random.choice(pistas_insp)
 
-    # 3. Fondos generales (excluir pistas específicas como Triste o Inspiracional a menos que sean las únicas)
+    # 3. Fondos generales
     fondos = [
         p for p in archivos
         if "trist" not in p.stem.lower()
@@ -1439,14 +1454,17 @@ async def editar_video_con_guion(
         dur_total_audio = dur_video_origen + dur_outro_seg
 
     tono_efectivo = config.tono_video
-    if not tono_efectivo or tono_efectivo in ("auto", "fondo", "neutral"):
-        texto_completo = f"{config.titulo_youtube} {config.descripcion_youtube} {' '.join(s.texto_voz for s in config.segmentos)}".lower()
-        if any(w in texto_completo for w in ("triste", "tristeza", "llorando", "llorar", "pena", "depresivo", "lamentable", "tragedia")):
-            tono_efectivo = "triste"
-        elif any(w in texto_completo for w in ("inspiracional", "inspiracion", "motivacion", "superacion", "emotivo", "emocionante", "lagrimas de emocion", "salvar", "rescate")):
-            tono_efectivo = "inspiracional"
+    if tono_efectivo and str(tono_efectivo).lower().strip() in ("sin_musica", "sin musica", "ninguna", "ninguno", "none", "off", "silencio", "mute"):
+        pista_musica = None
+    else:
+        if not tono_efectivo or tono_efectivo in ("auto", "fondo", "neutral"):
+            texto_completo = f"{config.titulo_youtube} {config.descripcion_youtube} {' '.join(s.texto_voz for s in config.segmentos)}".lower()
+            if any(w in texto_completo for w in ("triste", "tristeza", "llorando", "llorar", "pena", "depresivo", "lamentable", "tragedia")):
+                tono_efectivo = "triste"
+            elif any(w in texto_completo for w in ("inspiracional", "inspiracion", "motivacion", "superacion", "emotivo", "emocionante", "lagrimas de emocion", "salvar", "rescate")):
+                tono_efectivo = "inspiracional"
 
-    pista_musica = seleccionar_musica_fondo(tono_efectivo)
+        pista_musica = seleccionar_musica_fondo(tono_efectivo)
 
     if pista_musica and pista_musica.exists():
         # Volumen óptimo: presente en todo momento pero con ducking sutil cuando la voz habla

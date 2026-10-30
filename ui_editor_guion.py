@@ -76,18 +76,59 @@ def mmss_a_seg(texto: str) -> float:
     return 0.0
 
 
-def abrir_dialogo_posicion_pantalla(parent_win, datos_bloque: Dict, on_aplicar: Callable):
+def _extraer_frame_pil(ruta_video, t_seg: float, w: int = 270, h: int = 480):
+    """Extrae un fotograma exacto del video a t_seg y lo devuelve redimensionado en PIL.Image."""
+    if not ruta_video:
+        return None
+    try:
+        from pathlib import Path
+        import cv2
+        from PIL import Image
+        p = Path(ruta_video)
+        if not p.exists():
+            return None
+        cap = cv2.VideoCapture(str(p))
+        cap.set(cv2.CAP_PROP_POS_MSEC, max(0.0, float(t_seg) * 1000.0))
+        ret, frame_bgr = cap.read()
+        cap.release()
+        if not ret or frame_bgr is None:
+            return None
+        frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        return Image.fromarray(frame_rgb).resize((w, h), Image.Resampling.LANCZOS)
+    except Exception:
+        return None
+
+
+def abrir_dialogo_posicion_pantalla(
+    parent_win,
+    datos_bloque: Dict,
+    on_aplicar: Callable,
+    ruta_video: Optional[Any] = None,
+    on_preview_live: Optional[Callable] = None,
+):
     import tkinter as tk
     import re
     import math
+    from PIL import Image, ImageTk
+
     win_p = ctk.CTkToplevel(parent_win)
     win_p.title("🎯 Posicionar Círculo y Flechas en Pantalla")
-    win_p.geometry("380x750")
-    win_p.minsize(360, 720)
+    win_p.geometry("380x790")
+    win_p.minsize(360, 740)
     win_p.resizable(False, True)
     win_p.configure(fg_color="#0e111a")
     win_p.transient(parent_win)
     win_p.grab_set()
+
+    t_ini = float(datos_bloque.get("t_ini", 0.0))
+    t_fin = float(datos_bloque.get("t_fin", 4.0))
+
+    img_pil_ini = _extraer_frame_pil(ruta_video, t_ini)
+    img_pil_fin = _extraer_frame_pil(ruta_video, max(t_ini, t_fin - 0.1))
+
+    photo_ini = ImageTk.PhotoImage(img_pil_ini) if img_pil_ini else None
+    photo_fin = ImageTk.PhotoImage(img_pil_fin) if img_pil_fin else None
+    frame_activo = [photo_ini]
 
     tipo_var = ctk.StringVar(value="circulo")
     tam_var = ctk.StringVar(value="medio")
@@ -130,12 +171,49 @@ def abrir_dialogo_posicion_pantalla(parent_win, datos_bloque: Dict, on_aplicar: 
         except Exception:
             pass
 
+    hdr_frame = ctk.CTkFrame(win_p, fg_color="transparent")
+    hdr_frame.pack(fill="x", padx=16, pady=(8, 2))
+
     lbl_coord = ctk.CTkLabel(
-        win_p, text=f"🎯 Objetivo: X: {pos_x:.1f}% | Y: {pos_y:.1f}%",
-        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+        hdr_frame, text=f"🎯 Objetivo: X: {pos_x:.1f}% | Y: {pos_y:.1f}%",
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         text_color="#38bdf8"
     )
-    lbl_coord.pack(pady=(10, 4))
+    lbl_coord.pack(side="left")
+
+    if on_preview_live is not None:
+        try:
+            on_preview_live("seek", t_ini, "", "", 0)
+        except Exception:
+            pass
+
+    if photo_ini or photo_fin:
+        def _seleccionar_frame(op: str):
+            if "Inicio" in op or f"{t_ini:.1f}" in op:
+                frame_activo[0] = photo_ini
+                if on_preview_live is not None:
+                    try:
+                        on_preview_live("seek", t_ini, "", "", 0)
+                    except Exception:
+                        pass
+            else:
+                frame_activo[0] = photo_fin if photo_fin else photo_ini
+                if on_preview_live is not None:
+                    try:
+                        on_preview_live("seek", t_fin, "", "", 0)
+                    except Exception:
+                        pass
+            _redibujar()
+
+        btn_toggle_frame = ctk.CTkSegmentedButton(
+            hdr_frame,
+            values=[f"◀ {t_ini:.1f}s", f"▶ {t_fin:.1f}s"],
+            command=_seleccionar_frame,
+            width=110, height=22, font=ctk.CTkFont(size=10, weight="bold"),
+            selected_color="#1d4ed8", selected_hover_color="#1e40af",
+        )
+        btn_toggle_frame.set(f"◀ {t_ini:.1f}s")
+        btn_toggle_frame.pack(side="right")
 
     # Canvas de 270x480 (Exactamente idéntico al reproductor de video 9:16)
     CW, CH = 270, 480
@@ -144,12 +222,19 @@ def abrir_dialogo_posicion_pantalla(parent_win, datos_bloque: Dict, on_aplicar: 
 
     def _redibujar():
         canvas.delete("all")
-        canvas.create_line(CW * 0.33, 0, CW * 0.33, CH, fill="#151b28", dash=(2, 2))
-        canvas.create_line(CW * 0.66, 0, CW * 0.66, CH, fill="#151b28", dash=(2, 2))
-        canvas.create_line(0, CH * 0.33, CW, CH * 0.33, fill="#151b28", dash=(2, 2))
-        canvas.create_line(0, CH * 0.66, CW, CH * 0.66, fill="#151b28", dash=(2, 2))
-        canvas.create_line(CW * 0.50, 0, CW * 0.50, CH, fill="#1e2638", dash=(4, 4))
-        canvas.create_line(0, CH * 0.50, CW, CH * 0.50, fill="#1e2638", dash=(4, 4))
+
+        # 1. Fotograma real de fondo
+        if frame_activo[0] is not None:
+            canvas.create_image(0, 0, image=frame_activo[0], anchor="nw", tags="bg_video")
+        else:
+            canvas.create_rectangle(0, 0, CW, CH, fill="#050811", outline="")
+
+        # 2. Guías sutiles de composición
+        dash_col = "#2a3754" if frame_activo[0] is None else "#334155"
+        canvas.create_line(CW * 0.33, 0, CW * 0.33, CH, fill=dash_col, dash=(2, 3))
+        canvas.create_line(CW * 0.66, 0, CW * 0.66, CH, fill=dash_col, dash=(2, 3))
+        canvas.create_line(0, CH * 0.33, CW, CH * 0.33, fill=dash_col, dash=(2, 3))
+        canvas.create_line(0, CH * 0.66, CW, CH * 0.66, fill=dash_col, dash=(2, 3))
 
         px = (pos_x / 100.0) * CW
         py = (pos_y / 100.0) * CH
@@ -158,30 +243,54 @@ def abrir_dialogo_posicion_pantalla(parent_win, datos_bloque: Dict, on_aplicar: 
         tam = tam_var.get()
         r_px = 22 if tam == "chico" else (32 if tam == "medio" else 44)
 
+        # 3. Círculo con doble trazo (alto contraste)
         if t in ("circulo", "ambos"):
+            canvas.create_oval(px - r_px - 2, py - r_px - 2, px + r_px + 2, py + r_px + 2, outline="#000000", width=5)
             canvas.create_oval(px - r_px, py - r_px, px + r_px, py + r_px, outline="#ef4444", width=3)
-            canvas.create_oval(px - 3, py - 3, px + 3, py + 3, fill="#ef4444", outline="")
+            # Cruz central y diana
+            canvas.create_line(px - 8, py, px + 8, py, fill="#000000", width=3)
+            canvas.create_line(px - 8, py, px + 8, py, fill="#38bdf8", width=1.5)
+            canvas.create_line(px, py - 8, px, py + 8, fill="#000000", width=3)
+            canvas.create_line(px, py - 8, px, py + 8, fill="#38bdf8", width=1.5)
+            canvas.create_oval(px - 3, py - 3, px + 3, py + 3, fill="#38bdf8", outline="#000000", width=1)
 
+        # 4. Flecha con doble trazo y diana en la punta
         if t in ("flecha", "ambos"):
             rad = math.radians(rot_var.get())
-            dist_flecha = 55
+            dist_flecha = 60
             fx0 = px + dist_flecha * math.cos(rad)
             fy0 = py + dist_flecha * math.sin(rad)
             gap_c = (r_px + 4) if t == "ambos" else 0
             tip_x = px + gap_c * math.cos(rad)
             tip_y = py + gap_c * math.sin(rad)
-            canvas.create_line(fx0, fy0, tip_x, tip_y, fill="#f59e0b", width=4, arrow=tk.LAST, arrowshape=(14, 16, 6))
-            if t == "flecha":
-                # Marca luminosa en la punta exacta a la que apunta la flecha
-                canvas.create_oval(px - 3, py - 3, px + 3, py + 3, fill="#38bdf8", outline="")
+
+            # Sombra negra
+            canvas.create_line(fx0, fy0, tip_x, tip_y, fill="#000000", width=7, arrow=tk.LAST, arrowshape=(18, 20, 8))
+            # Flecha dorada
+            canvas.create_line(fx0, fy0, tip_x, tip_y, fill="#f59e0b", width=3.5, arrow=tk.LAST, arrowshape=(15, 17, 6))
+
+            # Diana en la punta exacta a señalar
+            canvas.create_oval(tip_x - 5, tip_y - 5, tip_x + 5, tip_y + 5, outline="#000000", width=3)
+            canvas.create_oval(tip_x - 5, tip_y - 5, tip_x + 5, tip_y + 5, outline="#38bdf8", width=1.5)
+            canvas.create_oval(tip_x - 2, tip_y - 2, tip_x + 2, tip_y + 2, fill="#38bdf8", outline="")
 
         if t == "circulo":
-            lbl_coord.configure(text=f"🎯 Centro Círculo (Objetivo): X: {pos_x:.1f}% | Y: {pos_y:.1f}%")
+            lbl_coord.configure(text=f"🎯 Centro Círculo: X: {pos_x:.1f}% | Y: {pos_y:.1f}%")
         elif t == "flecha":
-            lbl_coord.configure(text=f"🎯 Punta Flecha (Objetivo): X: {pos_x:.1f}% | Y: {pos_y:.1f}%")
+            lbl_coord.configure(text=f"🎯 Punta Flecha: X: {pos_x:.1f}% | Y: {pos_y:.1f}%")
+        elif t == "ambos":
+            lbl_coord.configure(text=f"🎯 Objetivo: X: {pos_x:.1f}% | Y: {pos_y:.1f}%")
         else:
-            lbl_coord.configure(text=f"🎯 Objetivo (Centro/Punta): X: {pos_x:.1f}% | Y: {pos_y:.1f}%")
+            lbl_coord.configure(text="Sin señalar")
+
         lbl_rot_val.configure(text=f"🔄 Ángulo Flecha: {rot_var.get():.0f}°")
+
+        # Reflejo en vivo sobre el reproductor
+        if on_preview_live is not None:
+            try:
+                on_preview_live(pos_x, pos_y, t, tam, rot_var.get())
+            except Exception:
+                pass
 
     def _on_canvas_click(event):
         nonlocal pos_x, pos_y
@@ -242,6 +351,14 @@ def abrir_dialogo_posicion_pantalla(parent_win, datos_bloque: Dict, on_aplicar: 
 
     _redibujar()
 
+    def _al_cerrar():
+        if on_preview_live is not None:
+            try:
+                on_preview_live(None, None, "", "", 0)
+            except Exception:
+                pass
+        win_p.destroy()
+
     def _guardar_y_cerrar():
         t = tipo_var.get()
         tam = tam_var.get()
@@ -251,7 +368,9 @@ def abrir_dialogo_posicion_pantalla(parent_win, datos_bloque: Dict, on_aplicar: 
         res_circulo = f"{pref}{pos_x:.1f},{pos_y:.1f}:{tam}" if t in ("circulo", "ambos") else "ninguno"
         res_flecha = f"{pref}{pos_x:.1f},{pos_y:.1f}@{rot_val}" if t in ("flecha", "ambos") else "ninguna"
         on_aplicar(res_circulo, res_flecha)
-        win_p.destroy()
+        _al_cerrar()
+
+    win_p.protocol("WM_DELETE_WINDOW", _al_cerrar)
 
     ctk.CTkButton(
         win_p, text="Aplicar Posición", command=_guardar_y_cerrar,
@@ -272,7 +391,9 @@ class BloqueGuionCard(ctk.CTkFrame):
         on_time_edit: Callable,
         on_move: Callable,
         on_delete: Callable,
-        mostrar_assets_inicial: bool = False
+        mostrar_assets_inicial: bool = False,
+        ruta_video: Optional[Any] = None,
+        on_preview_live: Optional[Callable] = None,
     ):
         super().__init__(master, fg_color="#181B26", corner_radius=10, border_width=1, border_color="#2A3147")
         self.index = index
@@ -282,6 +403,8 @@ class BloqueGuionCard(ctk.CTkFrame):
         self.on_move = on_move
         self.on_delete = on_delete
         self.mostrar_assets = mostrar_assets_inicial
+        self.ruta_video = ruta_video
+        self.on_preview_live = on_preview_live
         self._assets_creados = False
 
         self.grid_columnconfigure(0, weight=1)
@@ -488,7 +611,13 @@ class BloqueGuionCard(ctk.CTkFrame):
                 self.lbl_pos_status.configure(text=self._generar_texto_badge_pos())
             self.on_change()
 
-        abrir_dialogo_posicion_pantalla(self.winfo_toplevel(), self.datos, _on_aplicar)
+        abrir_dialogo_posicion_pantalla(
+            self.winfo_toplevel(),
+            self.datos,
+            _on_aplicar,
+            ruta_video=self.ruta_video,
+            on_preview_live=self.on_preview_live,
+        )
 
     def _destruir_assets_frame(self):
         """Libera la memoria de Tkinter destruyendo los OptionMenus de la tarjeta."""
@@ -593,7 +722,15 @@ class VisualScriptEditor(ctk.CTkFrame):
     - Modo Doble: Solo Voz ultra-rápido o Profundo con Assets.
     """
 
-    def __init__(self, master, **kwargs):
+    def __init__(
+        self,
+        master,
+        ruta_video: Optional[Any] = None,
+        on_preview_live: Optional[Callable] = None,
+        **kwargs
+    ):
+        self.ruta_video = ruta_video
+        self.on_preview_live = on_preview_live
         frame_kwargs = {
             k: v for k, v in kwargs.items()
             if k in ("width", "height", "corner_radius", "border_width", "bg_color", "fg_color", "border_color")
@@ -820,7 +957,9 @@ class VisualScriptEditor(ctk.CTkFrame):
                 on_time_edit=self._on_block_time_edited,
                 on_move=self._mover_bloque,
                 on_delete=self._eliminar_bloque,
-                mostrar_assets_inicial=self.modo_profundo
+                mostrar_assets_inicial=self.modo_profundo,
+                ruta_video=self.ruta_video,
+                on_preview_live=self.on_preview_live,
             )
             card.grid(row=idx, column=0, sticky="ew", padx=4, pady=4)
             self.cards.append(card)

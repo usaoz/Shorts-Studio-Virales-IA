@@ -4605,6 +4605,51 @@ def iniciar_aplicacion_gui() -> None:
         )
         lbl_ritmo.pack(side="right")
 
+        # Selector interactivo de Canción / Música de Fondo
+        pistas_disponibles = ["Auto", "Sin Música"]
+        try:
+            from shorts_engine.config import MUSICA_DIR
+            pistas_disco = [p.stem for p in sorted(MUSICA_DIR.glob("*")) if p.is_file() and p.suffix.lower() in (".mp3", ".wav", ".m4a", ".aac")]
+            if pistas_disco:
+                pistas_disponibles = ["Auto", *pistas_disco, "Sin Música"]
+        except Exception:
+            pass
+
+        def _al_cambiar_musica(nueva_cancion: str):
+            if txt_guion_box is not None:
+                if nueva_cancion == "Auto":
+                    txt_guion_box.metadatos_ocultos["TONO_VIDEO"] = "auto"
+                elif nueva_cancion == "Sin Música":
+                    txt_guion_box.metadatos_ocultos["TONO_VIDEO"] = "sin_musica"
+                else:
+                    txt_guion_box.metadatos_ocultos["TONO_VIDEO"] = nueva_cancion
+
+        f_musica = ctk.CTkFrame(hdr_inner, fg_color="transparent")
+        f_musica.pack(side="right", padx=(0, 16))
+
+        lbl_musica = ctk.CTkLabel(
+            f_musica,
+            text="🎵 Canción:",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color=TEXT_MUTED,
+        )
+        lbl_musica.pack(side="left", padx=(0, 6))
+
+        opt_musica = ctk.CTkOptionMenu(
+            f_musica,
+            values=pistas_disponibles,
+            command=_al_cambiar_musica,
+            width=130,
+            height=26,
+            fg_color="#182032",
+            button_color="#25304a",
+            button_hover_color="#334166",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            dropdown_font=ctk.CTkFont(family="Segoe UI", size=11),
+        )
+        opt_musica.set("Auto")
+        opt_musica.pack(side="left")
+
         # Tarjeta guion (ocupa todo el espacio disponible)
         card_guion = ctk.CTkFrame(
             col_der, fg_color=CARD_BG, corner_radius=18,
@@ -4623,7 +4668,64 @@ def iniciar_aplicacion_gui() -> None:
         )
         lbl_guion_tit.grid(row=0, column=0, sticky="w", padx=16, pady=(12, 4))
 
-        txt_guion_box = VisualScriptEditor(card_guion)
+        def _seek_en_reproductor(t_seg: float) -> None:
+            if player is not None and duracion_total > 0:
+                try:
+                    player.seek(max(0.0, float(t_seg)), relative=False)
+                    slider_seek.set(max(0.0, min(1.0, float(t_seg) / duracion_total)))
+                    lbl_tiempo.configure(text=f"{_fmt_tiempo(t_seg)} / {_fmt_tiempo(duracion_total)}")
+                    win_r.after(10, _loop_reproductor)
+                except Exception:
+                    pass
+
+        def _overlay_pos_en_reproductor(x_pct, y_pct, tipo, tam, rot) -> None:
+            if x_pct == "seek":
+                try:
+                    _seek_en_reproductor(float(y_pct))
+                except Exception:
+                    pass
+                return
+            canvas_video.delete("overlay_pos")
+            if x_pct is None or y_pct is None or not tipo or tipo == "ninguno":
+                return
+            try:
+                px = (float(x_pct) / 100.0) * 270.0
+                py = (float(y_pct) / 100.0) * 480.0
+                r_px = 22 if tam == "chico" else (32 if tam == "medio" else 44)
+
+                if tipo in ("circulo", "ambos"):
+                    canvas_video.create_oval(px - r_px - 2, py - r_px - 2, px + r_px + 2, py + r_px + 2, outline="#000000", width=5, tags="overlay_pos")
+                    canvas_video.create_oval(px - r_px, py - r_px, px + r_px, py + r_px, outline="#ef4444", width=3, tags="overlay_pos")
+                    canvas_video.create_line(px - 8, py, px + 8, py, fill="#000000", width=3, tags="overlay_pos")
+                    canvas_video.create_line(px - 8, py, px + 8, py, fill="#38bdf8", width=1.5, tags="overlay_pos")
+                    canvas_video.create_line(px, py - 8, px, py + 8, fill="#000000", width=3, tags="overlay_pos")
+                    canvas_video.create_line(px, py - 8, px, py + 8, fill="#38bdf8", width=1.5, tags="overlay_pos")
+                    canvas_video.create_oval(px - 3, py - 3, px + 3, py + 3, fill="#38bdf8", outline="#000000", width=1, tags="overlay_pos")
+
+                if tipo in ("flecha", "ambos"):
+                    rad = math.radians(float(rot))
+                    dist_flecha = 60
+                    fx0 = px + dist_flecha * math.cos(rad)
+                    fy0 = py + dist_flecha * math.sin(rad)
+                    gap_c = (r_px + 4) if tipo == "ambos" else 0
+                    tip_x = px + gap_c * math.cos(rad)
+                    tip_y = py + gap_c * math.sin(rad)
+
+                    canvas_video.create_line(fx0, fy0, tip_x, tip_y, fill="#000000", width=7, arrow=tk.LAST, arrowshape=(18, 20, 8), tags="overlay_pos")
+                    canvas_video.create_line(fx0, fy0, tip_x, tip_y, fill="#f59e0b", width=3.5, arrow=tk.LAST, arrowshape=(15, 17, 6), tags="overlay_pos")
+                    canvas_video.create_oval(tip_x - 5, tip_y - 5, tip_x + 5, tip_y + 5, outline="#000000", width=3, tags="overlay_pos")
+                    canvas_video.create_oval(tip_x - 5, tip_y - 5, tip_x + 5, tip_y + 5, outline="#38bdf8", width=1.5, tags="overlay_pos")
+                    canvas_video.create_oval(tip_x - 2, tip_y - 2, tip_x + 2, tip_y + 2, fill="#38bdf8", outline="", tags="overlay_pos")
+
+                canvas_video.tag_raise("overlay_pos")
+            except Exception:
+                pass
+
+        txt_guion_box = VisualScriptEditor(
+            card_guion,
+            ruta_video=ruta_video,
+            on_preview_live=_overlay_pos_en_reproductor,
+        )
         txt_guion_box.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 8))
 
         if ruta_guion.exists():
@@ -4646,6 +4748,17 @@ def iniciar_aplicacion_gui() -> None:
                         text=f"Ritmo {ok_c}/{len(res_r)} OK",
                         text_color=GREEN_ACCENT if ok_c == len(res_r) else "#facc15",
                     )
+                tono_leido = txt_guion_box.metadatos_ocultos.get("TONO_VIDEO", "").strip()
+                if tono_leido:
+                    if tono_leido.lower() in ("sin_musica", "sin musica", "ninguna", "ninguno", "none"):
+                        opt_musica.set("Sin Música")
+                    elif tono_leido.lower() in ("auto", "fondo", "neutral"):
+                        opt_musica.set("Auto")
+                    else:
+                        for p_nom in pistas_disponibles:
+                            if tono_leido.lower() == p_nom.lower() or tono_leido.lower() in p_nom.lower():
+                                opt_musica.set(p_nom)
+                                break
             except Exception:
                 pass
 
@@ -4768,8 +4881,11 @@ def iniciar_aplicacion_gui() -> None:
                     try:
                         pil_img = Image.frombytes("RGB", (w, h), bytes(img.to_bytearray()[0]))
                         photo = ImageTk.PhotoImage(pil_img)
-                        canvas_video.create_image(0, 0, image=photo, anchor="nw")
+                        canvas_video.delete("frame_video")
+                        canvas_video.create_image(0, 0, image=photo, anchor="nw", tags="frame_video")
                         canvas_video.image = photo
+                        canvas_video.tag_lower("frame_video")
+                        canvas_video.tag_raise("overlay_pos")
                     except Exception:
                         pass
 
