@@ -4865,6 +4865,7 @@ def iniciar_aplicacion_gui() -> None:
                                 estricto_min_views=True,
                                 cuenta_id=cid_reel,
                                 ids_excluir=ids_reservados_sesion,
+                                cancelar_check=lambda: evento_cancelar.is_set(),
                             )
                             if res_viral:
                                 elegido_info = res_viral
@@ -5035,7 +5036,12 @@ def iniciar_aplicacion_gui() -> None:
                             if vistas_orig > 0
                             else f"{pref_lote}Descargando video de YouTube en máxima calidad...",
                         )
-                        ruta_video_usar = descargar_video_youtube(url_descargar)
+                        ruta_video_usar = descargar_video_youtube(
+                            url_descargar,
+                            cancelar_check=lambda: evento_cancelar.is_set(),
+                        )
+                        if evento_cancelar.is_set():
+                            raise InterruptedError("Operación detenida por el usuario tras descargar el video.")
                         if ULTIMA_INFO_YTDLP.get("titulo"):
                             titulo_orig = ULTIMA_INFO_YTDLP["titulo"]
 
@@ -5075,7 +5081,12 @@ def iniciar_aplicacion_gui() -> None:
                                     contexto_titulo_orig=titulo_orig,
                                     modelo_preferido=pref_modelo_ia,
                                     progreso_cb=_cb_tit_solo,
+                                    cancelar_check=lambda: evento_cancelar.is_set(),
                                 )
+                                if evento_cancelar.is_set():
+                                    raise InterruptedError("Operación detenida por el usuario tras generar el título.")
+                            except InterruptedError:
+                                raise
                             except Exception as e_ia:
                                 print(f"[!] Aviso al generar título IA: {e_ia}. Usando nombre de archivo.")
                                 tit_fall = titulo_orig or ruta_final.stem
@@ -5133,7 +5144,10 @@ def iniciar_aplicacion_gui() -> None:
                                 modelo_preferido=pref_modelo_ia,
                                 progreso_cb=_cb_guion,
                                 auto_auditoria_retrospectiva=es_auto_auditoria,
+                                cancelar_check=lambda: evento_cancelar.is_set(),
                             )
+                            if evento_cancelar.is_set():
+                                raise InterruptedError("Operación detenida por el usuario tras generar el guion.")
                             if es_custom_activo and (c_tit or c_desc):
                                 _sobreescribir_campos_custom_en_guion_txt(c_tit, c_desc)
 
@@ -5248,6 +5262,7 @@ def iniciar_aplicacion_gui() -> None:
                                                 estricto_min_views=True,
                                                 cuenta_id=cid_actual,
                                                 ids_excluir=ids_reservados_sesion,
+                                                cancelar_check=lambda: evento_cancelar.is_set(),
                                             )
                                             if res_viral:
                                                 nuevo_elegido = res_viral
@@ -5290,7 +5305,12 @@ def iniciar_aplicacion_gui() -> None:
                                         _actualizar_milestone_actual("activo", f"Reel {num_actual}: Descargando...")
                                         _set_subprogreso(0.10, f"{pref_lote}Descargando nuevo Short: '{titulo_orig[:36]}...'")
                                         root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}DESCARGANDO NUEVO SHORT..."))
-                                        ruta_video_usar = descargar_video_youtube(url_descargar)
+                                        ruta_video_usar = descargar_video_youtube(
+                                            url_descargar,
+                                            cancelar_check=lambda: evento_cancelar.is_set(),
+                                        )
+                                        if evento_cancelar.is_set():
+                                            raise InterruptedError("Operación detenida por el usuario tras descargar el video.")
                                         if ULTIMA_INFO_YTDLP.get("titulo"):
                                             titulo_orig = ULTIMA_INFO_YTDLP["titulo"]
 
@@ -5315,7 +5335,10 @@ def iniciar_aplicacion_gui() -> None:
                                             modelo_preferido=pref_modelo_ia,
                                             progreso_cb=_cb_guion_otro,
                                             auto_auditoria_retrospectiva=True,
+                                            cancelar_check=lambda: evento_cancelar.is_set(),
                                         )
+                                        if evento_cancelar.is_set():
+                                            raise InterruptedError("Operación detenida por el usuario tras generar el guion.")
 
                                         _actualizar_milestone_actual("activo", f"Reel {num_actual}: Editando 60 FPS...")
                                         root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}RENDERIZANDO SHORT GPU..."))

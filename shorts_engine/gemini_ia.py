@@ -17,9 +17,38 @@ import re
 import time
 import asyncio
 import logging
+import threading
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Set
+from typing import Any, Callable, Dict, List, Optional, Tuple, Set
+
+
+def _llamar_gemini_cancelable(fn_llamada: Callable, cancelar_check: Optional[Callable[[], bool]] = None):
+    """Ejecuta generate_content en un hilo daemon y permite abortar en <150ms si el usuario frena."""
+    if not cancelar_check:
+        return fn_llamada()
+
+    resultado = {"resp": None, "err": None, "listo": False}
+
+    def _worker():
+        try:
+            resultado["resp"] = fn_llamada()
+        except Exception as ex:
+            resultado["err"] = ex
+        finally:
+            resultado["listo"] = True
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+
+    while not resultado["listo"]:
+        if cancelar_check():
+            raise InterruptedError("Generación de guion con IA cancelada instantáneamente por el usuario.")
+        time.sleep(0.12)
+
+    if resultado["err"] is not None:
+        raise resultado["err"]
+    return resultado["resp"]
 from PIL import Image, ImageDraw
 from google import genai
 from google.genai import types
@@ -454,6 +483,7 @@ class GeminiPoolOrchestrator:
         progreso_cb: Optional[Any] = None,
         timeout_video_seg: float = 40.0,
         modelo_preferido: Optional[str] = None,
+        cancelar_check: Optional[Callable[[], bool]] = None,
     ) -> str:
         """
         Ejecuta el Single-Pass Master Prompt:
@@ -462,6 +492,9 @@ class GeminiPoolOrchestrator:
         3. Conmutación instantánea a Mosaico JPEG ante 503/Timeout.
         4. Validación y auto-reparación determinista local.
         """
+        if cancelar_check and cancelar_check():
+            raise InterruptedError("Generación de guion cancelada por el usuario.")
+
         def _notif(frac: float, msg: str):
             if callable(progreso_cb):
                 try:
@@ -471,6 +504,8 @@ class GeminiPoolOrchestrator:
             logger.info(msg)
 
         dur_seg, _, _, _ = obtener_info_video(video_path)
+        if cancelar_check and cancelar_check():
+            raise InterruptedError("Generación de guion cancelada por el usuario.")
         video_bytes, _ = generar_video_compacto_ia(video_path)
 
         video_part: Optional[types.Part] = None
@@ -495,6 +530,8 @@ class GeminiPoolOrchestrator:
         ultimo_err = None
 
         for idx_m, model in enumerate(modelos_ordenados):
+            if cancelar_check and cancelar_check():
+                raise InterruptedError("Generación de guion cancelada por el usuario.")
             nom_mod = NOMBRES_UI.get(model, model)
             _notif(0.12 + (idx_m * 0.05), f"Verificando cuotas para {nom_mod} ({total_cuentas} cuentas)...")
 
@@ -505,6 +542,8 @@ class GeminiPoolOrchestrator:
                 continue
 
             for key_idx in cuentas_vivas:
+                if cancelar_check and cancelar_check():
+                    raise InterruptedError("Generación de guion cancelada por el usuario.")
                 client = self.clients[key_idx]
                 etiqueta_cuenta = f"Cuenta API {key_idx + 1}" + (f" de {total_cuentas}" if total_cuentas > 1 else "")
                 usar_mosaico = (video_part is None) or (errores_503_video >= 2)
@@ -525,13 +564,16 @@ class GeminiPoolOrchestrator:
                         contenido = [mosaico_part, prompt_maestro + nota_mosaico]
                         http_timeout = 25000
 
-                    response = client.models.generate_content(
-                        model=model,
-                        contents=contenido,
-                        config=types.GenerateContentConfig(
-                            temperature=0.35,
-                            http_options=types.HttpOptions(timeout=http_timeout),
+                    response = _llamar_gemini_cancelable(
+                        lambda: client.models.generate_content(
+                            model=model,
+                            contents=contenido,
+                            config=types.GenerateContentConfig(
+                                temperature=0.35,
+                                http_options=types.HttpOptions(timeout=http_timeout),
+                            ),
                         ),
+                        cancelar_check=cancelar_check,
                     )
 
                     if response and response.text and len(response.text.strip()) > 80:
@@ -546,6 +588,8 @@ class GeminiPoolOrchestrator:
                         _notif(1.0, f"✔ Guion completado con {nom_mod} ({etiqueta_cuenta}) en {elapsed:.1f}s.")
                         return guion_limpio
 
+                except InterruptedError:
+                    raise
                 except APIError as e:
                     code = getattr(e, "code", 500) or 500
                     self._mark_error(key_idx, model, code)
@@ -558,15 +602,20 @@ class GeminiPoolOrchestrator:
                             if mosaico_part is None:
                                 jpg_bytes, _ = generar_mosaico_video(video_path)
                                 mosaico_part = types.Part.from_bytes(data=jpg_bytes, mime_type="image/jpeg")
-                            resp_fb = client.models.generate_content(
-                                model=model,
-                                contents=[mosaico_part, prompt_maestro],
-                                config=types.GenerateContentConfig(temperature=0.35),
+                            resp_fb = _llamar_gemini_cancelable(
+                                lambda: client.models.generate_content(
+                                    model=model,
+                                    contents=[mosaico_part, prompt_maestro],
+                                    config=types.GenerateContentConfig(temperature=0.35),
+                                ),
+                                cancelar_check=cancelar_check,
                             )
                             if resp_fb and resp_fb.text and len(resp_fb.text.strip()) > 80:
                                 guion_limpio, _ = sanitizar_y_auditar_guion(resp_fb.text, dur_seg)
                                 _notif(1.0, f"✔ Guion completado vía Mosaico con {nom_mod} ({etiqueta_cuenta}).")
                                 return guion_limpio
+                        except InterruptedError:
+                            raise
                         except Exception as ex_m:
                             ultimo_err = ex_m
                     continue
@@ -706,6 +755,7 @@ def generar_guion_con_gemini_flash(
     contexto_feedback: str = "",
     auto_auditoria_retrospectiva: bool = False,
     guion_previo: Optional[str] = None,
+    cancelar_check: Optional[Callable[[], bool]] = None,
 ) -> str:
     """
     Punto de entrada maestro para generar guiones virales:
@@ -794,6 +844,7 @@ def generar_guion_con_gemini_flash(
         progreso_cb=progreso_cb,
         timeout_video_seg=38.0,
         modelo_preferido=modelo_preferido,
+        cancelar_check=cancelar_check,
     )
 
     DEFAULT_GUION_TXT.write_text(texto_respuesta + "\n", encoding="utf-8")

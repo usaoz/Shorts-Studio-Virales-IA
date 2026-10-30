@@ -7,9 +7,31 @@ import random
 import re
 import subprocess
 import sys
+import threading
+import time
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
+
+
+def _matar_arbol_proceso(proc: subprocess.Popen) -> None:
+    """Mata instantáneamente el proceso y todos sus hijos (yt-dlp + ffmpeg) en Windows/Linux."""
+    try:
+        if proc.poll() is None:
+            if os.name == "nt":
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+            else:
+                proc.kill()
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
 from .config import (
     BASE_DIR, DEFAULT_VIDEO_INPUT, WIN_NO_WINDOW, WIN_STARTUPINFO,
     HORARIOS_PICO_POR_DIA, HORARIOS_PICO_OPTIMOS
@@ -21,12 +43,15 @@ from .config import (
 ULTIMA_INFO_YTDLP: Dict[str, str] = {"titulo": "", "descripcion": ""}
 
 
-def descargar_video_youtube(url: str) -> Path:
+def descargar_video_youtube(url: str, cancelar_check: Optional[Callable[[], bool]] = None) -> Path:
     """
     Descarga el video o Short de YouTube usando yt-dlp en formato MP4 compatible
     y guarda su título/descripción original (`--write-info-json`) para que la IA
     entienda siempre el contexto real exacto de lo que ocurre en el video.
     """
+    if cancelar_check and cancelar_check():
+        raise InterruptedError("Descarga cancelada por el usuario.")
+
     url_limpia = url.strip()
     if not url_limpia:
         raise ValueError("La URL del video de YouTube está vacía.")
@@ -75,12 +100,30 @@ def descargar_video_youtube(url: str) -> Path:
         creationflags=WIN_NO_WINDOW,
         startupinfo=WIN_STARTUPINFO,
     )
+
+    def _vigilante_descarga():
+        while proc.poll() is None:
+            if cancelar_check and cancelar_check():
+                _matar_arbol_proceso(proc)
+                break
+            time.sleep(0.1)
+
+    if cancelar_check:
+        threading.Thread(target=_vigilante_descarga, daemon=True).start()
+
     if proc.stdout:
         for linea in proc.stdout:
+            if cancelar_check and cancelar_check():
+                _matar_arbol_proceso(proc)
+                raise InterruptedError("Descarga cancelada por el usuario.")
             linea_s = linea.rstrip()
             if linea_s:
                 print(f"[yt-dlp] {linea_s}")
     proc.wait()
+
+    if cancelar_check and cancelar_check():
+        _matar_arbol_proceso(proc)
+        raise InterruptedError("Descarga cancelada por el usuario.")
 
     if proc.returncode != 0:
         raise RuntimeError(f"yt-dlp terminó con código {proc.returncode}. Verifica que el link de YouTube sea válido.")
@@ -425,6 +468,7 @@ def buscar_short_viral_en_canal(
     estricto_min_views: bool = True,
     cuenta_id: Optional[str] = None,
     ids_excluir: Optional[Iterable[str]] = None,
+    cancelar_check: Optional[Callable[[], bool]] = None,
 ) -> Optional[Tuple[str, str, int]]:
     """
     Escanea la pestaña /shorts de un canal con yt-dlp (--flat-playlist),
@@ -434,6 +478,9 @@ def buscar_short_viral_en_canal(
     el flujo busque en el siguiente canal disponible.
     Retorna (url_short, titulo, view_count) o None.
     """
+    if cancelar_check and cancelar_check():
+        raise InterruptedError("Búsqueda de canal cancelada por el usuario.")
+
     url_shorts = normalizar_url_canal_shorts(url_canal)
     if not url_shorts:
         return None
@@ -458,23 +505,46 @@ def buscar_short_viral_en_canal(
     ]
     print(f"[*] Escaneando Shorts virales en {etiqueta_corta_canal(url_shorts)} (hasta {max_escanear} videos, filtro {min_views:,} vistas)...")
     try:
-        proc = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=35,
             creationflags=WIN_NO_WINDOW,
             startupinfo=WIN_STARTUPINFO,
         )
+
+        def _vigilante_scan():
+            while proc.poll() is None:
+                if cancelar_check and cancelar_check():
+                    _matar_arbol_proceso(proc)
+                    break
+                time.sleep(0.1)
+
+        if cancelar_check:
+            threading.Thread(target=_vigilante_scan, daemon=True).start()
+
+        try:
+            stdout_data, _ = proc.communicate(timeout=35)
+        except subprocess.TimeoutExpired:
+            _matar_arbol_proceso(proc)
+            return None
+
+        if cancelar_check and cancelar_check():
+            raise InterruptedError("Búsqueda de videos cancelada por el usuario.")
+    except InterruptedError:
+        raise
     except Exception as e:
         print(f"[!] Error al escanear canal {url_shorts}: {e}")
         return None
 
     candidatos: List[Tuple[str, str, int]] = []
     respaldo_sin_min: List[Tuple[str, str, int]] = []
-    for linea in proc.stdout.splitlines():
+    for linea in (stdout_data or "").splitlines():
+        if cancelar_check and cancelar_check():
+            raise InterruptedError("Búsqueda cancelada por el usuario.")
         linea_s = linea.strip()
         if not linea_s.startswith("{"):
             continue
