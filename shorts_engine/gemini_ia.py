@@ -401,6 +401,7 @@ class GeminiPoolOrchestrator:
         self.unsupported_pairs: Set[Tuple[int, str]] = set()
         self.paid_tier_only: Set[Tuple[int, str]] = set()
         self.key_latency: Dict[int, float] = {idx: 0.5 for idx in range(len(self.api_keys))}
+        self.last_probe_cache: Dict[str, Tuple[float, List[int]]] = {}
 
     def _mask_key(self, key_idx: int) -> str:
         k = self.api_keys[key_idx]
@@ -462,7 +463,17 @@ class GeminiPoolOrchestrator:
         """
         Ejecuta un micro-ping paralelo en <800ms sobre todas las cuentas para `target_model`.
         Devuelve la lista de índices de cuentas VIVAS ordenadas por menor latencia.
+        Usa caché de 180s para evitar re-probar cuentas que ya respondieron OK recientemente.
         """
+        # Retorno rápido en caché si el último probe exitoso fue hace menos de 180s
+        cached = self.last_probe_cache.get(target_model)
+        if cached:
+            ts_cache, lista_previa = cached
+            if (time.time() - ts_cache) < 180.0:
+                vivas_ahora = [idx for idx in lista_previa if self._is_available(idx, target_model)]
+                if vivas_ahora:
+                    return vivas_ahora
+
         async def _run_probes():
             tasks = [self._probe_single_key(idx, target_model) for idx in range(len(self.api_keys))]
             return await asyncio.gather(*tasks)
@@ -478,6 +489,8 @@ class GeminiPoolOrchestrator:
                 pass
 
         vivas = [idx for idx, ok, _ in sorted(results, key=lambda x: x[2]) if ok]
+        if vivas:
+            self.last_probe_cache[target_model] = (time.time(), vivas)
         return vivas
 
     def auditar_modelos_en_vivo(self) -> List[Dict[str, Any]]:
@@ -488,6 +501,7 @@ class GeminiPoolOrchestrator:
         self.cooldown_until.clear()
         self.unsupported_pairs.clear()
         self.paid_tier_only.clear()
+        self.last_probe_cache.clear()
 
         modelos_test = [
             ("gemini-4-argon", "Argon 4", "Argon"),

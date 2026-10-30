@@ -81,6 +81,9 @@ def descargar_video_youtube(url: str, cancelar_check: Optional[Callable[[], bool
         "-f", "bv*+ba/best",
         "--merge-output-format", "mp4",
         "-S", "res:1080,fps:60,br",
+        "--concurrent-fragments", "8",
+        "--buffer-size", "64K",
+        "--socket-timeout", "12",
         "-o", "video_input.%(ext)s",
         url_limpia,
     ]
@@ -499,6 +502,8 @@ def buscar_short_viral_en_canal(
         *cmd_base,
         "--flat-playlist",
         "--dump-json",
+        "--socket-timeout", "10",
+        "--extractor-args", "youtubetab:approximate_date",
         "--playlist-end",
         str(max_escanear),
         url_shorts,
