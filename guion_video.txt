@@ -1,16 +1,17 @@
-TITULO_SUPERIOR: trampa_roller_coaster
-TITULO_YOUTUBE: Fingió miedo para conseguir asiento y pasó esto 😱 #shorts
-DESCRIPCION_YOUTUBE: Un joven fingió terror en la atracción para recibir una sorpresa inesperada, pero el plan salió totalmente al revés. ¿Qué harías tú en su lugar? #shorts #viral
+TITULO_SUPERIOR: Pihu_Vision_Negro
+TITULO_YOUTUBE: ¡Perdió la visión a colores por esta extraña razón! 🐶👀 #shorts
+DESCRIPCION_YOUTUBE: Una niña pierde repentinamente la capacidad de ver colores y su perro intenta curarla de la forma más asquerosa posible. ¿Crees que funcionó la medicina perruna? #shorts #viral
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-10-31 11:30
+SCHEDULE: 2026-10-30 13:00
 PARA_NINOS: no
 MODO_ENCUADRE: full
 TONO_VIDEO: fondo
 ARCHIVO_SALIDA: auto
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
-00:00 - 00:04 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | ¡Mira con mucha atención lo que esta chica está a punto de hacer aquí!
-00:04 - 00:09 | alerta_roja | riser_suction | diablo:izquierda | izquierda | ninguno | ¡Llaman a un apuesto joven para sentarlo justo al lado de ella!
-00:09 - 00:14 | temblor | punch+xp_Error | risa:derecha | derecha | ninguno | ¡El tipo de al lado ve esto y cree que fingir miedo da premio!
-00:14 - 00:18 | zoom_in | whoosh | cerebro:centro | centro | ninguno | ¡Así que decide actuar como si estuviera aterrorizado para conseguir compañía!
-00:18 - 00:22 | brillo_epico | cash_ting+party_horn | fiesta:derecha | centro | ninguno | ¡Pero la selección natural actúa y le toca el peor compañero posible!
+00:00 - 00:04 | zoom_impacto | crowd_shocked | sorprendido:derecha | centro | ninguno | ¿Por qué de repente toda la visión de esta niña se volvió completamente en blanco y negro?
+00:04 - 00:08 | blanco_negro | suspense_hit | ojos:izquierda | ninguna | ninguno | Ni los animales ni su papá tienen color, ¡todo se transformó en una película antigua!
+00:08 - 00:13 | ninguno | riser_suction | calavera:centro | ninguna | box:[300,300,700,700]@00:10:espejo | Se lava el rostro en el espejo pero nada funciona, su cerebro decidió cancelar la suscripción al color.
+00:13 - 00:17 | flash | kids_yeyy | fiesta:derecha | ninguna | ninguno | ¡Pero a la mañana siguiente ocurre un milagro y el mundo recupera sus tonos vivos!
+00:17 - 00:22 | brillo_epico | good_idea | risa:derecha | ninguna | ninguno | El perro asegura ser un médico cirujano porque le estuvo lamiendo los ojos toda la noche.
+00:22 - 00:28 | temblor | fart+xp_Error | diablo:centro | ninguna | ninguno | Siente tanto asco que corre al baño a desinfectarse la cara, prefiriendo quedarse ciega antes que volver a ver...

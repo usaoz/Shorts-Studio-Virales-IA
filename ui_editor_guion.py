@@ -1,5 +1,7 @@
+# -*- coding: utf-8 -*-
+import re
 import customtkinter as ctk
-from typing import List, Dict, Callable
+from typing import List, Dict, Callable, Optional, Any
 
 # =====================================================================
 # CATÁLOGO OFICIAL Y 9 CUADRANTES PRECISOS DEL MOTOR
@@ -32,7 +34,6 @@ LISTA_EMOJIS = [
     "cerebro:derecha", "cerebro:izquierda"
 ]
 
-# 9 Cuadrantes nativos soportados por shorts_engine/vision_tracker.py
 LISTA_FLECHAS = [
     "ninguna", "ninguno",
     "centro", "arriba", "abajo", "izquierda", "derecha",
@@ -76,7 +77,7 @@ def mmss_a_seg(texto: str) -> float:
 
 
 class BloqueGuionCard(ctk.CTkFrame):
-    """Tarjeta interactiva ultra-optimizada con Lazy Loading y liberación real de widgets."""
+    """Tarjeta interactiva con edición de tiempos manual sincronizada y controles de reordenamiento."""
 
     def __init__(
         self,
@@ -84,8 +85,8 @@ class BloqueGuionCard(ctk.CTkFrame):
         index: int,
         datos: Dict,
         on_change: Callable,
-        on_time_shift: Callable,
-        on_add_below: Callable,
+        on_time_edit: Callable,
+        on_move: Callable,
         on_delete: Callable,
         mostrar_assets_inicial: bool = False
     ):
@@ -93,8 +94,8 @@ class BloqueGuionCard(ctk.CTkFrame):
         self.index = index
         self.datos = datos
         self.on_change = on_change
-        self.on_time_shift = on_time_shift
-        self.on_add_below = on_add_below
+        self.on_time_edit = on_time_edit
+        self.on_move = on_move
         self.on_delete = on_delete
         self.mostrar_assets = mostrar_assets_inicial
         self._assets_creados = False
@@ -110,60 +111,68 @@ class BloqueGuionCard(ctk.CTkFrame):
 
         badge = ctk.CTkLabel(
             top_frame, text=f"#{self.index + 1}",
-            font=ctk.CTkFont(size=13, weight="bold"),
-            fg_color="#313952", corner_radius=6, width=32, height=24,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="#313952", corner_radius=6, width=28, height=24,
             text_color="#f8fafc"
         )
-        badge.pack(side="left", padx=(0, 8))
+        badge.pack(side="left", padx=(0, 6))
 
-        ctk.CTkLabel(top_frame, text="⏱️", font=ctk.CTkFont(size=13)).pack(side="left", padx=(0, 2))
+        ctk.CTkLabel(top_frame, text="⏱", font=ctk.CTkFont(size=12)).pack(side="left", padx=(0, 2))
 
-        self.entry_t_ini = ctk.CTkEntry(top_frame, width=58, height=26, justify="center")
+        self.entry_t_ini = ctk.CTkEntry(
+            top_frame, width=54, height=24, justify="center",
+            font=ctk.CTkFont(family="Consolas", size=11, weight="bold"),
+            fg_color="#101524", border_color="#2a3147"
+        )
         self.entry_t_ini.insert(0, seg_a_mmss(self.datos["t_ini"]))
         self.entry_t_ini.pack(side="left", padx=2)
-        self.entry_t_ini.bind("<FocusOut>", self._manual_time_edit)
+        self.entry_t_ini.bind("<FocusOut>", self._on_ini_edited)
+        self.entry_t_ini.bind("<Return>", self._on_ini_edited)
 
-        ctk.CTkLabel(top_frame, text="→", font=ctk.CTkFont(size=13, weight="bold")).pack(side="left", padx=2)
+        ctk.CTkLabel(top_frame, text="→", font=ctk.CTkFont(size=12, weight="bold"), text_color="#64748b").pack(side="left", padx=2)
 
-        self.entry_t_fin = ctk.CTkEntry(top_frame, width=58, height=26, justify="center")
+        self.entry_t_fin = ctk.CTkEntry(
+            top_frame, width=54, height=24, justify="center",
+            font=ctk.CTkFont(family="Consolas", size=11, weight="bold"),
+            fg_color="#101524", border_color="#2a3147"
+        )
         self.entry_t_fin.insert(0, seg_a_mmss(self.datos["t_fin"]))
         self.entry_t_fin.pack(side="left", padx=2)
-        self.entry_t_fin.bind("<FocusOut>", self._manual_time_edit)
-
-        btn_menos = ctk.CTkButton(
-            top_frame, text="-0.5s", width=42, height=24, fg_color="#22283A", hover_color="#333D59",
-            command=lambda: self.on_time_shift(self.index, -0.5)
-        )
-        btn_menos.pack(side="left", padx=(6, 2))
-
-        btn_mas = ctk.CTkButton(
-            top_frame, text="+0.5s", width=42, height=24, fg_color="#22283A", hover_color="#333D59",
-            command=lambda: self.on_time_shift(self.index, +0.5)
-        )
-        btn_mas.pack(side="left", padx=2)
+        self.entry_t_fin.bind("<FocusOut>", self._on_fin_edited)
+        self.entry_t_fin.bind("<Return>", self._on_fin_edited)
 
         self.lbl_duracion = ctk.CTkLabel(
-            top_frame, text="", font=ctk.CTkFont(size=12, weight="bold"), text_color="#94a3b8"
+            top_frame, text="", font=ctk.CTkFont(size=11, weight="bold"), text_color="#94a3b8"
         )
-        self.lbl_duracion.pack(side="left", padx=(8, 6))
+        self.lbl_duracion.pack(side="left", padx=(6, 4))
 
         self.lbl_semaforo = ctk.CTkLabel(
-            top_frame, text="", font=ctk.CTkFont(size=12, weight="bold"),
+            top_frame, text="", font=ctk.CTkFont(size=11, weight="bold"),
             fg_color="#1E3A2F", corner_radius=6, padx=8, pady=2
         )
-        self.lbl_semaforo.pack(side="left", padx=6)
+        self.lbl_semaforo.pack(side="left", padx=4)
 
+        # Botones de acción a la derecha
         btn_del = ctk.CTkButton(
-            top_frame, text="🗑", width=28, height=24, fg_color="#6C252E", hover_color="#9E2A3B",
+            top_frame, text="🗑", width=26, height=24, fg_color="#45121b", hover_color="#881337",
+            font=ctk.CTkFont(size=11),
             command=lambda: self.on_delete(self.index)
         )
-        btn_del.pack(side="right", padx=(4, 0))
+        btn_del.pack(side="right", padx=(3, 0))
 
-        btn_add = ctk.CTkButton(
-            top_frame, text="＋ Bloque", width=68, height=24, fg_color="#1e3a5f", hover_color="#2a5285",
-            command=lambda: self.on_add_below(self.index)
+        btn_down = ctk.CTkButton(
+            top_frame, text="▼", width=24, height=24, fg_color="#1e2436", hover_color="#2d354d",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            command=lambda: self.on_move(self.index, 1)
         )
-        btn_add.pack(side="right", padx=4)
+        btn_down.pack(side="right", padx=2)
+
+        btn_up = ctk.CTkButton(
+            top_frame, text="▲", width=24, height=24, fg_color="#1e2436", hover_color="#2d354d",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            command=lambda: self.on_move(self.index, -1)
+        )
+        btn_up.pack(side="right", padx=2)
 
         self.btn_toggle_card_assets = ctk.CTkButton(
             top_frame,
@@ -198,6 +207,32 @@ class BloqueGuionCard(ctk.CTkFrame):
         self.entry_texto.grid(row=0, column=1, sticky="ew")
         self.entry_texto.bind("<KeyRelease>", self._on_texto_edit)
 
+    def _on_fin_edited(self, _event=None):
+        try:
+            nuevo_fin = mmss_a_seg(self.entry_t_fin.get())
+            if nuevo_fin <= self.datos["t_ini"]:
+                nuevo_fin = self.datos["t_ini"] + 0.5
+            self.datos["t_fin"] = nuevo_fin
+            self.entry_t_fin.delete(0, "end")
+            self.entry_t_fin.insert(0, seg_a_mmss(nuevo_fin))
+            self._actualizar_semaforo_palabras()
+            self.on_time_edit(self.index, "fin", nuevo_fin)
+        except Exception:
+            pass
+
+    def _on_ini_edited(self, _event=None):
+        try:
+            nuevo_ini = mmss_a_seg(self.entry_t_ini.get())
+            if nuevo_ini >= self.datos["t_fin"]:
+                nuevo_ini = max(0.0, self.datos["t_fin"] - 0.5)
+            self.datos["t_ini"] = nuevo_ini
+            self.entry_t_ini.delete(0, "end")
+            self.entry_t_ini.insert(0, seg_a_mmss(nuevo_ini))
+            self._actualizar_semaforo_palabras()
+            self.on_time_edit(self.index, "ini", nuevo_ini)
+        except Exception:
+            pass
+
     def _asegurar_assets_frame(self):
         """Instancia los 6 selectores solo cuando el usuario abre los assets."""
         if self._assets_creados:
@@ -219,30 +254,50 @@ class BloqueGuionCard(ctk.CTkFrame):
             self.assets_frame, "🔊 SFX 1", LISTA_SFX, sfx1_val, width=118
         )
         self.opt_sfx2 = self._crear_selector(
-            self.assets_frame, "➕ SFX 2", LISTA_SFX, sfx2_val, width=112
+            self.assets_frame, "🔊 SFX 2", LISTA_SFX, sfx2_val, width=118
         )
-
         self.opt_emoji = self._crear_selector(
-            self.assets_frame, "😎 Emoji", LISTA_EMOJIS, self.datos.get("emoji", "ninguno"), width=135
+            self.assets_frame, "🎭 Emoji", LISTA_EMOJIS, self.datos.get("emoji", "ninguno"), width=130
         )
-
         self.opt_flecha = self._crear_selector(
-            self.assets_frame, "🏹 Flecha", LISTA_FLECHAS, self.datos.get("flecha", "ninguna"), width=95
+            self.assets_frame, "↗️ Flecha (9 Pos)", LISTA_FLECHAS, self.datos.get("flecha", "ninguna"), width=120
         )
-
         self.opt_circulo = self._crear_selector(
-            self.assets_frame, "⭕ Círculo", LISTA_CIRCULOS, self.datos.get("circulo", "ninguno"), width=120
+            self.assets_frame, "⭕ Círculo (9 Pos)", LISTA_CIRCULOS, self.datos.get("circulo", "ninguno"), width=130
         )
 
     def _destruir_assets_frame(self):
-        """Guarda los valores seleccionados y destruye los OptionMenu para liberar el event loop."""
-        if self._assets_creados and hasattr(self, "assets_frame"):
-            self._sincronizar_estado()
-            try:
-                self.assets_frame.destroy()
-            except Exception:
-                pass
+        """Libera la memoria de Tkinter destruyendo los OptionMenus de la tarjeta."""
+        if not self._assets_creados:
+            return
+        try:
+            self._guardar_valores_assets_a_datos()
+            self.assets_frame.destroy()
+        except Exception:
+            pass
         self._assets_creados = False
+
+    def _guardar_valores_assets_a_datos(self):
+        if not self._assets_creados:
+            return
+        try:
+            self.datos["efecto"] = self.opt_efecto.get()
+            s1 = self.opt_sfx1.get()
+            s2 = self.opt_sfx2.get()
+            if s1 != "ninguno" and s2 != "ninguno" and s1 != s2:
+                self.datos["sfx"] = f"{s1}+{s2}"
+            elif s1 != "ninguno":
+                self.datos["sfx"] = s1
+            elif s2 != "ninguno":
+                self.datos["sfx"] = s2
+            else:
+                self.datos["sfx"] = "ninguno"
+
+            self.datos["emoji"] = self.opt_emoji.get()
+            self.datos["flecha"] = self.opt_flecha.get()
+            self.datos["circulo"] = self.opt_circulo.get()
+        except Exception:
+            pass
 
     def _toggle_assets_local(self):
         self.mostrar_assets = not self.mostrar_assets
@@ -252,39 +307,26 @@ class BloqueGuionCard(ctk.CTkFrame):
         else:
             self._destruir_assets_frame()
             self.btn_toggle_card_assets.configure(text="🎛️ Assets", fg_color="#22283A")
+        self.on_change()
 
-    def _crear_selector(self, parent, label_txt: str, opciones: List[str], valor_actual: str, width: int):
-        box = ctk.CTkFrame(parent, fg_color="transparent")
-        box.pack(side="left", padx=(0, 6))
-        ctk.CTkLabel(box, text=label_txt, font=ctk.CTkFont(size=11), text_color="#BAC2DE").pack(anchor="w")
-        lista_final = list(opciones)
-        val_clean = str(valor_actual or "").strip()
+    def _crear_selector(self, parent, label: str, lista: List[str], val_actual: str, width: int = 120):
+        f = ctk.CTkFrame(parent, fg_color="transparent")
+        f.pack(side="left", padx=4, pady=2)
+        ctk.CTkLabel(f, text=label, font=ctk.CTkFont(size=10, weight="bold"), text_color="#94a3b8").pack(anchor="w")
+
+        val_clean = str(val_actual).strip()
+        lista_final = list(lista)
         if val_clean and val_clean not in lista_final:
-            lista_final.insert(0, val_clean)
+            lista_final.append(val_clean)
+
         opt = ctk.CTkOptionMenu(
-            box, values=lista_final, width=width, height=26,
-            fg_color="#22283A", button_color="#333D59",
-            font=ctk.CTkFont(size=11),
+            f, values=lista_final, width=width, height=24,
+            corner_radius=6, font=ctk.CTkFont(size=10),
             command=lambda _: self._sincronizar_estado()
         )
         opt.set(val_clean if val_clean else lista_final[0])
         opt.pack()
         return opt
-
-    def _manual_time_edit(self, _event=None):
-        try:
-            t_ini = mmss_a_seg(self.entry_t_ini.get())
-            t_fin = max(t_ini + 0.5, mmss_a_seg(self.entry_t_fin.get()))
-            self.datos["t_ini"] = t_ini
-            self.datos["t_fin"] = t_fin
-            self.entry_t_ini.delete(0, "end")
-            self.entry_t_ini.insert(0, seg_a_mmss(t_ini))
-            self.entry_t_fin.delete(0, "end")
-            self.entry_t_fin.insert(0, seg_a_mmss(t_fin))
-            self._actualizar_semaforo_palabras()
-            self._sincronizar_estado()
-        except Exception:
-            pass
 
     def _on_texto_edit(self, _event=None):
         self.datos["texto"] = self.entry_texto.get()
@@ -313,32 +355,18 @@ class BloqueGuionCard(ctk.CTkFrame):
         self.lbl_semaforo.configure(text=txt, fg_color=bg)
 
     def _sincronizar_estado(self):
-        if self._assets_creados:
-            self.datos["efecto"] = self.opt_efecto.get()
-            s1 = self.opt_sfx1.get()
-            s2 = self.opt_sfx2.get()
-            if s1 != "ninguno" and s2 != "ninguno" and s1 != s2:
-                self.datos["sfx"] = f"{s1}+{s2}"
-            elif s1 != "ninguno":
-                self.datos["sfx"] = s1
-            elif s2 != "ninguno":
-                self.datos["sfx"] = s2
-            else:
-                self.datos["sfx"] = "ninguno"
-
-            self.datos["emoji"] = self.opt_emoji.get()
-            self.datos["flecha"] = self.opt_flecha.get()
-            self.datos["circulo"] = self.opt_circulo.get()
-
+        self._guardar_valores_assets_a_datos()
         self.datos["texto"] = self.entry_texto.get().strip()
         self.on_change()
 
 
 class VisualScriptEditor(ctk.CTkFrame):
     """
-    Editor Visual Interactivo con Modo Doble:
-    1) Modo Rápido (Solo Voz): Ultra liviano, carga en <30ms sin lag ni placeholders negros.
-    2) Modo Profundo (Efectos y Assets): Despliega 9 zonas de Flechas/Círculos, SFX dobles y Efectos.
+    Editor Visual Interactivo de Guiones:
+    - Ripple Time bidireccional automático entre bloques.
+    - Reordenamiento rápido de bloques con ▲ y ▼.
+    - Edición del Título viral real de YouTube con sincronización limpia.
+    - Modo Doble: Solo Voz ultra-rápido o Profundo con Assets.
     """
 
     def __init__(self, master, **kwargs):
@@ -366,36 +394,44 @@ class VisualScriptEditor(ctk.CTkFrame):
         self._build_body()
 
     def _build_header(self):
-        header = ctk.CTkFrame(self, fg_color="#141824", corner_radius=8, border_width=1, border_color="#252B3D")
+        header = ctk.CTkFrame(self, fg_color="#141824", corner_radius=10, border_width=1, border_color="#252B3D")
         header.grid(row=0, column=0, sticky="ew", padx=4, pady=(0, 6))
         header.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(
-            header, text="🎬 TÍTULO:", font=ctk.CTkFont(size=12, weight="bold"), text_color="#94a3b8"
+            header, text="🎬 TÍTULO YOUTUBE:", font=ctk.CTkFont(size=12, weight="bold"), text_color="#94a3b8"
         ).grid(row=0, column=0, padx=(10, 6), pady=8, sticky="w")
 
         self.entry_titulo = ctk.CTkEntry(
-            header, height=30, font=ctk.CTkFont(size=13, weight="bold"),
-            placeholder_text="Nombre del video / archivo MP4..."
+            header, height=30, font=ctk.CTkFont(size=12, weight="bold"),
+            placeholder_text="Título viral para YouTube con emojis y #shorts..."
         )
         self.entry_titulo.grid(row=0, column=1, padx=4, pady=8, sticky="ew")
         self.entry_titulo.bind("<KeyRelease>", lambda _: self._actualizar_raw_interno())
 
+        btn_add = ctk.CTkButton(
+            header, text="＋ Nuevo Bloque", width=120, height=28,
+            fg_color="#0284c7", hover_color="#0369a1",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            command=self._agregar_bloque_arriba
+        )
+        btn_add.grid(row=0, column=2, padx=4, pady=8)
+
         self.btn_toggle_modo = ctk.CTkButton(
-            header, text="🎙️ Modo: Solo Voz", width=145, height=28,
+            header, text="🎙️ Solo Voz (Todos)", width=140, height=28,
             fg_color="#1e3a5f", hover_color="#2a5285",
             font=ctk.CTkFont(size=11, weight="bold"),
             command=self._toggle_modo_profundo
         )
-        self.btn_toggle_modo.grid(row=0, column=2, padx=4, pady=8)
+        self.btn_toggle_modo.grid(row=0, column=3, padx=4, pady=8)
 
         self.btn_toggle_raw = ctk.CTkButton(
-            header, text="📝 Texto Crudo", width=115, height=28,
+            header, text="📝 Texto Crudo", width=105, height=28,
             fg_color="#22283A", hover_color="#333D59",
             font=ctk.CTkFont(size=11),
             command=self._toggle_vista
         )
-        self.btn_toggle_raw.grid(row=0, column=3, padx=8, pady=8)
+        self.btn_toggle_raw.grid(row=0, column=4, padx=8, pady=8)
 
     def _build_body(self):
         self.scroll_cards = ctk.CTkScrollableFrame(self, fg_color="#0e111a", corner_radius=8)
@@ -408,9 +444,9 @@ class VisualScriptEditor(ctk.CTkFrame):
     def _toggle_modo_profundo(self):
         self.modo_profundo = not self.modo_profundo
         if self.modo_profundo:
-            self.btn_toggle_modo.configure(text="🎛️ Modo: Profundo", fg_color="#6d28d9")
+            self.btn_toggle_modo.configure(text="🎛️ Ver Assets (Todos)", fg_color="#6d28d9")
         else:
-            self.btn_toggle_modo.configure(text="🎙️ Modo: Solo Voz", fg_color="#1e3a5f")
+            self.btn_toggle_modo.configure(text="🎙️ Solo Voz (Todos)", fg_color="#1e3a5f")
 
         for c in self.cards:
             c.mostrar_assets = self.modo_profundo
@@ -443,7 +479,8 @@ class VisualScriptEditor(ctk.CTkFrame):
         self.raw_textbox.insert("1.0", raw_script)
 
         self.bloques.clear()
-        titulo_detectado = "Short Viral"
+        titulo_yt = ""
+        titulo_sup = ""
         en_guion = False
 
         for linea in raw_script.splitlines():
@@ -456,12 +493,14 @@ class VisualScriptEditor(ctk.CTkFrame):
             if not en_guion:
                 if ":" in l_strip:
                     k, v = l_strip.split(":", 1)
-                    k_clean = k.strip()
+                    k_clean = k.strip().upper()
                     v_clean = v.strip()
-                    if k_clean.upper() == "TITULO_SUPERIOR":
-                        titulo_detectado = v_clean
+                    if k_clean == "TITULO_YOUTUBE":
+                        titulo_yt = v_clean
+                    elif k_clean == "TITULO_SUPERIOR":
+                        titulo_sup = v_clean
                     else:
-                        self.metadatos_ocultos[k_clean.upper()] = v_clean
+                        self.metadatos_ocultos[k_clean] = v_clean
                 continue
 
             if l_strip.upper().startswith("TIEMPO") or "|" not in l_strip:
@@ -485,8 +524,10 @@ class VisualScriptEditor(ctk.CTkFrame):
                     "texto": partes[6]
                 })
 
+        # Mostrar el título real viral de YouTube
+        titulo_mostrar = titulo_yt or titulo_sup or "Short Viral"
         self.entry_titulo.delete(0, "end")
-        self.entry_titulo.insert(0, titulo_detectado)
+        self.entry_titulo.insert(0, titulo_mostrar)
 
         if not self.bloques:
             self.bloques.append({
@@ -509,27 +550,20 @@ class VisualScriptEditor(ctk.CTkFrame):
                 c.datos["t_fin"] = max(c.datos["t_ini"] + 0.5, mmss_a_seg(c.entry_t_fin.get()))
                 c.datos["texto"] = c.entry_texto.get().strip()
                 if c._assets_creados:
-                    c.datos["efecto"] = c.opt_efecto.get()
-                    s1 = c.opt_sfx1.get()
-                    s2 = c.opt_sfx2.get()
-                    if s1 != "ninguno" and s2 != "ninguno" and s1 != s2:
-                        c.datos["sfx"] = f"{s1}+{s2}"
-                    elif s1 != "ninguno":
-                        c.datos["sfx"] = s1
-                    elif s2 != "ninguno":
-                        c.datos["sfx"] = s2
-                    else:
-                        c.datos["sfx"] = "ninguno"
-                    c.datos["emoji"] = c.opt_emoji.get()
-                    c.datos["flecha"] = c.opt_flecha.get()
-                    c.datos["circulo"] = c.opt_circulo.get()
+                    c._guardar_valores_assets_a_datos()
             except Exception:
                 pass
 
-        titulo = self.entry_titulo.get().strip() or "Short Viral"
-        lineas = [f"TITULO_SUPERIOR: {titulo}"]
+        titulo_editado = self.entry_titulo.get().strip() or "Short Viral"
+        tit_sup_limpio = re.sub(r'[^A-Za-z0-9_ -]', '', titulo_editado).strip()[:40] or "Short_Viral"
+
+        lineas = [
+            f"TITULO_SUPERIOR: {tit_sup_limpio}",
+            f"TITULO_YOUTUBE: {titulo_editado}"
+        ]
         for k, v in self.metadatos_ocultos.items():
-            lineas.append(f"{k}: {v}")
+            if k not in ("TITULO_SUPERIOR", "TITULO_YOUTUBE"):
+                lineas.append(f"{k}: {v}")
 
         lineas.append("")
         lineas.append("[GUION]")
@@ -571,53 +605,76 @@ class VisualScriptEditor(ctk.CTkFrame):
                 index=idx,
                 datos=b,
                 on_change=self._actualizar_raw_interno,
-                on_time_shift=self._ajustar_tiempo_cascada,
-                on_add_below=self._insertar_bloque_debajo,
+                on_time_edit=self._on_block_time_edited,
+                on_move=self._mover_bloque,
                 on_delete=self._eliminar_bloque,
                 mostrar_assets_inicial=self.modo_profundo
             )
-            card.grid(row=idx, column=0, sticky="ew", padx=4, pady=5)
+            card.grid(row=idx, column=0, sticky="ew", padx=4, pady=4)
             self.cards.append(card)
 
-    def _ajustar_tiempo_cascada(self, idx: int, delta_seg: float):
+    def _on_block_time_edited(self, idx: int, campo: str, nuevo_seg: float):
+        """Efecto dominó (Ripple Time): sincroniza el fin de un bloque con el inicio del siguiente."""
         if 0 <= idx < len(self.bloques):
-            bloque = self.bloques[idx]
-            nueva_dur = max(1.0, (bloque["t_fin"] - bloque["t_ini"]) + delta_seg)
-            nuevo_fin = bloque["t_ini"] + nueva_dur
-            desplazamiento = nuevo_fin - bloque["t_fin"]
-            bloque["t_fin"] = nuevo_fin
+            if campo == "fin":
+                self.bloques[idx]["t_fin"] = nuevo_seg
+                if idx + 1 < len(self.bloques):
+                    sig = self.bloques[idx + 1]
+                    dur_sig = max(0.5, sig["t_fin"] - sig["t_ini"])
+                    sig["t_ini"] = nuevo_seg
+                    if sig["t_fin"] <= sig["t_ini"]:
+                        sig["t_fin"] = sig["t_ini"] + dur_sig
+                    if idx + 1 < len(self.cards):
+                        c_sig = self.cards[idx + 1]
+                        c_sig.entry_t_ini.delete(0, "end")
+                        c_sig.entry_t_ini.insert(0, seg_a_mmss(sig["t_ini"]))
+                        c_sig.entry_t_fin.delete(0, "end")
+                        c_sig.entry_t_fin.insert(0, seg_a_mmss(sig["t_fin"]))
+                        c_sig._actualizar_semaforo_palabras()
+            elif campo == "ini":
+                self.bloques[idx]["t_ini"] = nuevo_seg
+                if idx > 0:
+                    ant = self.bloques[idx - 1]
+                    ant["t_fin"] = nuevo_seg
+                    if idx - 1 < len(self.cards):
+                        c_ant = self.cards[idx - 1]
+                        c_ant.entry_t_fin.delete(0, "end")
+                        c_ant.entry_t_fin.insert(0, seg_a_mmss(nuevo_seg))
+                        c_ant._actualizar_semaforo_palabras()
 
-            for j in range(idx + 1, len(self.bloques)):
-                self.bloques[j]["t_ini"] = max(0.0, self.bloques[j]["t_ini"] + desplazamiento)
-                self.bloques[j]["t_fin"] = max(
-                    self.bloques[j]["t_ini"] + 1.0,
-                    self.bloques[j]["t_fin"] + desplazamiento
-                )
+            self._actualizar_raw_interno()
+
+    def _mover_bloque(self, idx: int, direccion: int):
+        target = idx + direccion
+        if 0 <= idx < len(self.bloques) and 0 <= target < len(self.bloques):
+            self.bloques[idx], self.bloques[target] = self.bloques[target], self.bloques[idx]
+            # Reencadenar tiempos desde 00:00 conservando la duración de cada bloque
+            t_curr = 0.0
+            for b in self.bloques:
+                d = max(0.5, b["t_fin"] - b["t_ini"])
+                b["t_ini"] = t_curr
+                b["t_fin"] = t_curr + d
+                t_curr += d
 
             self._renderizar_tarjetas()
             self._actualizar_raw_interno()
 
-    def _insertar_bloque_debajo(self, idx: int):
-        if 0 <= idx < len(self.bloques):
-            t_base = self.bloques[idx]["t_fin"]
-            dur_nueva = 4.0
-            nuevo = {
-                "t_ini": t_base,
-                "t_fin": t_base + dur_nueva,
-                "efecto": "zoom_in",
-                "sfx": "whoosh",
-                "emoji": "sorprendido:derecha",
-                "flecha": "centro",
-                "circulo": "ninguno",
-                "texto": "¡Escribe aquí la nueva línea de narración sincronizada!"
-            }
-            for j in range(idx + 1, len(self.bloques)):
-                self.bloques[j]["t_ini"] += dur_nueva
-                self.bloques[j]["t_fin"] += dur_nueva
-
-            self.bloques.insert(idx + 1, nuevo)
-            self._renderizar_tarjetas()
-            self._actualizar_raw_interno()
+    def _agregar_bloque_arriba(self):
+        t_base = self.bloques[-1]["t_fin"] if self.bloques else 0.0
+        dur_nueva = 4.0
+        nuevo = {
+            "t_ini": t_base,
+            "t_fin": t_base + dur_nueva,
+            "efecto": "zoom_in",
+            "sfx": "whoosh",
+            "emoji": "sorprendido:derecha",
+            "flecha": "centro",
+            "circulo": "ninguno",
+            "texto": "¡Escribe aquí la nueva narración sincronizada!"
+        }
+        self.bloques.append(nuevo)
+        self._renderizar_tarjetas()
+        self._actualizar_raw_interno()
 
     def _eliminar_bloque(self, idx: int):
         if len(self.bloques) <= 1:

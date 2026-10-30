@@ -4185,7 +4185,7 @@ def iniciar_aplicacion_gui() -> None:
         slider_seek.configure(command=_on_slider_change)
 
         row_ctrl = ctk.CTkFrame(col_izq, fg_color="transparent")
-        row_ctrl.pack(fill="x", padx=18, pady=(0, 14))
+        row_ctrl.pack(fill="x", padx=18, pady=(0, 10))
 
         btn_play = ctk.CTkButton(
             row_ctrl, text="▶", width=36, height=30, corner_radius=8,
@@ -4232,56 +4232,20 @@ def iniciar_aplicacion_gui() -> None:
 
         btn_play.configure(command=_toggle_play)
 
-        # ── Columna derecha ────────────────────────────────────────────────
-        col_der = ctk.CTkFrame(panel_principal, fg_color="transparent")
-        col_der.grid(row=0, column=1, sticky="nsew")
-        col_der.grid_rowconfigure(1, weight=1)
-        col_der.grid_columnconfigure(0, weight=1)
-
-        # Header compacto
-        hdr = ctk.CTkFrame(col_der, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
-        hdr.grid(row=0, column=0, sticky="ew", pady=(0, 10))
-
-        hdr_inner = ctk.CTkFrame(hdr, fg_color="transparent")
-        hdr_inner.pack(fill="x", padx=16, pady=10)
-
-        lbl_estado = ctk.CTkLabel(
-            hdr_inner,
-            text="Video editado" if es_modo_editado else "Short listo para publicar",
-            font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
-            text_color=TEXT_MAIN,
-        )
-        lbl_estado.pack(side="left")
-
-        lbl_ritmo = ctk.CTkLabel(
-            hdr_inner, text="",
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            text_color=GREEN_ACCENT,
-        )
-        lbl_ritmo.pack(side="right")
-
-        tit_corto = titulo[:72] + ("..." if len(titulo) > 72 else "")
-        ctk.CTkLabel(
-            hdr,
-            text=tit_corto,
-            font=ctk.CTkFont(family="Segoe UI", size=11),
-            text_color=TEXT_MUTED,
-            anchor="w",
-        ).pack(fill="x", padx=16, pady=(0, 6))
-
+        # Enlace original por debajo del reproductor de video
         if url_video_orig and url_video_orig.strip():
-            row_url = ctk.CTkFrame(hdr, fg_color="transparent")
-            row_url.pack(fill="x", padx=16, pady=(0, 8))
+            row_url = ctk.CTkFrame(col_izq, fg_color="#101524", corner_radius=10, border_width=1, border_color="#1e2538")
+            row_url.pack(fill="x", padx=16, pady=(0, 10))
 
             ent_url_disp = ctk.CTkEntry(
                 row_url, height=24,
                 font=ctk.CTkFont(family="Segoe UI", size=10),
-                fg_color=INPUT_BG, border_color=CARD_BORDER, border_width=1,
+                fg_color="transparent", border_width=0,
                 text_color=CYAN_ACCENT,
             )
             ent_url_disp.insert(0, url_video_orig.strip())
             ent_url_disp.configure(state="readonly")
-            ent_url_disp.pack(side="left", fill="x", expand=True, padx=(0, 6))
+            ent_url_disp.pack(side="left", fill="x", expand=True, padx=(8, 2), pady=3)
 
             def _abrir_url_navegador() -> None:
                 import webbrowser
@@ -4294,25 +4258,53 @@ def iniciar_aplicacion_gui() -> None:
                 try:
                     root.clipboard_clear()
                     root.clipboard_append(url_video_orig.strip())
-                    btn_copiar_url.configure(text="Copiado")
+                    btn_copiar_url.configure(text="OK!")
                     root.after(1400, lambda: btn_copiar_url.configure(text="Copiar"))
                 except Exception:
                     pass
 
             ctk.CTkButton(
-                row_url, text="Abrir", width=52, height=24, corner_radius=8,
-                fg_color=INPUT_BG, hover_color="#2a3147",
+                row_url, text="Abrir", width=42, height=22, corner_radius=6,
+                fg_color="#1e2538", hover_color="#2d3752",
                 font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
                 command=_abrir_url_navegador,
-            ).pack(side="right", padx=(4, 0))
+            ).pack(side="right", padx=(2, 4), pady=3)
 
             btn_copiar_url = ctk.CTkButton(
-                row_url, text="Copiar", width=52, height=24, corner_radius=8,
-                fg_color=INPUT_BG, hover_color="#2a3147",
+                row_url, text="Copiar", width=46, height=22, corner_radius=6,
+                fg_color="#1e2538", hover_color="#2d3752",
                 font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
                 command=_copiar_url_clip,
             )
-            btn_copiar_url.pack(side="right")
+            btn_copiar_url.pack(side="right", padx=(2, 0), pady=3)
+
+        # ── Columna derecha ────────────────────────────────────────────────
+        col_der = ctk.CTkFrame(panel_principal, fg_color="transparent")
+        col_der.grid(row=0, column=1, sticky="nsew")
+        col_der.grid_rowconfigure(1, weight=1)
+        col_der.grid_columnconfigure(0, weight=1)
+
+        # Header compacto
+        hdr = ctk.CTkFrame(col_der, fg_color=CARD_BG, corner_radius=14, border_width=1, border_color=CARD_BORDER)
+        hdr.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+
+        hdr_inner = ctk.CTkFrame(hdr, fg_color="transparent")
+        hdr_inner.pack(fill="x", padx=16, pady=8)
+
+        lbl_estado = ctk.CTkLabel(
+            hdr_inner,
+            text="Video editado listo" if es_modo_editado else "Short listo para publicar",
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+            text_color=TEXT_MAIN,
+        )
+        lbl_estado.pack(side="left")
+
+        lbl_ritmo = ctk.CTkLabel(
+            hdr_inner, text="",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color=GREEN_ACCENT,
+        )
+        lbl_ritmo.pack(side="right")
 
         # Tarjeta guion (ocupa todo el espacio disponible)
         card_guion = ctk.CTkFrame(
@@ -4416,13 +4408,13 @@ def iniciar_aplicacion_gui() -> None:
 
         ctk.CTkButton(
             row_sec,
-            text="Cancelar",
+            text="Cancelar Proceso",
             command=lambda: _responder("descartar"),
             height=32, corner_radius=10,
-            fg_color=INPUT_BG, hover_color="#7f1d1d",
-            border_width=1, border_color="#2a3147",
+            fg_color="#1c2030", hover_color="#7f1d1d",
+            border_width=1, border_color="#3b4252",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            text_color=TEXT_MUTED,
+            text_color="#f87171",
         ).grid(row=0, column=1, padx=(4, 0), sticky="ew")
 
         # Inicialización del reproductor ffpyplayer (inicia pausado)
@@ -4487,15 +4479,13 @@ def iniciar_aplicacion_gui() -> None:
                         slider_seek.set(progreso)
                         lbl_tiempo.configure(text=f"{_fmt_tiempo(pts)} / {_fmt_tiempo(duracion_total)}")
 
-                    delay_ms = int(val * 1000) if isinstance(val, (int, float)) and val > 0 else 16
+                    delay_ms = max(5, int(val * 1000)) if isinstance(val, (int, float)) and val > 0 else 10
                 else:
-                    delay_ms = int(val * 1000) if isinstance(val, (int, float)) and val > 0 else 20
+                    delay_ms = max(5, int(val * 1000)) if isinstance(val, (int, float)) and val > 0 else 12
 
-                # Cuando el video está en pausa, no saturar el event loop de Tkinter (ahorro 85% CPU)
                 if not reproduciendo:
                     delay_ms = max(delay_ms, 120)
-                else:
-                    delay_ms = max(5, min(50, delay_ms))
+
                 win_r.after(delay_ms, _loop_reproductor)
 
         if player is not None:
