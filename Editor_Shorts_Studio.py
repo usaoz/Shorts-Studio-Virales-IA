@@ -1937,26 +1937,7 @@ def iniciar_aplicacion_gui() -> None:
             font=ctk.CTkFont(family="Segoe UI", size=12),
             fg_color="#1e2436",
             button_color="#2d354d",
-        ).pack(fill="x", padx=18, pady=(0, 8))
-
-        ctk.CTkLabel(
-            card_cfg,
-            text="Aceleración de Video (Render)",
-            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-            text_color=TEXT_MAIN,
-        ).pack(anchor="w", padx=18, pady=(0, 4))
-
-        ctk.CTkOptionMenu(
-            card_cfg,
-            variable=modo_render_var,
-            values=["Automático (GPU)", "Procesador CPU Equilibrado (Recomendado al jugar)"],
-            command=_guardar_memoria,
-            corner_radius=14,
-            height=32,
-            font=ctk.CTkFont(family="Segoe UI", size=12),
-            fg_color="#1e2436",
-            button_color="#2d354d",
-        ).pack(fill="x", padx=18, pady=(0, 12))
+        ).pack(fill="x", padx=18, pady=(0, 14))
 
         # 3. Tarjeta de API Key Gemini / Argon 4 Multi-Cuenta
         card_api = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
@@ -2054,21 +2035,22 @@ def iniciar_aplicacion_gui() -> None:
         ).pack(side="right")
 
         # Monitor de cuotas y estado en vivo de Gemini / Argon
-        frame_probe = ctk.CTkFrame(card_api, fg_color="#101524", corner_radius=12, border_width=1, border_color="#222b42")
+        frame_probe = ctk.CTkFrame(card_api, fg_color="#101524", corner_radius=14, border_width=1, border_color="#222b42")
         frame_probe.pack(fill="x", padx=18, pady=(0, 14))
 
         row_probe_top = ctk.CTkFrame(frame_probe, fg_color="transparent")
-        row_probe_top.pack(fill="x", padx=12, pady=(10, 6))
+        row_probe_top.pack(fill="x", padx=14, pady=(10, 8))
 
         ctk.CTkLabel(
             row_probe_top,
-            text="Estado en Vivo de Modelos y Cuotas",
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            text="Estado actual de modelos y cuotas",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(side="left")
 
         frame_filas_modelos = ctk.CTkFrame(frame_probe, fg_color="transparent")
-        frame_filas_modelos.pack(fill="x", padx=12, pady=(0, 10))
+        frame_filas_modelos.pack(fill="x", padx=10, pady=(0, 12))
+        frame_filas_modelos.grid_columnconfigure((0, 1, 2, 3), weight=1, uniform="model_box")
 
         def _render_resultado_modelos(lista_res: List[Dict[str, Any]]):
             for w in frame_filas_modelos.winfo_children():
@@ -2077,29 +2059,48 @@ def iniciar_aplicacion_gui() -> None:
                 except Exception:
                     pass
 
-            for item in lista_res:
-                r_item = ctk.CTkFrame(frame_filas_modelos, fg_color="#151a2d", corner_radius=8)
-                r_item.pack(fill="x", pady=2)
+            for idx, item in enumerate(lista_res):
+                c_box = ctk.CTkFrame(
+                    frame_filas_modelos,
+                    fg_color=item.get("color_bg", "#151a2d"),
+                    border_color=item.get("color_borde", "#334155"),
+                    border_width=2,
+                    corner_radius=12,
+                )
+                c_box.grid(row=0, column=idx, padx=4, pady=2, sticky="nsew")
 
                 ctk.CTkLabel(
-                    r_item,
-                    text=f"{item['icono']} {item['nombre']}",
-                    font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                    c_box,
+                    text=item.get("nombre_corto", item.get("nombre", "")),
+                    font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
                     text_color="#ffffff",
-                    width=150,
-                    anchor="w",
-                ).pack(side="left", padx=8, pady=4)
+                ).pack(padx=6, pady=(8, 2))
+
+                pill = ctk.CTkFrame(
+                    c_box,
+                    fg_color=item.get("color_pill_bg", "#1e293b"),
+                    border_color=item.get("color_borde", "#334155"),
+                    border_width=1,
+                    corner_radius=8,
+                )
+                pill.pack(padx=6, pady=2)
 
                 ctk.CTkLabel(
-                    r_item,
-                    text=item["estado_str"],
-                    font=ctk.CTkFont(family="Segoe UI", size=10),
-                    text_color=item["color"],
-                    anchor="w",
-                ).pack(side="left", fill="x", expand=True, padx=4, pady=4)
+                    pill,
+                    text=item.get("tag", item.get("estado_str", "")),
+                    font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+                    text_color=item.get("color_texto", item.get("color", "#cbd5e1")),
+                ).pack(padx=8, pady=2)
+
+                ctk.CTkLabel(
+                    c_box,
+                    text=item.get("desc", ""),
+                    font=ctk.CTkFont(family="Segoe UI", size=9),
+                    text_color="#94a3b8",
+                ).pack(padx=4, pady=(2, 8))
 
         def _ejecutar_diagnostico_ia():
-            btn_probe_ia.configure(state="disabled", text="Verificando en Google...")
+            btn_probe_ia.configure(state="disabled", text="Verificando...")
             for w in frame_filas_modelos.winfo_children():
                 try:
                     w.destroy()
@@ -2107,17 +2108,17 @@ def iniciar_aplicacion_gui() -> None:
                     pass
             lbl_cargando = ctk.CTkLabel(
                 frame_filas_modelos,
-                text="Comprobando disponibilidad de Argon 4, 3.8 Flash, 3.6 Flash y 3.5 Lite...",
+                text="Comprobando disponibilidad en tiempo real con Google...",
                 font=ctk.CTkFont(family="Segoe UI", size=11),
                 text_color=CYAN_ACCENT,
             )
-            lbl_cargando.pack(pady=8)
+            lbl_cargando.grid(row=0, column=0, columnspan=4, pady=16)
 
             def _worker():
                 from shorts_engine.gemini_ia import auditar_estado_pool_en_vivo
                 res = auditar_estado_pool_en_vivo()
                 def _ui():
-                    btn_probe_ia.configure(state="normal", text="⚡ Comprobar en Vivo")
+                    btn_probe_ia.configure(state="normal", text="Refrescar")
                     _render_resultado_modelos(res)
                 win.after(0, _ui)
 
@@ -2125,17 +2126,23 @@ def iniciar_aplicacion_gui() -> None:
 
         btn_probe_ia = ctk.CTkButton(
             row_probe_top,
-            text="⚡ Comprobar en Vivo",
+            text="Refrescar",
             command=_ejecutar_diagnostico_ia,
             corner_radius=10,
-            height=26,
-            width=140,
+            height=28,
+            width=90,
             fg_color="#1e293b",
             hover_color="#334155",
+            border_width=1,
+            border_color="#334155",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            text_color=CYAN_ACCENT,
+            text_color="#e2e8f0",
         )
         btn_probe_ia.pack(side="right")
+
+        # Cargar plantilla inicial de cajas
+        from shorts_engine.gemini_ia import obtener_modelos_plantilla
+        _render_resultado_modelos(obtener_modelos_plantilla())
 
         # 4. Carpeta Output
         card_tools = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)

@@ -399,6 +399,7 @@ class GeminiPoolOrchestrator:
         }
         self.cooldown_until: Dict[Tuple[int, str], float] = {}
         self.unsupported_pairs: Set[Tuple[int, str]] = set()
+        self.paid_tier_only: Set[Tuple[int, str]] = set()
         self.key_latency: Dict[int, float] = {idx: 0.5 for idx in range(len(self.api_keys))}
 
     def _mask_key(self, key_idx: int) -> str:
@@ -449,6 +450,9 @@ class GeminiPoolOrchestrator:
             return key_idx, True, lat
         except APIError as e:
             code = getattr(e, "code", 500) or 500
+            msg = str(e).lower()
+            if "limit: 0" in msg or ("free" in msg and "limit: 0" in msg):
+                self.paid_tier_only.add((key_idx, model))
             self._mark_error(key_idx, model, code)
             return key_idx, False, 999.0
         except Exception:
@@ -483,46 +487,81 @@ class GeminiPoolOrchestrator:
         """
         self.cooldown_until.clear()
         self.unsupported_pairs.clear()
+        self.paid_tier_only.clear()
 
         modelos_test = [
-            ("gemini-4-argon", "Argon 4", "Máxima calidad"),
-            ("gemini-3.8-flash", "Gemini 3.8 Flash", "Razonamiento top"),
-            ("gemini-3.6-flash", "Gemini 3.6 Flash", "Alta calidad (20/día)"),
-            ("gemini-3.5-flash-lite", "Gemini 3.5 Flash Lite", "Cuota amplia"),
+            ("gemini-4-argon", "Argon 4", "Argon"),
+            ("gemini-3.8-flash", "Gemini 3.8 Flash", "3.8 Flash"),
+            ("gemini-3.6-flash", "Gemini 3.6 Flash", "3.6 Flash"),
+            ("gemini-3.5-flash-lite", "Gemini 3.5 Flash Lite", "3.5 Lite"),
         ]
 
         resultados = []
         total_k = len(self.api_keys)
 
-        for m_id, m_nombre, m_desc in modelos_test:
+        for m_id, m_nombre, m_corto in modelos_test:
             vivas = self.fast_probe_accounts(m_id)
             n_vivas = len(vivas)
-            if n_vivas == total_k and total_k > 0:
-                est = f"{n_vivas}/{total_k} cuentas listas · Disponible (<1s)"
-                color = "#10b981"
-                icono = "🟢"
+
+            es_tier_pago = (
+                any((k, m_id) in self.paid_tier_only for k in range(total_k))
+                or (m_id == "gemini-4-argon" and n_vivas == 0 and any((k, m_id) in self.unsupported_pairs for k in range(total_k)))
+            )
+
+            if total_k == 0:
+                tipo = "sin_claves"
+                tag = "SIN CLAVES"
+                desc = "Carga tu API Key"
+                borde = "#475569"
+                bg = "#182030"
+                pill_bg = "#243048"
+                txt_col = "#94a3b8"
+            elif es_tier_pago:
+                tipo = "tier_pago"
+                tag = "PLAN PAGO"
+                desc = "Requiere Facturación"
+                borde = "#818cf8"
+                bg = "#16182e"
+                pill_bg = "#252849"
+                txt_col = "#a5b4fc"
+            elif n_vivas == total_k:
+                tipo = "disponible"
+                tag = "DISPONIBLE"
+                desc = f"{n_vivas}/{total_k} listas (<1s)"
+                borde = "#10b981"
+                bg = "#072419"
+                pill_bg = "#0c3827"
+                txt_col = "#34d399"
             elif n_vivas > 0:
-                est = f"{n_vivas}/{total_k} cuentas listas · Disponible con rotación"
-                color = "#facc15"
-                icono = "🟡"
-            elif any((k, m_id) in self.unsupported_pairs for k in range(total_k)):
-                est = "Requiere facturación paga en AI Studio"
-                color = "#94a3b8"
-                icono = "⚪"
+                tipo = "mucho_trafico"
+                tag = "MUCHO TRÁFICO"
+                desc = f"{n_vivas}/{total_k} con rotación"
+                borde = "#f59e0b"
+                bg = "#281b09"
+                pill_bg = "#3d2b0e"
+                txt_col = "#fbbf24"
             else:
-                est = "Sin cuota diaria (429) · Esperando reinicio de Google"
-                color = "#f87171"
-                icono = "🔴"
+                tipo = "agotado"
+                tag = "AGOTADO"
+                desc = "Sin cuota diaria (429)"
+                borde = "#ef4444"
+                bg = "#280d12"
+                pill_bg = "#3d161d"
+                txt_col = "#f87171"
 
             resultados.append({
                 "id": m_id,
                 "nombre": m_nombre,
-                "desc": m_desc,
+                "nombre_corto": m_corto,
                 "vivas": n_vivas,
                 "total": total_k,
-                "estado_str": est,
-                "color": color,
-                "icono": icono,
+                "tipo": tipo,
+                "tag": tag,
+                "desc": desc,
+                "color_borde": borde,
+                "color_bg": bg,
+                "color_pill_bg": pill_bg,
+                "color_texto": txt_col,
             })
 
         return resultados
@@ -795,11 +834,42 @@ TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | TEXTO
 00:13 - 00:17 | brillo_epico | cash_ting+party_horn | fiesta:derecha | centro | ninguno | [12 a 15 palabras conectando en loop con el inicio]"""
 
 
+def obtener_modelos_plantilla() -> List[Dict[str, Any]]:
+    """Devuelve la estructura de modelos lista para renderizado inicial o sin claves."""
+    return [
+        {
+            "id": m_id,
+            "nombre": m_nombre,
+            "nombre_corto": m_corto,
+            "vivas": 0,
+            "total": 0,
+            "tipo": "standby",
+            "tag": "COMPROBAR",
+            "desc": "Toca Refrescar",
+            "color_borde": "#334155",
+            "color_bg": "#151a2d",
+            "color_pill_bg": "#1e293b",
+            "color_texto": "#94a3b8",
+        }
+        for m_id, m_nombre, m_corto in [
+            ("gemini-4-argon", "Argon 4", "Argon"),
+            ("gemini-3.8-flash", "Gemini 3.8 Flash", "3.8"),
+            ("gemini-3.6-flash", "Gemini 3.6 Flash", "3.6"),
+            ("gemini-3.5-flash-lite", "Gemini 3.5 Flash Lite", "3.5"),
+        ]
+    ]
+
+
 def auditar_estado_pool_en_vivo() -> List[Dict[str, Any]]:
     """Función pública para verificar el estado de cuotas de todos los modelos en vivo."""
     keys = obtener_gemini_api_keys()
     if not keys:
-        return []
+        res = obtener_modelos_plantilla()
+        for r in res:
+            r["tipo"] = "sin_claves"
+            r["tag"] = "SIN CLAVES"
+            r["desc"] = "Carga tu API Key"
+        return res
     orch = GeminiPoolOrchestrator(api_keys=keys)
     return orch.auditar_modelos_en_vivo()
 
