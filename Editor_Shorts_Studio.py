@@ -2388,8 +2388,8 @@ def iniciar_aplicacion_gui() -> None:
         # Selector superior de modo: 1 Cuenta | Todas las Cuentas | Grupo Seleccionado
         mapa_modo_seg = {
             "1 Cuenta": "una",
-            "Todas": "todas",
             "Grupo": "grupo",
+            "Todas": "todas",
         }
         inv_modo_seg = {v: k for k, v in mapa_modo_seg.items()}
         seg_modo_var = tk.StringVar(value=inv_modo_seg.get(modo_actual, "1 Cuenta"))
@@ -2477,14 +2477,23 @@ def iniciar_aplicacion_gui() -> None:
                     bot_bar.grid_remove()
 
             if m_sel == "todas":
+                f_todas = ctk.CTkFrame(lista_scroll, fg_color="#182032", corner_radius=14, border_width=1, border_color="#26334d")
+                f_todas.pack(fill="both", expand=True, padx=12, pady=24)
                 ctk.CTkLabel(
-                    lista_scroll,
-                    text=f"Se incluirán TODAS tus cuentas vinculadas ({len(cuentas_disp)}):",
-                    font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+                    f_todas,
+                    text="🌐 Modo Todas las Cuentas Activo",
+                    font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
                     text_color=CYAN_ACCENT,
-                    justify="left",
-                    wraplength=410,
-                ).pack(anchor="w", padx=12, pady=(8, 10))
+                ).pack(pady=(20, 6))
+                ctk.CTkLabel(
+                    f_todas,
+                    text=f"Se publicará automáticamente en todas tus cuentas vinculadas ({len(cuentas_disp)} canales).\nConfigura la estrategia deseada arriba y presiona Listo.",
+                    font=ctk.CTkFont(family="Segoe UI", size=12),
+                    text_color=TEXT_MUTED,
+                    justify="center",
+                    wraplength=380,
+                ).pack(padx=16, pady=(0, 20))
+                return
 
             elif m_sel == "grupo":
                 ctk.CTkLabel(
@@ -2592,18 +2601,13 @@ def iniciar_aplicacion_gui() -> None:
                         except Exception:
                             pass
 
-                    ctk.CTkButton(
-                        item_f,
-                        text="Seleccionada" if es_activa else "Seleccionar",
-                        command=lambda cx=c_id: _marcar_esta(None, cx),
-                        corner_radius=12,
-                        height=30,
-                        width=100,
-                        fg_color=GREEN_ACCENT if es_activa else "#1e2538",
-                        hover_color="#059669" if es_activa else "#2e3955",
-                        text_color="#052e16" if es_activa else TEXT_MAIN,
-                        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-                    ).pack(side="right", padx=10)
+                    if es_activa:
+                        ctk.CTkLabel(
+                            item_f,
+                            text="✓ Activa",
+                            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+                            text_color=GREEN_ACCENT,
+                        ).pack(side="right", padx=16)
                 elif m_sel == "grupo":
                     if c_id not in vars_checks_grupo:
                         vars_checks_grupo[c_id] = tk.BooleanVar(
@@ -2675,7 +2679,7 @@ def iniciar_aplicacion_gui() -> None:
 
         seg_modo = ctk.CTkSegmentedButton(
             pop,
-            values=["1 Cuenta", "Todas", "Grupo"],
+            values=["1 Cuenta", "Grupo", "Todas"],
             variable=seg_modo_var,
             command=_al_cambiar_modo_toggle,
             corner_radius=14,
