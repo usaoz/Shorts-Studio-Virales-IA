@@ -693,38 +693,22 @@ def iniciar_aplicacion_gui() -> None:
 
     lbl_cuota_info = ctk.CTkLabel(
         quota_top,
-        text="6/6 Shorts hoy",
+        text="6/6 disponibles",
         font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         text_color="#ffffff",
     )
-    lbl_cuota_info.pack(side="left", padx=(0, 8), pady=2)
-
-    btn_add_api_top = ctk.CTkButton(
-        quota_top,
-        text="+",
-        command=lambda: abrir_dialogo_explicativo_api_json(root),
-        width=28,
-        height=28,
-        corner_radius=14,
-        fg_color=INPUT_BG,
-        hover_color="#1e2538",
-        border_width=1,
-        border_color="#2a3147",
-        text_color="#ffffff",
-        font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-    )
-    btn_add_api_top.pack(side="left", padx=(0, 2), pady=2)
+    lbl_cuota_info.pack(side="left", padx=(6, 8), pady=2)
 
     def refrescar_barra_cuota() -> None:
         max_tot, n_apis = obtener_max_shorts_pool_dia()
         usados_h, disp_h, _pct = obtener_estado_cuota_diaria()
         lbl_cuota_info.configure(
-            text=f"{disp_h}/{max_tot} Shorts restantes",
+            text=f"⚡ {disp_h}/{max_tot} disponibles hoy",
             text_color="#ffffff",
         )
 
     def sincronizar_cuota_async() -> None:
-        lbl_cuota_info.configure(text="Sincronizando...", text_color=CYAN_ACCENT)
+        lbl_cuota_info.configure(text="⚡ Sincronizando...", text_color=CYAN_ACCENT)
 
         def _worker_sync() -> None:
             sincronizar_cuota_real_youtube()
@@ -1762,33 +1746,29 @@ def iniciar_aplicacion_gui() -> None:
             es_editado = "Editado" in mf
             es_canales = "Canales" in mf
             es_link = not es_editado and not es_canales
-            es_custom = "Personalizado" in modo_contenido_var.get()
             es_manual = "Manual" in modo_subida_var.get()
 
             # 1. TEXTO PARA EL BOTÓN PRINCIPAL (SUBIR A YOUTUBE)
             if es_manual:
                 txt_subir = "ELEGIR VIDEO Y EDITAR GUION" if not es_editado else "IMPORTAR Y EDITAR GUION"
             elif es_editado:
-                txt_subir = "IMPORTAR Y SUBIR A YOUTUBE" if not es_custom else "PERSONALIZAR Y SUBIR A YOUTUBE"
+                txt_subir = "IMPORTAR Y SUBIR A YOUTUBE"
             elif es_canales:
-                txt_subir = "CREAR Y SUBIR EN 1 CLIC" if not es_custom else "PERSONALIZAR Y SUBIR SHORTS"
+                txt_subir = "CREAR Y SUBIR EN 1 CLIC"
             else:
-                txt_subir = "CREAR Y SUBIR DESDE LINK" if not es_custom else "PERSONALIZAR Y SUBIR DESDE LINK"
+                txt_subir = "CREAR Y SUBIR DESDE LINK"
 
             if btn_auto_1clic is not None:
                 btn_auto_1clic.configure(
                     text=txt_subir,
-                    fg_color=PURPLE_MAIN if not es_custom else "#0284c7",
-                    hover_color=PURPLE_HOVER if not es_custom else "#0369a1",
+                    fg_color=PURPLE_MAIN,
+                    hover_color=PURPLE_HOVER,
                     text_color="#ffffff",
                 )
 
             # 2. TEXTO PARA EL BOTÓN SECUNDARIO (GUARDAR EN CARPETA DIRECTAMENTE)
             if not es_editado:
-                if es_manual:
-                    txt_guardar = "EDITAR Y GUARDAR EN CARPETA"
-                else:
-                    txt_guardar = "CREAR Y GUARDAR EN CARPETA" if not es_custom else "PERSONALIZAR Y GUARDAR EN CARPETA"
+                txt_guardar = "EDITAR Y GUARDAR EN CARPETA" if es_manual else "CREAR Y GUARDAR EN CARPETA"
 
                 if btn_guardar_carpeta is not None:
                     btn_guardar_carpeta.configure(
@@ -1839,12 +1819,12 @@ def iniciar_aplicacion_gui() -> None:
         win = ctk.CTkToplevel(root)
         win.withdraw()
         win.title("Ajustes y Herramientas")
-        win.geometry("600x820")
+        win.geometry("600x740")
         win.resizable(False, False)
         win.configure(fg_color=BG_DARK)
         win.transient(root)
 
-        # 1. Tarjeta de Modo de Trabajo, Título/Guión (IA vs Manual), Acción Final y Selección de Canales
+        # 1. Modos de Trabajo principales
         card_modo = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
         card_modo.pack(fill="x", padx=24, pady=(18, 8))
 
@@ -1864,25 +1844,7 @@ def iniciar_aplicacion_gui() -> None:
             height=32,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
             selected_color=PURPLE_MAIN,
-        ).pack(fill="x", padx=18, pady=(0, 8))
-
-        ctk.CTkLabel(
-            card_modo,
-            text="Modo de Título, Descripción y Guión",
-            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-            text_color=TEXT_MAIN,
-        ).pack(anchor="w", padx=18, pady=(2, 4))
-
-        ctk.CTkSegmentedButton(
-            card_modo,
-            values=["IA Automática", "Personalizado"],
-            variable=modo_contenido_var,
-            command=actualizar_modo_vista,
-            corner_radius=14,
-            height=32,
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-            selected_color=PURPLE_MAIN,
-        ).pack(fill="x", padx=18, pady=(0, 8))
+        ).pack(fill="x", padx=18, pady=(0, 12))
 
         ctk.CTkLabel(
             card_modo,
@@ -1906,13 +1868,13 @@ def iniciar_aplicacion_gui() -> None:
             selected_color=PURPLE_MAIN,
         ).pack(fill="x", padx=18, pady=(0, 14))
 
-        # 2. Cerebro IA, Voz del Narrador y Encuadre
+        # 2. Voz por Defecto y Cuota Diaria de YouTube
         card_cfg = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
         card_cfg.pack(fill="x", padx=24, pady=(0, 8))
 
         ctk.CTkLabel(
             card_cfg,
-            text="Voz del Narrador IA",
+            text="Voz del Narrador IA (por defecto)",
             font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             text_color=TEXT_MAIN,
         ).pack(anchor="w", padx=18, pady=(10, 4))
@@ -1927,26 +1889,98 @@ def iniciar_aplicacion_gui() -> None:
             font=ctk.CTkFont(family="Segoe UI", size=12),
             fg_color="#1e2436",
             button_color="#2d354d",
-        ).pack(fill="x", padx=18, pady=(0, 8))
+        ).pack(fill="x", padx=18, pady=(0, 10))
 
-        ctk.CTkLabel(
-            card_cfg,
-            text="Formato de Encuadre Vertical (9:16)",
-            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+        # Cuota y Límites Diarios de YouTube con botón '+' y '?'
+        row_cuota_ajustes = ctk.CTkFrame(card_cfg, fg_color="#101524", corner_radius=12, border_width=1, border_color="#222b42")
+        row_cuota_ajustes.pack(fill="x", padx=18, pady=(2, 12))
+
+        top_cuota_aj = ctk.CTkFrame(row_cuota_ajustes, fg_color="transparent")
+        top_cuota_aj.pack(fill="x", padx=12, pady=(8, 8))
+
+        lbl_cuota_ajustes_txt = ctk.CTkLabel(
+            top_cuota_aj,
+            text="Cuota Diaria de YouTube",
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
             text_color=TEXT_MAIN,
-        ).pack(anchor="w", padx=18, pady=(0, 4))
+        )
+        lbl_cuota_ajustes_txt.pack(side="left")
 
-        ctk.CTkOptionMenu(
-            card_cfg,
-            variable=encuadre_var,
-            values=list(encuadre_map.keys()),
-            command=_guardar_memoria,
-            corner_radius=14,
-            height=32,
-            font=ctk.CTkFont(family="Segoe UI", size=12),
-            fg_color="#1e2436",
-            button_color="#2d354d",
-        ).pack(fill="x", padx=18, pady=(0, 14))
+        def _mostrar_ayuda_cuota_yt():
+            win_h = ctk.CTkToplevel(win)
+            win_h.title("Guía de Cuota de YouTube")
+            win_h.geometry("490x240")
+            win_h.resizable(False, False)
+            aplicar_icono_ventana(win_h)
+            win_h.transient(win)
+            win_h.grab_set()
+
+            try:
+                win_h.update_idletasks()
+                x = win.winfo_x() + (win.winfo_width() // 2) - 245
+                y = win.winfo_y() + (win.winfo_height() // 2) - 120
+                win_h.geometry(f"+{max(0, x)}+{max(0, y)}")
+            except Exception:
+                pass
+
+            f_c = ctk.CTkFrame(win_h, fg_color="#101524", corner_radius=16, border_width=1, border_color="#222b42")
+            f_c.pack(fill="both", expand=True, padx=14, pady=14)
+
+            ctk.CTkLabel(
+                f_c,
+                text="¿Cómo funciona la cuota de subida?",
+                font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+                text_color=TEXT_MAIN,
+            ).pack(anchor="w", padx=16, pady=(12, 8))
+
+            ctk.CTkLabel(
+                f_c,
+                text="• Cada proyecto de Google Cloud otorga 10.000 unidades diarias (~6 Shorts por día).\n\n• Podés agregar más archivos client_secrets.json de otros proyectos gratuitos para sumar +6 Shorts por día por cada proyecto.\n\n• La cuota se reinicia automáticamente todos los días a las 04:00 AM (Argentina / UTC-3).",
+                font=ctk.CTkFont(family="Segoe UI", size=11),
+                text_color="#cbd5e1",
+                justify="left",
+                anchor="w",
+            ).pack(fill="x", padx=16, pady=(0, 14))
+
+            ctk.CTkButton(
+                f_c,
+                text="Entendido",
+                command=win_h.destroy,
+                corner_radius=10,
+                height=28,
+                width=100,
+                fg_color=PURPLE_MAIN,
+                hover_color=PURPLE_HOVER,
+                font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            ).pack(pady=(0, 6))
+
+        btn_ayuda_cuota_yt = ctk.CTkButton(
+            top_cuota_aj,
+            text="?",
+            command=_mostrar_ayuda_cuota_yt,
+            corner_radius=11,
+            width=22,
+            height=22,
+            fg_color="#1e293b",
+            hover_color="#334155",
+            border_width=1,
+            border_color="#334155",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color=CYAN_ACCENT,
+        )
+        btn_ayuda_cuota_yt.pack(side="left", padx=(8, 0))
+
+        ctk.CTkButton(
+            top_cuota_aj,
+            text="+ Agregar API (+6 Shorts/día)",
+            command=lambda: abrir_dialogo_explicativo_api_json(win),
+            corner_radius=12,
+            height=28,
+            fg_color="#1e293b",
+            hover_color="#334155",
+            text_color=CYAN_ACCENT,
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        ).pack(side="right")
 
         # 3. Tarjeta de API Key Gemini / Argon 4 Multi-Cuenta
         card_api = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
@@ -4617,7 +4651,44 @@ def iniciar_aplicacion_gui() -> None:
 
 
 
-        # Selector interactivo de Canción / Música de Fondo
+        # Selectores interactivos de Voz del Narrador y Canción de Fondo
+        f_top_ctrls = ctk.CTkFrame(hdr_inner, fg_color="transparent")
+        f_top_ctrls.pack(side="right", padx=(0, 12))
+
+        # 1. Selector interactivo de Voz del Narrador
+        f_voz = ctk.CTkFrame(f_top_ctrls, fg_color="transparent")
+        f_voz.pack(side="left", padx=(0, 12))
+
+        lbl_voz = ctk.CTkLabel(
+            f_voz,
+            text="🗣️ Voz:",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color=TEXT_MUTED,
+        )
+        lbl_voz.pack(side="left", padx=(0, 5))
+
+        def _al_cambiar_voz(nueva_voz: str):
+            voz_var.set(nueva_voz)
+            _guardar_memoria()
+            if txt_guion_box is not None:
+                txt_guion_box.metadatos_ocultos["VOZ_NARRADOR"] = nueva_voz
+
+        opt_voz = ctk.CTkOptionMenu(
+            f_voz,
+            values=list(VOCES_DISPONIBLES.keys()),
+            command=_al_cambiar_voz,
+            width=135,
+            height=26,
+            fg_color="#182032",
+            button_color="#25304a",
+            button_hover_color="#334166",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            dropdown_font=ctk.CTkFont(family="Segoe UI", size=11),
+        )
+        opt_voz.set(voz_var.get())
+        opt_voz.pack(side="left")
+
+        # 2. Selector interactivo de Canción / Música de Fondo
         pistas_disponibles = ["Auto", "Sin Música"]
         try:
             from shorts_engine.config import MUSICA_DIR
@@ -4636,8 +4707,8 @@ def iniciar_aplicacion_gui() -> None:
                 else:
                     txt_guion_box.metadatos_ocultos["TONO_VIDEO"] = nueva_cancion
 
-        f_musica = ctk.CTkFrame(hdr_inner, fg_color="transparent")
-        f_musica.pack(side="right", padx=(0, 16))
+        f_musica = ctk.CTkFrame(f_top_ctrls, fg_color="transparent")
+        f_musica.pack(side="left")
 
         lbl_musica = ctk.CTkLabel(
             f_musica,
@@ -4645,13 +4716,13 @@ def iniciar_aplicacion_gui() -> None:
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
             text_color=TEXT_MUTED,
         )
-        lbl_musica.pack(side="left", padx=(0, 6))
+        lbl_musica.pack(side="left", padx=(0, 5))
 
         opt_musica = ctk.CTkOptionMenu(
             f_musica,
             values=pistas_disponibles,
             command=_al_cambiar_musica,
-            width=130,
+            width=125,
             height=26,
             fg_color="#182032",
             button_color="#25304a",
@@ -4772,6 +4843,11 @@ def iniciar_aplicacion_gui() -> None:
                             if tono_leido.lower() == p_nom.lower() or tono_leido.lower() in p_nom.lower():
                                 opt_musica.set(p_nom)
                                 break
+
+                voz_leida = txt_guion_box.metadatos_ocultos.get("VOZ_NARRADOR", "").strip()
+                if voz_leida and voz_leida in VOCES_DISPONIBLES:
+                    opt_voz.set(voz_leida)
+                    voz_var.set(voz_leida)
             except Exception:
                 pass
 
@@ -5844,6 +5920,7 @@ def iniciar_aplicacion_gui() -> None:
                                     if feedback_usr and feedback_usr.strip():
                                         DEFAULT_GUION_TXT.write_text(feedback_usr.strip() + "\n", encoding="utf-8")
 
+                                    voz_elegida = VOCES_DISPONIBLES.get(voz_var.get(), EDGE_VOICE_DEFAULT)
                                     _set_subprogreso(0.35, f"{pref_lote}Renderizando video a 60 FPS con GPU...", CYAN_ACCENT)
                                     root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}RENDERIZANDO SHORT GPU..."))
 
