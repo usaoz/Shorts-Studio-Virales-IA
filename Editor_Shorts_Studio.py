@@ -693,7 +693,7 @@ def iniciar_aplicacion_gui() -> None:
 
     lbl_cuota_info = ctk.CTkLabel(
         quota_top,
-        text="6/6 disponibles",
+        text="6/6 Shorts disponibles",
         font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         text_color="#ffffff",
     )
@@ -703,12 +703,12 @@ def iniciar_aplicacion_gui() -> None:
         max_tot, n_apis = obtener_max_shorts_pool_dia()
         usados_h, disp_h, _pct = obtener_estado_cuota_diaria()
         lbl_cuota_info.configure(
-            text=f"⚡ {disp_h}/{max_tot} disponibles hoy",
+            text=f"{disp_h}/{max_tot} Shorts disponibles",
             text_color="#ffffff",
         )
 
     def sincronizar_cuota_async() -> None:
-        lbl_cuota_info.configure(text="⚡ Sincronizando...", text_color=CYAN_ACCENT)
+        lbl_cuota_info.configure(text="Sincronizando...", text_color=CYAN_ACCENT)
 
         def _worker_sync() -> None:
             sincronizar_cuota_real_youtube()
@@ -1819,14 +1819,14 @@ def iniciar_aplicacion_gui() -> None:
         win = ctk.CTkToplevel(root)
         win.withdraw()
         win.title("Ajustes y Herramientas")
-        win.geometry("600x740")
+        win.geometry("600x670")
         win.resizable(False, False)
         win.configure(fg_color=BG_DARK)
         win.transient(root)
 
         # 1. Modos de Trabajo principales
         card_modo = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
-        card_modo.pack(fill="x", padx=24, pady=(18, 8))
+        card_modo.pack(fill="x", padx=24, pady=(18, 10))
 
         ctk.CTkLabel(
             card_modo,
@@ -1868,32 +1868,13 @@ def iniciar_aplicacion_gui() -> None:
             selected_color=PURPLE_MAIN,
         ).pack(fill="x", padx=18, pady=(0, 14))
 
-        # 2. Voz por Defecto y Cuota Diaria de YouTube
-        card_cfg = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
-        card_cfg.pack(fill="x", padx=24, pady=(0, 8))
+        # 2. Tarjeta de APIs, Cuotas y Límites (YouTube y Gemini / Argon 4)
+        card_api = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
+        card_api.pack(fill="x", padx=24, pady=(0, 10))
 
-        ctk.CTkLabel(
-            card_cfg,
-            text="Voz del Narrador IA (por defecto)",
-            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-            text_color=TEXT_MAIN,
-        ).pack(anchor="w", padx=18, pady=(10, 4))
-
-        ctk.CTkOptionMenu(
-            card_cfg,
-            variable=voz_var,
-            values=list(VOCES_DISPONIBLES.keys()),
-            command=_guardar_memoria,
-            corner_radius=14,
-            height=32,
-            font=ctk.CTkFont(family="Segoe UI", size=12),
-            fg_color="#1e2436",
-            button_color="#2d354d",
-        ).pack(fill="x", padx=18, pady=(0, 10))
-
-        # Cuota y Límites Diarios de YouTube con botón '+' y '?'
-        row_cuota_ajustes = ctk.CTkFrame(card_cfg, fg_color="#101524", corner_radius=12, border_width=1, border_color="#222b42")
-        row_cuota_ajustes.pack(fill="x", padx=18, pady=(2, 12))
+        # Fila de Cuota Diaria de YouTube dentro de card_api
+        row_cuota_ajustes = ctk.CTkFrame(card_api, fg_color="#101524", corner_radius=12, border_width=1, border_color="#222b42")
+        row_cuota_ajustes.pack(fill="x", padx=18, pady=(14, 10))
 
         top_cuota_aj = ctk.CTkFrame(row_cuota_ajustes, fg_color="transparent")
         top_cuota_aj.pack(fill="x", padx=12, pady=(8, 8))
@@ -1901,7 +1882,7 @@ def iniciar_aplicacion_gui() -> None:
         lbl_cuota_ajustes_txt = ctk.CTkLabel(
             top_cuota_aj,
             text="Cuota Diaria de YouTube",
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             text_color=TEXT_MAIN,
         )
         lbl_cuota_ajustes_txt.pack(side="left")
@@ -1981,10 +1962,6 @@ def iniciar_aplicacion_gui() -> None:
             text_color=CYAN_ACCENT,
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
         ).pack(side="right")
-
-        # 3. Tarjeta de API Key Gemini / Argon 4 Multi-Cuenta
-        card_api = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
-        card_api.pack(fill="x", padx=24, pady=(0, 10))
 
         top_api = ctk.CTkFrame(card_api, fg_color="transparent")
         top_api.pack(fill="x", padx=18, pady=(12, 8))
