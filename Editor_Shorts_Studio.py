@@ -73,6 +73,8 @@ from motor_optimizado import (
     recortar_silencios_tts,
     realzar_frame_viral,
     generar_plantilla_guion_manual,
+    comprobar_actualizacion_repo,
+    ejecutar_actualizacion_repo,
 )
 from ui_editor_guion import VisualScriptEditor
 
@@ -440,6 +442,7 @@ def iniciar_aplicacion_gui() -> None:
     row_botones_accion: Optional[ctk.CTkFrame] = None
     btn_auto_1clic: Optional[ctk.CTkButton] = None
     btn_guardar_carpeta: Optional[ctk.CTkButton] = None
+    btn_ajustes: Optional[ctk.CTkButton] = None
     solo_guardar_actual = [False]
 
     # Lista de diccionarios para personalizar cada Reel individualmente (hasta 12 Shorts)
@@ -721,6 +724,26 @@ def iniciar_aplicacion_gui() -> None:
 
     refrescar_barra_cuota()
     root.after(400, sincronizar_cuota_async)
+
+    def _comprobar_actualizacion_background() -> None:
+        def _worker_bg():
+            hay_upd, cant_upd, _msg = comprobar_actualizacion_repo(BASE_DIR)
+            if hay_upd:
+                def _notificar_header():
+                    if btn_ajustes is not None:
+                        btn_ajustes.configure(
+                            text=f"Ajustes ({cant_upd})",
+                            border_color="#facc15",
+                            text_color="#facc15",
+                        )
+                try:
+                    root.after(0, _notificar_header)
+                except Exception:
+                    pass
+
+        threading.Thread(target=_worker_bg, daemon=True).start()
+
+    root.after(1500, _comprobar_actualizacion_background)
 
     # Contenedor dinámico del Paso 1 (alterna entre Modo Canales y Modo Link según Ajustes)
     contenedor_paso1 = ctk.CTkFrame(root, fg_color="transparent")
@@ -1819,7 +1842,7 @@ def iniciar_aplicacion_gui() -> None:
         win = ctk.CTkToplevel(root)
         win.withdraw()
         win.title("Ajustes y Herramientas")
-        win.geometry("600x670")
+        win.geometry("600x750")
         win.resizable(False, False)
         win.configure(fg_color=BG_DARK)
         win.transient(root)
@@ -2308,6 +2331,157 @@ def iniciar_aplicacion_gui() -> None:
             text_color="#ffffff",
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         ).pack(side="right", fill="both", expand=True, padx=(6, 0))
+
+        # 5. Tarjeta de Actualizaciones de GitHub / Repositorio
+        card_actualizacion = ctk.CTkFrame(win, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
+        card_actualizacion.pack(fill="x", padx=24, pady=(0, 14))
+
+        row_act_inner = ctk.CTkFrame(card_actualizacion, fg_color="transparent")
+        row_act_inner.pack(fill="x", padx=18, pady=12)
+
+        f_txt_act = ctk.CTkFrame(row_act_inner, fg_color="transparent")
+        f_txt_act.pack(side="left", fill="both", expand=True)
+
+        lbl_tit_act = ctk.CTkLabel(
+            f_txt_act,
+            text="Actualizaciones de la Aplicación",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text_color=TEXT_MAIN,
+            anchor="w",
+        )
+        lbl_tit_act.pack(anchor="w")
+
+        lbl_estado_act = ctk.CTkLabel(
+            f_txt_act,
+            text="Comprobando repositorio...",
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color=TEXT_MUTED,
+            anchor="w",
+        )
+        lbl_estado_act.pack(anchor="w")
+
+        def _reiniciar_app_local():
+            try:
+                import subprocess as _subp, sys as _sys, os as _os
+                win.destroy()
+                _subp.Popen([_sys.executable, _sys.argv[0]], cwd=str(BASE_DIR))
+                _os._exit(0)
+            except Exception as e_rst:
+                messagebox.showerror("Error al reiniciar", f"Por favor cerrá y volvé a abrir la app manualmente:\n{e_rst}")
+
+        def _ejecutar_pull_actualizacion():
+            btn_accion_act.configure(text="Descargando...", state="disabled")
+            lbl_estado_act.configure(text="Descargando última versión desde GitHub...", text_color=CYAN_ACCENT)
+
+            def _worker_pull():
+                ok_pull, msg_pull = ejecutar_actualizacion_repo(BASE_DIR)
+                def _ui_fin_pull():
+                    if ok_pull:
+                        lbl_estado_act.configure(text="Actualización descargada con éxito.", text_color=GREEN_ACCENT)
+                        btn_accion_act.configure(
+                            text="Reiniciar App",
+                            state="normal",
+                            fg_color=GREEN_ACCENT,
+                            hover_color="#059669",
+                            text_color="#052e16",
+                            command=_reiniciar_app_local,
+                        )
+                        if btn_ajustes is not None:
+                            btn_ajustes.configure(text="Ajustes", border_color=CARD_BORDER, text_color=TEXT_MAIN)
+
+                        resp = messagebox.askyesno(
+                            "Actualización Completada",
+                            "¡Shorts Studio se actualizó correctamente a la última versión!\n\n¿Deseas reiniciar la aplicación ahora para aplicar los cambios?",
+                            parent=win,
+                        )
+                        if resp:
+                            _reiniciar_app_local()
+                    else:
+                        lbl_estado_act.configure(text=f"Error: {msg_pull[:60]}", text_color="#f87171")
+                        btn_accion_act.configure(
+                            text="Reintentar",
+                            state="normal",
+                            fg_color=PURPLE_MAIN,
+                            command=_ejecutar_pull_actualizacion,
+                        )
+                        messagebox.showwarning("Fallo al actualizar", f"No se pudo completar la actualización automática:\n\n{msg_pull}", parent=win)
+
+                try:
+                    root.after(0, _ui_fin_pull)
+                except Exception:
+                    pass
+
+            threading.Thread(target=_worker_pull, daemon=True).start()
+
+        def _verificar_en_ajustes(forzar: bool = False):
+            if forzar:
+                lbl_estado_act.configure(text="Conectando con GitHub...", text_color=TEXT_MUTED)
+                btn_accion_act.configure(text="Buscando...", state="disabled")
+
+            def _worker_chk():
+                hay_upd, cant_upd, msg_upd = comprobar_actualizacion_repo(BASE_DIR)
+                def _ui_fin_chk():
+                    try:
+                        if hay_upd:
+                            lbl_estado_act.configure(
+                                text=f"Hay {cant_upd} mejora{'s' if cant_upd != 1 else ''} nueva{'s' if cant_upd != 1 else ''} disponible{'s' if cant_upd != 1 else ''} en GitHub",
+                                text_color="#facc15",
+                            )
+                            btn_accion_act.configure(
+                                text="Actualizar Ahora",
+                                state="normal",
+                                fg_color=GREEN_ACCENT,
+                                hover_color="#059669",
+                                text_color="#052e16",
+                                command=_ejecutar_pull_actualizacion,
+                            )
+                            if btn_ajustes is not None:
+                                btn_ajustes.configure(
+                                    text=f"Ajustes ({cant_upd})",
+                                    border_color="#facc15",
+                                    text_color="#facc15",
+                                )
+                        else:
+                            lbl_estado_act.configure(
+                                text="La app está al día con la última versión de GitHub.",
+                                text_color="#94a3b8",
+                            )
+                            btn_accion_act.configure(
+                                text="Buscar Actualizaciones",
+                                state="normal",
+                                fg_color=INPUT_BG,
+                                hover_color="#1e2538",
+                                text_color="#ffffff",
+                                command=lambda: _verificar_en_ajustes(forzar=True),
+                            )
+                            if btn_ajustes is not None:
+                                btn_ajustes.configure(text="Ajustes", border_color=CARD_BORDER, text_color=TEXT_MAIN)
+                    except Exception:
+                        pass
+
+                try:
+                    root.after(0, _ui_fin_chk)
+                except Exception:
+                    pass
+
+            threading.Thread(target=_worker_chk, daemon=True).start()
+
+        btn_accion_act = ctk.CTkButton(
+            row_act_inner,
+            text="Buscar Actualizaciones",
+            corner_radius=12,
+            height=32,
+            fg_color=INPUT_BG,
+            hover_color="#1e2538",
+            border_width=1,
+            border_color="#2a3147",
+            text_color="#ffffff",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            command=lambda: _verificar_en_ajustes(forzar=True),
+        )
+        btn_accion_act.pack(side="right")
+
+        _verificar_en_ajustes(forzar=False)
 
         aplicar_icono_ventana(win)
         win.update_idletasks()

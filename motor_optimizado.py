@@ -10,7 +10,7 @@ import re
 import sys
 import subprocess
 from pathlib import Path
-from typing import Union, Optional, List
+from typing import Union, Optional, List, Tuple
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
@@ -280,5 +280,79 @@ def generar_plantilla_guion_manual(
         t_actual = t_sig
 
     return "\n".join(lineas) + "\n"
+
+
+# =====================================================================
+# 7. GESTOR DE ACTUALIZACIONES AUTOMÁTICAS DESDE GIT
+# =====================================================================
+def comprobar_actualizacion_repo(raiz_dir: Optional[Union[str, Path]] = None) -> Tuple[bool, int, str]:
+    """
+    Comprueba de forma silenciosa si el repositorio remoto (origin/main) tiene nuevos commits.
+    Devuelve (hay_actualizacion, cantidad_commits, mensaje).
+    """
+    if raiz_dir is None:
+        raiz_dir = Path(__file__).resolve().parent
+
+    try:
+        fetch_res = subprocess.run(
+            ["git", "fetch", "origin", "main", "--quiet"],
+            cwd=str(raiz_dir),
+            capture_output=True,
+            text=True,
+            timeout=8,
+            startupinfo=WIN_STARTUPINFO,
+            creationflags=WIN_NO_WINDOW,
+        )
+        if fetch_res.returncode != 0:
+            return False, 0, "No se pudo conectar con el repositorio remoto."
+
+        count_res = subprocess.run(
+            ["git", "rev-list", "--count", "HEAD..origin/main"],
+            cwd=str(raiz_dir),
+            capture_output=True,
+            text=True,
+            timeout=5,
+            startupinfo=WIN_STARTUPINFO,
+            creationflags=WIN_NO_WINDOW,
+        )
+        if count_res.returncode == 0:
+            cant = int(count_res.stdout.strip() or 0)
+            if cant > 0:
+                return True, cant, f"Hay {cant} cambio{'s' if cant != 1 else ''} nuevo{'s' if cant != 1 else ''} en GitHub"
+            return False, 0, "Al día"
+    except Exception as e:
+        return False, 0, f"Error: {e}"
+    return False, 0, "Al día"
+
+
+def ejecutar_actualizacion_repo(raiz_dir: Optional[Union[str, Path]] = None) -> Tuple[bool, str]:
+    """
+    Ejecuta git pull origin main para actualizar el código local a la última versión.
+    Devuelve (exito, mensaje).
+    """
+    if raiz_dir is None:
+        raiz_dir = Path(__file__).resolve().parent
+
+    try:
+        res = subprocess.run(
+            ["git", "pull", "origin", "main"],
+            cwd=str(raiz_dir),
+            capture_output=True,
+            text=True,
+            timeout=30,
+            startupinfo=WIN_STARTUPINFO,
+            creationflags=WIN_NO_WINDOW,
+        )
+        if res.returncode == 0:
+            out = res.stdout.strip()
+            if "Already up to date" in out or "Ya está actualizado" in out:
+                return True, "La app ya está en la última versión disponible."
+            return True, "Actualización completada con éxito."
+        else:
+            err = res.stderr.strip() or res.stdout.strip()
+            return False, f"Fallo al actualizar: {err[:140]}"
+    except Exception as e:
+        return False, f"Excepción durante actualización: {e}"
+
 
 
