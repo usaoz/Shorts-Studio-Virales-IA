@@ -9,6 +9,8 @@ import os
 import re
 import sys
 import subprocess
+from pathlib import Path
+from typing import Union, Optional, List
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
@@ -197,4 +199,86 @@ def pegar_placa_rgba_rapida(frame_rgb: np.ndarray, placa_rgba: np.ndarray, y_top
     fg = sub_placa[:, :, :3].astype(np.float32)
     out[y1:y2, :x2] = (fg * alpha + roi * (1.0 - alpha)).astype(np.uint8)
     return out
+
+
+# =====================================================================
+# 6. PLANTILLA MANUAL DE GUIONES Y CÁLCULO DE DURACIÓN
+# =====================================================================
+def obtener_duracion_video_segundos(ruta_video: Union[str, Path]) -> float:
+    """Devuelve la duración exacta en segundos de un archivo de video."""
+    try:
+        import cv2
+        cap = cv2.VideoCapture(str(ruta_video))
+        if not cap.isOpened():
+            return 15.0
+        fps = float(cap.get(cv2.CAP_PROP_FPS) or 30.0)
+        frames = float(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        cap.release()
+        if fps > 0 and frames > 0:
+            return round(frames / fps, 2)
+    except Exception:
+        pass
+    return 15.0
+
+
+def _segundos_a_mm_ss(segundos: float) -> str:
+    s = max(0, int(round(segundos)))
+    m = s // 60
+    resto = s % 60
+    return f"{m:02d}:{resto:02d}"
+
+
+def generar_plantilla_guion_manual(
+    ruta_video: Union[str, Path],
+    titulo_sugerido: str = "",
+    sched_str: str = "auto",
+    modo_priv: str = "privado",
+    modo_encuadre: str = "full",
+    descripcion_custom: str = "",
+) -> str:
+    """
+    Genera un archivo de guion base listo para el modo de Edición Manual.
+    Segmenta el video en bloques de 3.5 a 4.5 segundos cubriendo la duración exacta,
+    dejando el texto vacío para redacción manual directa del usuario.
+    """
+    dur_total = obtener_duracion_video_segundos(ruta_video)
+    if dur_total < 3.0:
+        dur_total = 15.0
+
+    dur_bloque = 4.0
+    num_bloques = max(1, int(round(dur_total / dur_bloque)))
+    paso = dur_total / num_bloques
+
+    tit_limpio = (titulo_sugerido or Path(ruta_video).stem).replace("_", " ").title()
+    desc_final = descripcion_custom or f"{tit_limpio} #shorts #viral"
+    if "#shorts" not in desc_final.lower():
+        desc_final += " #shorts"
+
+    lineas = [
+        f"TITULO_SUPERIOR: {tit_limpio}",
+        f"TITULO_YOUTUBE: {tit_limpio} #shorts",
+        f"MODO_ENCUADRE: {modo_encuadre}",
+        "VOLUMEN_VIDEO_ORIGINAL: 0",
+        "ARCHIVO_SALIDA: auto",
+        f"DESCRIPCION_YOUTUBE: {desc_final}",
+        f"ESTADO_PUBLICACION: {modo_priv}",
+        f"SCHEDULE: {sched_str}",
+        "PARA_NINOS: no",
+        "TONO_VIDEO: auto",
+        "",
+        "[GUION]",
+        "TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | ALTURA | TEXTO",
+    ]
+
+    t_actual = 0.0
+    for i in range(num_bloques):
+        t_sig = min(dur_total, t_actual + paso) if i < num_bloques - 1 else dur_total
+        t_inicio_str = _segundos_a_mm_ss(t_actual)
+        t_fin_str = _segundos_a_mm_ss(t_sig)
+        efecto = "zoom_impacto" if i == 0 else "normal"
+        lineas.append(f"{t_inicio_str} - {t_fin_str} | {efecto} | ninguno | ninguno | ninguno | ninguno | 70% | ")
+        t_actual = t_sig
+
+    return "\n".join(lineas) + "\n"
+
 

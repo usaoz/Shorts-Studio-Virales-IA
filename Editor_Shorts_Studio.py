@@ -72,6 +72,7 @@ from motor_optimizado import (
     evaluar_ritmo_bloque,
     recortar_silencios_tts,
     realzar_frame_viral,
+    generar_plantilla_guion_manual,
 )
 from ui_editor_guion import VisualScriptEditor
 
@@ -351,7 +352,7 @@ def iniciar_aplicacion_gui() -> None:
                     "encuadre": str(leido.get("encuadre", def_data["encuadre"])),
                     "modo_fuente": mf_val,
                     "modo_contenido": "Personalizado" if "Personalizado" in str(leido.get("modo_contenido", "IA Automática")) else "IA Automática",
-                    "modo_subida": "Revisión Previa" if "Revisión" in str(leido.get("modo_subida", "")) or "Revision" in str(leido.get("modo_subida", "")) else "Subida Automática",
+                    "modo_subida": "Edición Manual" if "Manual" in str(leido.get("modo_subida", "")) else ("Revisión Previa" if "Revisión" in str(leido.get("modo_subida", "")) or "Revision" in str(leido.get("modo_subida", "")) else "Subida Automática"),
                     "accion_final": "Subir automáticamente",
                     "modelo_ia": (str(leido.get("modelo_ia")) if str(leido.get("modelo_ia")) in MAPA_MODELOS_IA else def_data["modelo_ia"]),
                     "orden_canales": str(leido.get("orden_canales", "Rotación (En fila)")),
@@ -1762,9 +1763,12 @@ def iniciar_aplicacion_gui() -> None:
             es_canales = "Canales" in mf
             es_link = not es_editado and not es_canales
             es_custom = "Personalizado" in modo_contenido_var.get()
+            es_manual = "Manual" in modo_subida_var.get()
 
             # 1. TEXTO PARA EL BOTÓN PRINCIPAL (SUBIR A YOUTUBE)
-            if es_editado:
+            if es_manual:
+                txt_subir = "ELEGIR VIDEO Y EDITAR GUION" if not es_editado else "IMPORTAR Y EDITAR GUION"
+            elif es_editado:
                 txt_subir = "IMPORTAR Y SUBIR A YOUTUBE" if not es_custom else "PERSONALIZAR Y SUBIR A YOUTUBE"
             elif es_canales:
                 txt_subir = "CREAR Y SUBIR EN 1 CLIC" if not es_custom else "PERSONALIZAR Y SUBIR SHORTS"
@@ -1781,7 +1785,10 @@ def iniciar_aplicacion_gui() -> None:
 
             # 2. TEXTO PARA EL BOTÓN SECUNDARIO (GUARDAR EN CARPETA DIRECTAMENTE)
             if not es_editado:
-                txt_guardar = "CREAR Y GUARDAR EN CARPETA" if not es_custom else "PERSONALIZAR Y GUARDAR EN CARPETA"
+                if es_manual:
+                    txt_guardar = "EDITAR Y GUARDAR EN CARPETA"
+                else:
+                    txt_guardar = "CREAR Y GUARDAR EN CARPETA" if not es_custom else "PERSONALIZAR Y GUARDAR EN CARPETA"
 
                 if btn_guardar_carpeta is not None:
                     btn_guardar_carpeta.configure(
@@ -1884,11 +1891,15 @@ def iniciar_aplicacion_gui() -> None:
             text_color=TEXT_MAIN,
         ).pack(anchor="w", padx=18, pady=(2, 4))
 
+        def _al_cambiar_modo_subida(_val=None):
+            _guardar_memoria()
+            refrescar_texto_boton_accion()
+
         ctk.CTkSegmentedButton(
             card_modo,
-            values=["Subida Automática", "Revisión Previa"],
+            values=["Subida Automática", "Revisión Previa", "Edición Manual"],
             variable=modo_subida_var,
-            command=_guardar_memoria,
+            command=_al_cambiar_modo_subida,
             corner_radius=14,
             height=32,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
@@ -4350,9 +4361,11 @@ def iniciar_aplicacion_gui() -> None:
         on_decision: Callable[[str, str], None],
         es_modo_editado: bool = False,
         url_video_orig: str = "",
+        es_modo_manual_inicial: bool = False,
+        solo_guardar: bool = False,
     ) -> None:
         win_r = ctk.CTkToplevel(root)
-        win_r.title("Shorts Studio · Revisión Previa")
+        win_r.title("Shorts Studio · Edición Manual" if es_modo_manual_inicial else "Shorts Studio · Revisión Previa")
         win_r.geometry("1080x700")
         win_r.minsize(980, 640)
         win_r.resizable(True, True)
@@ -4592,7 +4605,11 @@ def iniciar_aplicacion_gui() -> None:
 
         lbl_estado = ctk.CTkLabel(
             hdr_inner,
-            text="Video editado listo" if es_modo_editado else "Short listo para publicar",
+            text=(
+                "Edición Manual · Redactá el Guion y Efectos"
+                if es_modo_manual_inicial
+                else ("Video editado listo" if es_modo_editado else "Short listo para publicar")
+            ),
             font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             text_color=TEXT_MAIN,
         )
@@ -4758,7 +4775,7 @@ def iniciar_aplicacion_gui() -> None:
             except Exception:
                 pass
 
-        if not es_modo_editado:
+        if not es_modo_editado and not es_modo_manual_inicial:
             ctk.CTkButton(
                 card_guion,
                 text="Re-renderizar con guion editado",
@@ -4788,16 +4805,28 @@ def iniciar_aplicacion_gui() -> None:
         )
         card_acciones.grid(row=2, column=0, sticky="ew")
 
-        btn_subir = ctk.CTkButton(
-            card_acciones,
-            text="Subir a YouTube",
-            command=lambda: _responder("subir"),
-            height=40, corner_radius=12,
-            fg_color=GREEN_ACCENT, hover_color="#059669",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-            text_color="#ffffff",
-        )
-        btn_subir.pack(fill="x", padx=16, pady=(12, 8))
+        if es_modo_manual_inicial:
+            btn_subir = ctk.CTkButton(
+                card_acciones,
+                text="🎬 Renderizar Short con este Guion",
+                command=lambda: _responder("reeditar"),
+                height=40, corner_radius=12,
+                fg_color=PURPLE_MAIN, hover_color=PURPLE_HOVER,
+                font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+                text_color="#ffffff",
+            )
+            btn_subir.pack(fill="x", padx=16, pady=(12, 8))
+        else:
+            btn_subir = ctk.CTkButton(
+                card_acciones,
+                text="Guardar en Carpeta" if solo_guardar else "Subir a YouTube",
+                command=lambda: _responder("subir"),
+                height=40, corner_radius=12,
+                fg_color=GREEN_ACCENT, hover_color="#059669",
+                font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+                text_color="#ffffff",
+            )
+            btn_subir.pack(fill="x", padx=16, pady=(12, 8))
 
         row_sec = ctk.CTkFrame(card_acciones, fg_color="transparent")
         row_sec.pack(fill="x", padx=16, pady=(0, 12))
@@ -5079,8 +5108,9 @@ def iniciar_aplicacion_gui() -> None:
         ).pack(side="right")
 
     def ejecutar_flujo_1_clic(solo_guardar_override: Optional[bool] = None) -> None:
+        es_modo_manual_cfg = "Manual" in modo_subida_var.get()
         api_k = "\n".join(obtener_gemini_api_keys()) or obtener_gemini_api_key()
-        if not api_k:
+        if not api_k and not es_modo_manual_cfg and not ("Editado" in modo_fuente_var.get()):
             messagebox.showinfo(
                 "Configura tu API Key Gratuita (1 vez)",
                 "Primero ingresa tu clave gratuita de Google AI Studio en Ajustes.",
@@ -5494,7 +5524,6 @@ def iniciar_aplicacion_gui() -> None:
                                 DEFAULT_GUION_TXT.write_text(f"TITULO_SUPERIOR: {tit_fall}\nTITULO_YOUTUBE: {tit_fall} #shorts\nSCHEDULE: {sched_str}\n\n[GUION]\n", encoding="utf-8")
                             _set_subprogreso(0.65, f"{pref_lote}Título listo...", CYAN_ACCENT)
                     else:
-                        # Verificar si el usuario personalizó Título / Descripción / Guión para este Reel
                         custom_data = datos_custom_reels[idx_lote] if idx_lote < len(datos_custom_reels) else {}
                         usar_ia_tit = custom_data.get("usar_ia_tit", True) if es_custom_activo else True
                         usar_ia_desc = custom_data.get("usar_ia_desc", True) if es_custom_activo else True
@@ -5504,80 +5533,102 @@ def iniciar_aplicacion_gui() -> None:
                         c_desc = custom_data.get("descripcion", "").strip() if (es_custom_activo and not usar_ia_desc) else ""
                         c_guion = custom_data.get("guion", "").strip() if (es_custom_activo and not usar_ia_guion) else ""
 
-                        guion_ya_listo = False
-                        if es_custom_activo and c_guion:
-                            _actualizar_milestone_actual("activo", f"Reel {num_actual}: Guión propio...")
-                            _set_subprogreso(0.26, f"{pref_lote}Aplicando tu guión y título personalizados...")
-                            guion_ya_listo = _aplicar_custom_a_guion_txt(
-                                idx_reel=idx_lote,
+                        es_modo_manual = ("Manual" in modo_subida_var.get())
+                        es_modo_manual_inicial = False
+
+                        if es_modo_manual:
+                            _actualizar_milestone_actual("activo", f"Reel {num_actual}: Abriendo editor manual...")
+                            _set_subprogreso(0.30, f"{pref_lote}Preparando video y plantilla de guion manual...", PURPLE_MAIN)
+                            root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}LISTO PARA EDITAR GUION..."))
+
+                            tit_base = c_tit or titulo_orig or ruta_video_usar.stem
+                            plantilla_raw = generar_plantilla_guion_manual(
                                 ruta_video=ruta_video_usar,
-                                custom_tit=c_tit,
-                                custom_desc=c_desc,
-                                custom_guion=c_guion,
+                                titulo_sugerido=tit_base,
                                 sched_str=sched_str,
                                 modo_priv="privado" if modo_priv == "private" else modo_priv,
+                                modo_encuadre=encuadre_elegido,
+                                descripcion_custom=c_desc,
                             )
+                            DEFAULT_GUION_TXT.write_text(plantilla_raw, encoding="utf-8")
+                            ruta_final = ruta_video_usar
+                            ultimo_video_generado[0] = ruta_final
+                            es_modo_manual_inicial = True
+                        else:
+                            guion_ya_listo = False
+                            if es_custom_activo and c_guion:
+                                _actualizar_milestone_actual("activo", f"Reel {num_actual}: Guión propio...")
+                                _set_subprogreso(0.26, f"{pref_lote}Aplicando tu guión y título personalizados...")
+                                guion_ya_listo = _aplicar_custom_a_guion_txt(
+                                    idx_reel=idx_lote,
+                                    ruta_video=ruta_video_usar,
+                                    custom_tit=c_tit,
+                                    custom_desc=c_desc,
+                                    custom_guion=c_guion,
+                                    sched_str=sched_str,
+                                    modo_priv="privado" if modo_priv == "private" else modo_priv,
+                                )
 
-                        if not guion_ya_listo:
-                            _actualizar_milestone_actual("activo", f"Reel {num_actual}: Creando guión IA...")
+                            if not guion_ya_listo:
+                                _actualizar_milestone_actual("activo", f"Reel {num_actual}: Creando guión IA...")
+                                root.after(
+                                    0,
+                                    lambda p=pref_lote: btn_auto_1clic.configure(
+                                        text=f"{p}CREANDO GUIÓN VIRAL CON IA..."
+                                    ),
+                                )
+                                def _cb_guion(sub_frac: float, msg_ia: str) -> None:
+                                    frac_ia = 0.12 + max(0.0, min(1.0, sub_frac)) * 0.16
+                                    _set_subprogreso(frac_ia, f"{pref_lote}{msg_ia}", "#facc15")
+                                    if "Auto-Auditoría" in msg_ia or "Auditoría" in msg_ia:
+                                        root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}AUDITANDO COHERENCIA CON IA..."))
+
+                                # Auto-auditoría retrospectiva de 3 rondas SIEMPRE activa al generar guion nuevo
+                                # (tanto en Subida Automática como en Revisión Previa manual)
+                                es_auto_auditoria = not es_modo_editado
+
+                                generar_guion_con_gemini_flash(
+                                    ruta_video=ruta_video_usar,
+                                    api_key=api_k,
+                                    schedule_str=sched_str,
+                                    modo_privacidad="privado" if modo_priv == "private" else modo_priv,
+                                    contexto_titulo_orig=titulo_orig,
+                                    modelo_preferido=pref_modelo_ia,
+                                    progreso_cb=_cb_guion,
+                                    auto_auditoria_retrospectiva=es_auto_auditoria,
+                                    cancelar_check=lambda: evento_cancelar.is_set(),
+                                )
+                                if evento_cancelar.is_set():
+                                    raise InterruptedError("Operación detenida por el usuario tras generar el guion.")
+                                if es_custom_activo and (c_tit or c_desc):
+                                    _sobreescribir_campos_custom_en_guion_txt(c_tit, c_desc)
+
+                            _actualizar_milestone_actual("activo", f"Reel {num_actual}: Editando 60 FPS...")
                             root.after(
                                 0,
                                 lambda p=pref_lote: btn_auto_1clic.configure(
-                                    text=f"{p}CREANDO GUIÓN VIRAL CON IA..."
+                                    text=f"{p}RENDERIZANDO SHORT CON GPU..."
                                 ),
                             )
-                            def _cb_guion(sub_frac: float, msg_ia: str) -> None:
-                                frac_ia = 0.12 + max(0.0, min(1.0, sub_frac)) * 0.16
-                                _set_subprogreso(frac_ia, f"{pref_lote}{msg_ia}", "#facc15")
-                                if "Auto-Auditoría" in msg_ia or "Auditoría" in msg_ia:
-                                    root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}AUDITANDO COHERENCIA CON IA..."))
 
-                            # Auto-auditoría retrospectiva de 3 rondas SIEMPRE activa al generar guion nuevo
-                            # (tanto en Subida Automática como en Revisión Previa manual)
-                            es_auto_auditoria = not es_modo_editado
+                            def _cb_edicion(pct_edit: float, txt_edit: str) -> None:
+                                # Soporta tanto fracción 0.0..1.0 como porcentaje 0.0..100.0 sin saltos
+                                f_val = pct_edit if pct_edit <= 1.0 else (pct_edit / 100.0)
+                                frac_interna = 0.30 + max(0.0, min(1.0, f_val)) * 0.58
+                                _set_subprogreso(frac_interna, f"{pref_lote}{txt_edit}", CYAN_ACCENT)
 
-                            generar_guion_con_gemini_flash(
-                                ruta_video=ruta_video_usar,
-                                api_key=api_k,
-                                schedule_str=sched_str,
-                                modo_privacidad="privado" if modo_priv == "private" else modo_priv,
-                                contexto_titulo_orig=titulo_orig,
-                                modelo_preferido=pref_modelo_ia,
-                                progreso_cb=_cb_guion,
-                                auto_auditoria_retrospectiva=es_auto_auditoria,
-                                cancelar_check=lambda: evento_cancelar.is_set(),
+                            modo_render_elegido = "cpu" if "CPU" in modo_render_var.get() else "auto"
+                            ruta_final = asyncio.run(
+                                editar_video_con_guion(
+                                    ruta_video=ruta_video_usar,
+                                    ruta_guion=DEFAULT_GUION_TXT,
+                                    voz_override=voz_elegida,
+                                    modo_encuadre_override=encuadre_elegido,
+                                    progreso_cb=_cb_edicion,
+                                    cancelar_check=lambda: evento_cancelar.is_set(),
+                                    encoder_override=modo_render_elegido,
+                                )
                             )
-                            if evento_cancelar.is_set():
-                                raise InterruptedError("Operación detenida por el usuario tras generar el guion.")
-                            if es_custom_activo and (c_tit or c_desc):
-                                _sobreescribir_campos_custom_en_guion_txt(c_tit, c_desc)
-
-                        _actualizar_milestone_actual("activo", f"Reel {num_actual}: Editando 60 FPS...")
-                        root.after(
-                            0,
-                            lambda p=pref_lote: btn_auto_1clic.configure(
-                                text=f"{p}RENDERIZANDO SHORT CON GPU..."
-                            ),
-                        )
-
-                        def _cb_edicion(pct_edit: float, txt_edit: str) -> None:
-                            # Soporta tanto fracción 0.0..1.0 como porcentaje 0.0..100.0 sin saltos
-                            f_val = pct_edit if pct_edit <= 1.0 else (pct_edit / 100.0)
-                            frac_interna = 0.30 + max(0.0, min(1.0, f_val)) * 0.58
-                            _set_subprogreso(frac_interna, f"{pref_lote}{txt_edit}", CYAN_ACCENT)
-
-                        modo_render_elegido = "cpu" if "CPU" in modo_render_var.get() else "auto"
-                        ruta_final = asyncio.run(
-                            editar_video_con_guion(
-                                ruta_video=ruta_video_usar,
-                                ruta_guion=DEFAULT_GUION_TXT,
-                                voz_override=voz_elegida,
-                                modo_encuadre_override=encuadre_elegido,
-                                progreso_cb=_cb_edicion,
-                                cancelar_check=lambda: evento_cancelar.is_set(),
-                                encoder_override=modo_render_elegido,
-                            )
-                        )
                     ultimo_video_generado[0] = ruta_final
                     shorts_guardados_disco.append({
                         "titulo": (c_tit if (es_custom_activo and c_tit) else titulo_orig) or ruta_final.stem,
@@ -5589,7 +5640,8 @@ def iniciar_aplicacion_gui() -> None:
                     if evento_cancelar.is_set():
                         raise InterruptedError("Operación detenida por el usuario tras guardar la edición.")
 
-                    if solo_guardar:
+                    es_modo_manual = ("Manual" in modo_subida_var.get())
+                    if solo_guardar and not es_modo_manual:
                         _actualizar_milestone_actual("subido", f"Reel {num_actual}: ✓ Guardado")
                         _set_subprogreso(
                             1.0,
@@ -5597,10 +5649,10 @@ def iniciar_aplicacion_gui() -> None:
                             GREEN_ACCENT,
                         )
                     else:
-                        # Si está activo el Modo Revisión Previa, esperar la decisión del usuario
-                        if "Revisión" in modo_subida_var.get() or "Revision" in modo_subida_var.get():
-                            _actualizar_milestone_actual("activo", f"Reel {num_actual}: Esperando tu revisión...")
-                            root.after(0, lambda: btn_auto_1clic.configure(text="ESPERANDO TU REVISIÓN DEL SHORT..."))
+                        # Si está activo el Modo Revisión Previa o Edición Manual, esperar la decisión del usuario
+                        if "Revisión" in modo_subida_var.get() or "Revision" in modo_subida_var.get() or es_modo_manual:
+                            _actualizar_milestone_actual("activo", f"Reel {num_actual}: {'Editando guion manual...' if es_modo_manual_inicial else 'Esperando tu revisión...'}")
+                            root.after(0, lambda: btn_auto_1clic.configure(text="EDITANDO GUION MANUAL..." if es_modo_manual_inicial else "ESPERANDO TU REVISIÓN DEL SHORT..."))
 
                             descartar_video_actual = False
                             while True:
@@ -5611,6 +5663,8 @@ def iniciar_aplicacion_gui() -> None:
                                     rf=ruta_final,
                                     tit=(c_tit if (es_custom_activo and c_tit) else titulo_orig) or ruta_final.stem,
                                     url_v=str(info_sel.get("url") or info_sel.get("link") or link_directo_var.get().strip() or ""),
+                                    es_man_ini=es_modo_manual_inicial,
+                                    sg=solo_guardar,
                                 ):
                                     try:
                                         abrir_dialogo_revision_short(
@@ -5623,12 +5677,14 @@ def iniciar_aplicacion_gui() -> None:
                                             ),
                                             es_modo_editado=es_modo_editado,
                                             url_video_orig=url_v,
+                                            es_modo_manual_inicial=es_man_ini,
+                                            solo_guardar=sg,
                                         )
                                     except Exception:
                                         datos_dec.update({"accion": "subir", "feedback": ""})
                                         ev_decision.set()
 
-                                root.after(0, _mostrar_rev)
+                                root.after(0, lambda rf=ruta_final, tit=(c_tit if (es_custom_activo and c_tit) else titulo_orig) or ruta_final.stem, url_v=str(info_sel.get("url") or info_sel.get("link") or link_directo_var.get().strip() or ""), es_m=es_modo_manual_inicial, sg=solo_guardar: _mostrar_rev(rf, tit, url_v, es_m, sg))
                                 ev_decision.wait()
 
                                 accion = datos_dec.get("accion", "subir")
@@ -5718,6 +5774,22 @@ def iniciar_aplicacion_gui() -> None:
                                     if es_modo_editado:
                                         ruta_final = ruta_video_usar
                                         ultimo_video_generado[0] = ruta_final
+                                    elif es_modo_manual:
+                                        _actualizar_milestone_actual("activo", f"Reel {num_actual}: Abriendo editor manual...")
+                                        _set_subprogreso(0.30, f"{pref_lote}Preparando nuevo video en editor manual...", PURPLE_MAIN)
+                                        root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}LISTO PARA EDITAR GUION..."))
+
+                                        plantilla_raw = generar_plantilla_guion_manual(
+                                            ruta_video=ruta_video_usar,
+                                            titulo_sugerido=titulo_orig or ruta_video_usar.stem,
+                                            sched_str=sched_actual or "auto",
+                                            modo_priv="privado" if modo_priv == "private" else modo_priv,
+                                            modo_encuadre=encuadre_elegido,
+                                        )
+                                        DEFAULT_GUION_TXT.write_text(plantilla_raw, encoding="utf-8")
+                                        ruta_final = ruta_video_usar
+                                        ultimo_video_generado[0] = ruta_final
+                                        es_modo_manual_inicial = True
                                     else:
                                         _actualizar_milestone_actual("activo", f"Reel {num_actual}: Creando guión IA...")
                                         _set_subprogreso(0.20, f"{pref_lote}Generando guión con IA...", PURPLE_MAIN)
@@ -5765,14 +5837,14 @@ def iniciar_aplicacion_gui() -> None:
 
                                     continue
                                 elif accion == "reeditar":
-                                    _actualizar_milestone_actual("activo", f"Reel {num_actual}: Re-renderizando con guion editado...")
-                                    _set_subprogreso(0.25, f"{pref_lote}Guardando guion editado...", PURPLE_MAIN)
-                                    root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}RE-RENDERIZANDO CON GUION EDITADO..."))
+                                    _actualizar_milestone_actual("activo", f"Reel {num_actual}: Renderizando Short con tu guion...")
+                                    _set_subprogreso(0.25, f"{pref_lote}Guardando guion...", PURPLE_MAIN)
+                                    root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}RENDERIZANDO CON TU GUION..."))
 
                                     if feedback_usr and feedback_usr.strip():
                                         DEFAULT_GUION_TXT.write_text(feedback_usr.strip() + "\n", encoding="utf-8")
 
-                                    _set_subprogreso(0.35, f"{pref_lote}Re-renderizando video a 60 FPS con GPU...", CYAN_ACCENT)
+                                    _set_subprogreso(0.35, f"{pref_lote}Renderizando video a 60 FPS con GPU...", CYAN_ACCENT)
                                     root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}RENDERIZANDO SHORT GPU..."))
 
                                     def _cb_reedit_e(pct_edit: float, txt_edit: str) -> None:
@@ -5792,6 +5864,7 @@ def iniciar_aplicacion_gui() -> None:
                                         )
                                     )
                                     ultimo_video_generado[0] = ruta_final
+                                    es_modo_manual_inicial = False
                                     continue
                                 else:
                                     if feedback_usr and feedback_usr.strip() and not es_modo_editado:
@@ -5799,7 +5872,18 @@ def iniciar_aplicacion_gui() -> None:
                                             DEFAULT_GUION_TXT.write_text(feedback_usr.strip() + "\n", encoding="utf-8")
                                         except Exception:
                                             pass
+                                    if solo_guardar:
+                                        _actualizar_milestone_actual("subido", f"Reel {num_actual}: ✓ Guardado")
+                                        _set_subprogreso(
+                                            1.0,
+                                            f"{pref_lote}Reel guardado en output_shorts ({ruta_final.name})",
+                                            GREEN_ACCENT,
+                                        )
+                                        break
                                     break
+
+                        if solo_guardar:
+                            continue
 
                         # Cuentas de YouTube asignadas a este Reel (una o varias si es cross-posting)
                         cuentas_dest_video: List[Dict[str, Any]] = list(info_sel.get("cuentas_destino") or [])

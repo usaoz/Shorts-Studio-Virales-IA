@@ -344,6 +344,20 @@ async def generar_voz_y_timestamps_segmento(
     if ruta_wav.exists():
         ruta_wav.unlink()
 
+    if not texto or not str(texto).strip():
+        try:
+            sr = 44100
+            n_silencio = int(sr * max(0.5, dur_objetivo_seg or 0.5))
+            silencio_pcm = np.zeros(n_silencio, dtype=np.int16)
+            with wave.open(str(ruta_wav), "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(sr)
+                wf.writeframes(silencio_pcm.tobytes())
+        except Exception:
+            pass
+        return 0.0, [], 0.0, 0.0
+
     if ELEVENLABS_API_KEY:
         genero_audio = intentar_voz_elevenlabs(texto, ruta_audio_salida)
         if genero_audio:
