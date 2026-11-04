@@ -1146,9 +1146,12 @@ def sincronizar_guion_renderizado_en_disco(ruta_guion: Union[str, Path], segment
 # =====================================================================
 
 MAPA_FUENTES_OVERLAY: Dict[str, str] = {
+    "Bahnschrift": "C:/Windows/Fonts/bahnschrift.ttf",
     "Impact": "C:/Windows/Fonts/impact.ttf",
-    "Arial": "C:/Windows/Fonts/arialbd.ttf",
     "Segoe UI": "C:/Windows/Fonts/segoeuib.ttf",
+    "Verdana": "C:/Windows/Fonts/verdanab.ttf",
+    "Tahoma": "C:/Windows/Fonts/tahomabd.ttf",
+    "Arial": "C:/Windows/Fonts/arialbd.ttf",
     "Trebuchet MS": "C:/Windows/Fonts/trebucbd.ttf",
     "MrBeast": str(Path(__file__).resolve().parent / "assets" / "fonts" / "MrBeast_Gaming_Font.ttf"),
 }
@@ -1163,9 +1166,13 @@ def cargar_fuente_overlay(nombre_fuente: str, tamano: int) -> ImageFont.FreeType
         return _CACHE_FUENTES_OVERLAY[clave]
 
     nom = clave[0]
-    p_fuente = MAPA_FUENTES_OVERLAY.get(nom)
+    p_fuente = None
+    for k, v in MAPA_FUENTES_OVERLAY.items():
+        if k.lower() == nom.lower():
+            p_fuente = v
+            break
     if not p_fuente or not os.path.exists(p_fuente):
-        for alt in ("Impact", "Arial", "Segoe UI"):
+        for alt in ("Bahnschrift", "Segoe UI", "Impact", "Arial"):
             cand = MAPA_FUENTES_OVERLAY.get(alt, "")
             if cand and os.path.exists(cand):
                 p_fuente = cand
@@ -1224,8 +1231,9 @@ def _parsear_coord_overlay(val: Any, defecto: float = 50.0, minimo: float = 2.0,
         return defecto
 
 def dividir_lineas_ajustadas_overlay(texto: str, fnt: ImageFont.ImageFont, max_ancho: int) -> List[str]:
-    """Divide el texto respetando saltos de línea explícitos y envolviendo palabras (word-wrap) si superan max_ancho."""
+    """Divide el texto respetando saltos de linea y envolviendo palabras sin desbordar el ancho maximo."""
     lineas = []
+    max_ancho = max(24, int(max_ancho))
     for parrafo in str(texto or "").splitlines():
         parrafo_s = parrafo.strip()
         if not parrafo_s:
@@ -1234,15 +1242,37 @@ def dividir_lineas_ajustadas_overlay(texto: str, fnt: ImageFont.ImageFont, max_a
         palabras = parrafo_s.split()
         if not palabras:
             continue
-        linea_act = palabras[0]
-        for p in palabras[1:]:
-            prueba = f"{linea_act} {p}"
-            bb = fnt.getbbox(prueba)
-            if (bb[2] - bb[0]) <= max_ancho:
-                linea_act = prueba
-            else:
-                lineas.append(linea_act)
+        linea_act = ""
+        for p in palabras:
+            bb_p = fnt.getbbox(p)
+            ancho_p = bb_p[2] - bb_p[0]
+            if ancho_p > max_ancho:
+                if linea_act:
+                    lineas.append(linea_act)
+                    linea_act = ""
+                sub_trozo = ""
+                for ch in p:
+                    bb_ch = fnt.getbbox(sub_trozo + ch)
+                    if (bb_ch[2] - bb_ch[0]) <= max_ancho:
+                        sub_trozo += ch
+                    else:
+                        if sub_trozo:
+                            lineas.append(sub_trozo)
+                        sub_trozo = ch
+                if sub_trozo:
+                    linea_act = sub_trozo
+                continue
+
+            if not linea_act:
                 linea_act = p
+            else:
+                prueba = f"{linea_act} {p}"
+                bb = fnt.getbbox(prueba)
+                if (bb[2] - bb[0]) <= max_ancho:
+                    linea_act = prueba
+                else:
+                    lineas.append(linea_act)
+                    linea_act = p
         if linea_act:
             lineas.append(linea_act)
     return lineas or [texto]
@@ -1312,14 +1342,15 @@ def _obtener_sprite_overlay(opciones: Dict[str, Any], target_w: int, target_h: i
             box_w = target_w
             bx0 = 0
         else:
-            box_w = max(20, max_line_w + pad_x * 2)
+            box_w = max(24, min(target_w, max_line_w + pad_x * 2))
             bx0 = max(0, min(target_w - box_w, cx - (box_w // 2)))
-        box_h = max(20, total_text_h + pad_y * 2)
+        box_h = max(20, min(target_h, total_text_h + pad_y * 2))
         by0 = max(0, min(target_h - box_h, cy - (box_h // 2)))
 
         patch = Image.new("RGBA", (box_w, box_h), (0, 0, 0, 0))
         draw_p = ImageDraw.Draw(patch)
-        draw_p.rounded_rectangle([0, 0, box_w, box_h], radius=max(4, int(10 * escala_lienzo)), fill=(*c_fondo_rgb, 255))
+        radio_esquinas = max(8, min(int(box_h * 0.32), int(26 * max(0.5, escala_lienzo)))) if not ancho_completo else 0
+        draw_p.rounded_rectangle([0, 0, box_w, box_h], radius=radio_esquinas, fill=(*c_fondo_rgb, 255))
         y_cursor = pad_y
         for l, (lw, lh, off_x, off_y) in zip(lineas, line_metrics):
             if l:

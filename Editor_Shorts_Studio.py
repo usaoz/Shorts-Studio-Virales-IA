@@ -78,6 +78,7 @@ from motor_optimizado import (
     comprobar_actualizacion_repo,
     ejecutar_actualizacion_repo,
     envolver_texto_overlay,
+    _obtener_sprite_overlay,
 )
 from ui_editor_guion import VisualScriptEditor
 
@@ -5743,81 +5744,32 @@ def iniciar_aplicacion_gui() -> None:
                 if not cfg or not isinstance(cfg, dict) or not cfg.get("activo") or not str(cfg.get("texto", "")).strip():
                     return
                 try:
-                    txt = str(cfg.get("texto", "")).strip()
-                    pos_x_pct = float(cfg.get("pos_x", 50.0) or 50.0)
-                    pos_y_pct = float(cfg.get("pos_y", 25.0) or 25.0)
-                    ancho_renglon_pct = float(cfg.get("ancho_renglon", 85.0) or 85.0)
-                    ancho_comp = bool(cfg.get("ancho_completo", False))
+                    patch, patch_np, bx0, by0 = _obtener_sprite_overlay(cfg, 270, 480)
+                    photo = ImageTk.PhotoImage(patch)
+                    canvas_video._overlay_sprite_photo = photo
+                    canvas_video.create_image(bx0, by0, image=photo, anchor="nw", tags="overlay_texto_fijo")
 
-                    cx = (pos_x_pct / 100.0) * 270.0
-                    cy = (pos_y_pct / 100.0) * 480.0
+                    bx1 = bx0 + patch.width
+                    by1 = by0 + patch.height
+                    my = (by0 + by1) // 2
 
-                    font_name = str(cfg.get("font", "Impact") or "Impact")
-                    tam_pt = int(cfg.get("tamano", 48) or 48)
-                    tam_canvas = max(8, int(tam_pt * (270.0 / 1080.0)))
-
-                    map_colores = {
-                        "blanco": "#ffffff", "negro": "#0f0f0f", "amarillo": "#fde047",
-                        "rojo": "#ef4444", "cian": "#38bdf8", "verde": "#22c55e", "naranja": "#f97316"
-                    }
-                    map_fondos = {
-                        "negro": "#000000", "blanco": "#ffffff", "rojo": "#b91c1c",
-                        "azul": "#1d4ed8", "amarillo": "#eab308", "verde": "#15803d"
-                    }
-
-                    c_txt = map_colores.get(str(cfg.get("color", "blanco")).lower(), "#ffffff")
-                    fondo_raw = str(cfg.get("fondo", "negro")).lower()
-                    c_bg = map_fondos.get(fondo_raw)
-
-                    pad_x = 8
-                    if ancho_comp:
-                        max_w_canvas = 270 - pad_x * 2
-                    else:
-                        max_w_canvas = max(30, int(270 * (ancho_renglon_pct / 100.0)) - pad_x * 2)
-
-                    lineas = envolver_texto_overlay(txt, font_name, tam_canvas, max_w_canvas)
-                    line_h = max(11, int(tam_canvas * 1.25))
-                    total_h = len(lineas) * line_h + 8
-
-                    char_w = max(4, int(tam_canvas * 0.58))
-                    max_line_w = max(len(l) for l in lineas) * char_w if lineas else 30
-                    box_w = 270 if ancho_comp else max(32, min(270, max_line_w + pad_x * 2))
-
-                    if ancho_comp:
-                        bx0 = 0
-                        bx1 = 270
-                    else:
-                        bx0 = max(0, min(270 - box_w, int(cx - (box_w // 2))))
-                        bx1 = bx0 + box_w
-
-                    by0 = max(0, min(480 - total_h, int(cy - (total_h // 2))))
-                    by1 = by0 + total_h
-                    center_y_start = by0 + 4 + (line_h // 2)
-
-                    if c_bg is not None:
-                        canvas_video.create_rectangle(
-                            bx0, by0, bx1, by1,
-                            fill=c_bg, outline="", tags="overlay_texto_fijo"
-                        )
-                        for i, linea in enumerate(lineas):
-                            y_linea = center_y_start + i * line_h
-                            canvas_video.create_text(
-                                cx, y_linea, text=linea, fill=c_txt,
-                                font=(font_name, tam_canvas, "bold"), tags="overlay_texto_fijo"
-                            )
-                    else:
-                        for i, linea in enumerate(lineas):
-                            y_linea = center_y_start + i * line_h
-                            for ox, oy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                                canvas_video.create_text(
-                                    cx + ox, y_linea + oy, text=linea, fill="#000000",
-                                    font=(font_name, tam_canvas, "bold"), tags="overlay_texto_fijo"
-                                )
-                            canvas_video.create_text(
-                                cx, y_linea, text=linea, fill=c_txt,
-                                font=(font_name, tam_canvas, "bold"), tags="overlay_texto_fijo"
-                            )
-
+                    # Guía de límites interactiva y manijas para moldear con el mouse
+                    canvas_video.create_rectangle(
+                        bx0 - 1, by0 - 1, bx1 + 1, by1 + 1,
+                        outline="#38bdf8", dash=(3, 3), width=1.5,
+                        tags=("overlay_texto_fijo", "overlay_sel_box")
+                    )
+                    r_h = 5
+                    canvas_video.create_oval(
+                        bx0 - r_h, my - r_h, bx0 + r_h, my + r_h,
+                        fill="#38bdf8", outline="#ffffff", width=1.5,
+                        tags=("overlay_texto_fijo", "overlay_handle_l")
+                    )
+                    canvas_video.create_oval(
+                        bx1 - r_h, my - r_h, bx1 + r_h, my + r_h,
+                        fill="#38bdf8", outline="#ffffff", width=1.5,
+                        tags=("overlay_texto_fijo", "overlay_handle_r")
+                    )
                     canvas_video.tag_raise("overlay_texto_fijo")
                 except Exception:
                     pass
@@ -5887,33 +5839,66 @@ def iniciar_aplicacion_gui() -> None:
         )
         txt_guion_box.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 8))
 
-        _drag_overlay = {"activo": False}
+        _drag_overlay = {"modo": None, "start_x": 0, "start_y": 0, "cx": 135.0}
+
+        def _on_overlay_motion(event: Any) -> None:
+            if _drag_overlay["modo"] is not None:
+                return
+            items = canvas_video.find_withtag("current")
+            tags = [t for it in items for t in canvas_video.gettags(it)]
+            if "overlay_handle_l" in tags or "overlay_handle_r" in tags:
+                canvas_video.configure(cursor="sb_h_double_arrow")
+            elif any("overlay_texto_fijo" in t for t in tags):
+                canvas_video.configure(cursor="fleur")
+            else:
+                canvas_video.configure(cursor="")
 
         def _on_overlay_press(event: Any) -> None:
             if not hasattr(txt_guion_box, "datos_overlay") or not txt_guion_box.datos_overlay.get("activo"):
                 return
             items = canvas_video.find_withtag("current")
-            es_ov = any("overlay_texto_fijo" in canvas_video.gettags(it) for it in items)
-            if not es_ov:
-                overlapping = canvas_video.find_overlapping(event.x - 4, event.y - 4, event.x + 4, event.y + 4)
-                es_ov = any("overlay_texto_fijo" in canvas_video.gettags(it) for it in overlapping)
-            if es_ov:
-                _drag_overlay["activo"] = True
+            tags = [t for it in items for t in canvas_video.gettags(it)]
+            if not tags:
+                overlapping = canvas_video.find_overlapping(event.x - 5, event.y - 5, event.x + 5, event.y + 5)
+                tags = [t for it in overlapping for t in canvas_video.gettags(it)]
+
+            px_pct = float(txt_guion_box.datos_overlay.get("pos_x", 50.0) or 50.0)
+            cx = (px_pct / 100.0) * 270.0
+            _drag_overlay["cx"] = cx
+            _drag_overlay["start_x"] = event.x
+            _drag_overlay["start_y"] = event.y
+
+            if "overlay_handle_r" in tags:
+                _drag_overlay["modo"] = "resize_r"
+            elif "overlay_handle_l" in tags:
+                _drag_overlay["modo"] = "resize_l"
+            elif any("overlay_texto_fijo" in t for t in tags):
+                _drag_overlay["modo"] = "move"
 
         def _on_overlay_drag(event: Any) -> None:
-            if not _drag_overlay["activo"]:
+            modo = _drag_overlay["modo"]
+            if not modo:
                 return
-            px = max(5.0, min(95.0, (event.x / 270.0) * 100.0))
-            py = max(5.0, min(95.0, (event.y / 480.0) * 100.0))
-            if hasattr(txt_guion_box, "mover_overlay_desde_canvas"):
-                txt_guion_box.mover_overlay_desde_canvas(px, py)
+            if modo in ("resize_r", "resize_l"):
+                cx = _drag_overlay["cx"]
+                dist = abs(event.x - cx)
+                nuevo_ancho = min(100.0, max(20.0, ((dist * 2.0) / 270.0) * 100.0))
+                if hasattr(txt_guion_box, "actualizar_ancho_overlay"):
+                    txt_guion_box.actualizar_ancho_overlay(nuevo_ancho)
+            elif modo == "move":
+                px = max(5.0, min(95.0, (event.x / 270.0) * 100.0))
+                py = max(5.0, min(95.0, (event.y / 480.0) * 100.0))
+                if hasattr(txt_guion_box, "mover_overlay_desde_canvas"):
+                    txt_guion_box.mover_overlay_desde_canvas(px, py)
 
         def _on_overlay_release(event: Any) -> None:
-            if _drag_overlay["activo"]:
-                _drag_overlay["activo"] = False
+            if _drag_overlay["modo"] is not None:
+                _drag_overlay["modo"] = None
+                canvas_video.configure(cursor="")
                 if hasattr(txt_guion_box, "_actualizar_raw_interno"):
                     txt_guion_box._actualizar_raw_interno()
 
+        canvas_video.bind("<Motion>", _on_overlay_motion, add="+")
         canvas_video.bind("<ButtonPress-1>", _on_overlay_press, add="+")
         canvas_video.bind("<B1-Motion>", _on_overlay_drag, add="+")
         canvas_video.bind("<ButtonRelease-1>", _on_overlay_release, add="+")

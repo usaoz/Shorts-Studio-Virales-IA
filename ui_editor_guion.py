@@ -1447,7 +1447,7 @@ class VisualScriptEditor(ctk.CTkFrame):
             "texto": "",
             "fondo": "Negro",
             "color": "Blanco",
-            "font": "Impact",
+            "font": "Bahnschrift",
             "tamano": 48,
             "pos_x": 50,
             "pos_y": 25,
@@ -1605,13 +1605,13 @@ class VisualScriptEditor(ctk.CTkFrame):
         )
         self.opt_overlay_font = ctk.CTkOptionMenu(
             row2,
-            values=["Impact", "MrBeast", "Arial", "Segoe UI", "Trebuchet MS"],
-            width=105,
+            values=["Bahnschrift", "Impact", "MrBeast", "Segoe UI", "Verdana", "Tahoma", "Arial", "Trebuchet MS"],
+            width=110,
             height=24,
             font=ctk.CTkFont(size=11),
             command=lambda _: self._on_overlay_control_changed(),
         )
-        self.opt_overlay_font.set("Impact")
+        self.opt_overlay_font.set("Bahnschrift")
         self.opt_overlay_font.pack(side="left", padx=(0, 10))
 
         ctk.CTkLabel(row2, text="Tamaño:", font=ctk.CTkFont(size=11, weight="bold"), text_color="#94a3b8").pack(
@@ -1817,6 +1817,19 @@ class VisualScriptEditor(ctk.CTkFrame):
         if hasattr(self, "slider_overlay_pos_y"):
             self.slider_overlay_pos_y.set(py)
             self.lbl_pos_y_overlay_val.configure(text=f"{py}%")
+        self._actualizar_raw_interno()
+        self.notificar_overlay_live()
+
+    def actualizar_ancho_overlay(self, nuevo_ancho_pct: float):
+        ancho_int = max(20, min(100, int(round(nuevo_ancho_pct))))
+        self.datos_overlay["ancho_renglon"] = ancho_int
+        self.datos_overlay["ancho_completo"] = False
+        if hasattr(self, "chk_overlay_ancho"):
+            self.chk_overlay_ancho.deselect()
+        if hasattr(self, "slider_overlay_ancho"):
+            self.slider_overlay_ancho.set(ancho_int)
+        if hasattr(self, "lbl_ancho_overlay_val"):
+            self.lbl_ancho_overlay_val.configure(text=f"{ancho_int}%")
         self._actualizar_raw_interno()
         self.notificar_overlay_live()
 
