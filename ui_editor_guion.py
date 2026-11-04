@@ -1449,7 +1449,9 @@ class VisualScriptEditor(ctk.CTkFrame):
             "color": "Blanco",
             "font": "Impact",
             "tamano": 48,
+            "pos_x": 50,
             "pos_y": 25,
+            "ancho_renglon": 85,
             "ancho_completo": False,
         }
         self.panel_overlay_visible = False
@@ -1566,9 +1568,9 @@ class VisualScriptEditor(ctk.CTkFrame):
         )
         self.chk_overlay_ancho.grid(row=0, column=2, sticky="e")
 
-        # Fila 2: Controles visuales (Fondo, Color texto, Fuente, Tamaño, Posición Y)
+        # Fila 2: Estilo visual (Fondo, Color texto, Fuente, Tamaño)
         row2 = ctk.CTkFrame(self.frame_overlay, fg_color="transparent")
-        row2.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(4, 8))
+        row2.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(2, 4))
 
         ctk.CTkLabel(row2, text="Fondo:", font=ctk.CTkFont(size=11, weight="bold"), text_color="#94a3b8").pack(
             side="left", padx=(0, 4)
@@ -1577,7 +1579,7 @@ class VisualScriptEditor(ctk.CTkFrame):
             row2,
             values=["Negro", "Blanco", "Rojo", "Azul", "Amarillo", "Verde", "Sin Fondo"],
             width=95,
-            height=26,
+            height=24,
             font=ctk.CTkFont(size=11),
             command=lambda _: self._on_overlay_control_changed(),
         )
@@ -1591,7 +1593,7 @@ class VisualScriptEditor(ctk.CTkFrame):
             row2,
             values=["Blanco", "Amarillo", "Negro", "Rojo", "Cian", "Verde"],
             width=95,
-            height=26,
+            height=24,
             font=ctk.CTkFont(size=11),
             command=lambda _: self._on_overlay_control_changed(),
         )
@@ -1605,7 +1607,7 @@ class VisualScriptEditor(ctk.CTkFrame):
             row2,
             values=["Impact", "MrBeast", "Arial", "Segoe UI", "Trebuchet MS"],
             width=105,
-            height=26,
+            height=24,
             font=ctk.CTkFont(size=11),
             command=lambda _: self._on_overlay_control_changed(),
         )
@@ -1624,64 +1626,118 @@ class VisualScriptEditor(ctk.CTkFrame):
             from_=20,
             to=110,
             number_of_steps=90,
-            width=85,
+            width=90,
             height=16,
             command=self._on_slider_tamano_overlay,
         )
         self.slider_overlay_tamano.set(48)
-        self.slider_overlay_tamano.pack(side="left", padx=(0, 12))
+        self.slider_overlay_tamano.pack(side="left", padx=(0, 4))
 
-        ctk.CTkLabel(row2, text="Pos Y:", font=ctk.CTkFont(size=11, weight="bold"), text_color="#94a3b8").pack(
-            side="left", padx=(0, 4)
+        # Fila 3: Posición X, Y y Ancho de renglón (Auto-wrap)
+        row3 = ctk.CTkFrame(self.frame_overlay, fg_color="transparent")
+        row3.grid(row=3, column=0, columnspan=2, sticky="ew", padx=10, pady=(2, 6))
+
+        # --- Ancho de Renglón ---
+        ctk.CTkLabel(row3, text="Ancho:", font=ctk.CTkFont(size=11, weight="bold"), text_color="#94a3b8").pack(
+            side="left", padx=(0, 2)
         )
-        self.lbl_pos_overlay_val = ctk.CTkLabel(
-            row2, text="25%", width=32, font=ctk.CTkFont(size=11, weight="bold"), text_color="#fde047"
+        self.lbl_ancho_overlay_val = ctk.CTkLabel(
+            row3, text="85%", width=30, font=ctk.CTkFont(size=11, weight="bold"), text_color="#a78bfa"
         )
-        self.lbl_pos_overlay_val.pack(side="left", padx=(0, 4))
-        self.slider_overlay_pos_y = ctk.CTkSlider(
-            row2,
+        self.lbl_ancho_overlay_val.pack(side="left", padx=(0, 2))
+        self.slider_overlay_ancho = ctk.CTkSlider(
+            row3,
+            from_=20,
+            to=100,
+            number_of_steps=80,
+            width=65,
+            height=16,
+            command=self._on_slider_ancho_overlay,
+        )
+        self.slider_overlay_ancho.set(85)
+        self.slider_overlay_ancho.pack(side="left", padx=(0, 4))
+
+        f_presets_ancho = ctk.CTkFrame(row3, fg_color="transparent")
+        f_presets_ancho.pack(side="left", padx=(0, 8))
+        for p_lbl, p_val in [("50%", 50), ("75%", 75), ("90%", 90)]:
+            ctk.CTkButton(
+                f_presets_ancho,
+                text=p_lbl,
+                width=30,
+                height=20,
+                fg_color="#1b2234",
+                hover_color="#28324e",
+                font=ctk.CTkFont(size=9),
+                command=lambda v=p_val: self._set_ancho_preset(v),
+            ).pack(side="left", padx=1)
+
+        # --- Posición X ---
+        ctk.CTkLabel(row3, text="X:", font=ctk.CTkFont(size=11, weight="bold"), text_color="#94a3b8").pack(
+            side="left", padx=(0, 2)
+        )
+        self.lbl_pos_x_overlay_val = ctk.CTkLabel(
+            row3, text="50%", width=30, font=ctk.CTkFont(size=11, weight="bold"), text_color="#38bdf8"
+        )
+        self.lbl_pos_x_overlay_val.pack(side="left", padx=(0, 2))
+        self.slider_overlay_pos_x = ctk.CTkSlider(
+            row3,
             from_=5,
             to=95,
             number_of_steps=90,
-            width=85,
+            width=65,
             height=16,
-            command=self._on_slider_pos_overlay,
+            command=self._on_slider_pos_x_overlay,
+        )
+        self.slider_overlay_pos_x.set(50)
+        self.slider_overlay_pos_x.pack(side="left", padx=(0, 4))
+
+        f_presets_x = ctk.CTkFrame(row3, fg_color="transparent")
+        f_presets_x.pack(side="left", padx=(0, 8))
+        for p_lbl, p_val in [("Izq", 20), ("Ctr", 50), ("Der", 80)]:
+            ctk.CTkButton(
+                f_presets_x,
+                text=p_lbl,
+                width=30,
+                height=20,
+                fg_color="#1b2234",
+                hover_color="#28324e",
+                font=ctk.CTkFont(size=9),
+                command=lambda v=p_val: self._set_pos_x_preset(v),
+            ).pack(side="left", padx=1)
+
+        # --- Posición Y ---
+        ctk.CTkLabel(row3, text="Y:", font=ctk.CTkFont(size=11, weight="bold"), text_color="#94a3b8").pack(
+            side="left", padx=(0, 2)
+        )
+        self.lbl_pos_y_overlay_val = ctk.CTkLabel(
+            row3, text="25%", width=30, font=ctk.CTkFont(size=11, weight="bold"), text_color="#fde047"
+        )
+        self.lbl_pos_y_overlay_val.pack(side="left", padx=(0, 2))
+        self.slider_overlay_pos_y = ctk.CTkSlider(
+            row3,
+            from_=5,
+            to=95,
+            number_of_steps=90,
+            width=65,
+            height=16,
+            command=self._on_slider_pos_y_overlay,
         )
         self.slider_overlay_pos_y.set(25)
-        self.slider_overlay_pos_y.pack(side="left", padx=(0, 8))
+        self.slider_overlay_pos_y.pack(side="left", padx=(0, 4))
 
-        f_presets = ctk.CTkFrame(row2, fg_color="transparent")
-        f_presets.pack(side="left", padx=(0, 4))
-        ctk.CTkButton(
-            f_presets,
-            text="Arriba",
-            width=46,
-            height=22,
-            fg_color="#1b2234",
-            hover_color="#28324e",
-            font=ctk.CTkFont(size=10),
-            command=lambda: self._set_pos_y_preset(15),
-        ).pack(side="left", padx=1)
-        ctk.CTkButton(
-            f_presets,
-            text="Centro",
-            width=48,
-            height=22,
-            fg_color="#1b2234",
-            hover_color="#28324e",
-            font=ctk.CTkFont(size=10),
-            command=lambda: self._set_pos_y_preset(50),
-        ).pack(side="left", padx=1)
-        ctk.CTkButton(
-            f_presets,
-            text="Abajo",
-            width=46,
-            height=22,
-            fg_color="#1b2234",
-            hover_color="#28324e",
-            font=ctk.CTkFont(size=10),
-            command=lambda: self._set_pos_y_preset(80),
-        ).pack(side="left", padx=1)
+        f_presets_y = ctk.CTkFrame(row3, fg_color="transparent")
+        f_presets_y.pack(side="left", padx=(0, 2))
+        for p_lbl, p_val in [("Arr", 15), ("Ctr", 50), ("Aba", 80)]:
+            ctk.CTkButton(
+                f_presets_y,
+                text=p_lbl,
+                width=30,
+                height=20,
+                fg_color="#1b2234",
+                hover_color="#28324e",
+                font=ctk.CTkFont(size=9),
+                command=lambda v=p_val: self._set_pos_y_preset(v),
+            ).pack(side="left", padx=1)
 
     def _toggle_panel_overlay(self, forzar: Optional[bool] = None):
         if forzar is not None:
@@ -1718,19 +1774,51 @@ class VisualScriptEditor(ctk.CTkFrame):
                 border_width=1,
             )
 
+    def _set_ancho_preset(self, val: int):
+        self.slider_overlay_ancho.set(val)
+        self._on_slider_ancho_overlay(val)
+
+    def _set_pos_x_preset(self, val: int):
+        self.slider_overlay_pos_x.set(val)
+        self._on_slider_pos_x_overlay(val)
+
     def _set_pos_y_preset(self, val: int):
         self.slider_overlay_pos_y.set(val)
-        self._on_slider_pos_overlay(val)
+        self._on_slider_pos_y_overlay(val)
 
     def _on_slider_tamano_overlay(self, val):
         val_int = int(round(float(val)))
         self.lbl_tam_overlay_val.configure(text=f"{val_int} pt")
         self._on_overlay_control_changed()
 
-    def _on_slider_pos_overlay(self, val):
+    def _on_slider_ancho_overlay(self, val):
         val_int = int(round(float(val)))
-        self.lbl_pos_overlay_val.configure(text=f"{val_int}%")
+        self.lbl_ancho_overlay_val.configure(text=f"{val_int}%")
         self._on_overlay_control_changed()
+
+    def _on_slider_pos_x_overlay(self, val):
+        val_int = int(round(float(val)))
+        self.lbl_pos_x_overlay_val.configure(text=f"{val_int}%")
+        self._on_overlay_control_changed()
+
+    def _on_slider_pos_y_overlay(self, val):
+        val_int = int(round(float(val)))
+        self.lbl_pos_y_overlay_val.configure(text=f"{val_int}%")
+        self._on_overlay_control_changed()
+
+    def mover_overlay_desde_canvas(self, pos_x_pct: float, pos_y_pct: float):
+        px = max(5, min(95, int(round(pos_x_pct))))
+        py = max(5, min(95, int(round(pos_y_pct))))
+        self.datos_overlay["pos_x"] = px
+        self.datos_overlay["pos_y"] = py
+        if hasattr(self, "slider_overlay_pos_x"):
+            self.slider_overlay_pos_x.set(px)
+            self.lbl_pos_x_overlay_val.configure(text=f"{px}%")
+        if hasattr(self, "slider_overlay_pos_y"):
+            self.slider_overlay_pos_y.set(py)
+            self.lbl_pos_y_overlay_val.configure(text=f"{py}%")
+        self._actualizar_raw_interno()
+        self.notificar_overlay_live()
 
     def _on_overlay_control_changed(self):
         txt = self.entry_overlay_texto.get().strip()
@@ -1739,7 +1827,9 @@ class VisualScriptEditor(ctk.CTkFrame):
         color = self.opt_overlay_color.get()
         font_n = self.opt_overlay_font.get()
         tamano = int(round(self.slider_overlay_tamano.get()))
+        pos_x = int(round(self.slider_overlay_pos_x.get()))
         pos_y = int(round(self.slider_overlay_pos_y.get()))
+        ancho_renglon = int(round(self.slider_overlay_ancho.get()))
         ancho_comp = bool(self.chk_overlay_ancho.get())
 
         self.datos_overlay["activo"] = activo
@@ -1748,7 +1838,9 @@ class VisualScriptEditor(ctk.CTkFrame):
         self.datos_overlay["color"] = color
         self.datos_overlay["font"] = font_n
         self.datos_overlay["tamano"] = tamano
+        self.datos_overlay["pos_x"] = pos_x
         self.datos_overlay["pos_y"] = pos_y
+        self.datos_overlay["ancho_renglon"] = ancho_renglon
         self.datos_overlay["ancho_completo"] = ancho_comp
 
         self._refrescar_estilo_btn_overlay()
@@ -1787,9 +1879,17 @@ class VisualScriptEditor(ctk.CTkFrame):
         self.slider_overlay_tamano.set(tam)
         self.lbl_tam_overlay_val.configure(text=f"{tam} pt")
 
+        pos_x = int(self.datos_overlay.get("pos_x", 50) or 50)
+        self.slider_overlay_pos_x.set(pos_x)
+        self.lbl_pos_x_overlay_val.configure(text=f"{pos_x}%")
+
         pos_y = int(self.datos_overlay.get("pos_y", 25) or 25)
         self.slider_overlay_pos_y.set(pos_y)
-        self.lbl_pos_overlay_val.configure(text=f"{pos_y}%")
+        self.lbl_pos_y_overlay_val.configure(text=f"{pos_y}%")
+
+        ancho_r = int(self.datos_overlay.get("ancho_renglon", 85) or 85)
+        self.slider_overlay_ancho.set(ancho_r)
+        self.lbl_ancho_overlay_val.configure(text=f"{ancho_r}%")
 
         self._refrescar_estilo_btn_overlay()
         self.notificar_overlay_live()
@@ -1888,9 +1988,19 @@ class VisualScriptEditor(ctk.CTkFrame):
                             pass
                     elif k_clean in ("OVERLAY_FONT", "OVERLAY_FUENTE"):
                         self.datos_overlay["font"] = v_clean
-                    elif k_clean in ("OVERLAY_POS_Y", "OVERLAY_Y"):
+                    elif k_clean in ("OVERLAY_POS_X", "OVERLAY_X", "POS_X_OVERLAY"):
+                        try:
+                            self.datos_overlay["pos_x"] = int(float(v_clean.rstrip("%")))
+                        except ValueError:
+                            pass
+                    elif k_clean in ("OVERLAY_POS_Y", "OVERLAY_Y", "POS_Y_OVERLAY", "ALTURA_TEXTO_FIJO"):
                         try:
                             self.datos_overlay["pos_y"] = int(float(v_clean.rstrip("%")))
+                        except ValueError:
+                            pass
+                    elif k_clean in ("OVERLAY_ANCHO_RENGLON", "OVERLAY_ANCHO", "OVERLAY_MAX_ANCHO", "ANCHO_RENGLON"):
+                        try:
+                            self.datos_overlay["ancho_renglon"] = int(float(v_clean.rstrip("%")))
                         except ValueError:
                             pass
                     elif k_clean in ("OVERLAY_ANCHO_COMPLETO", "OVERLAY_FRANJA_COMPLETA"):
@@ -1991,10 +2101,16 @@ class VisualScriptEditor(ctk.CTkFrame):
             self.metadatos_ocultos["OVERLAY_COLOR"] = str(self.datos_overlay.get("color", "blanco")).lower()
             self.metadatos_ocultos["OVERLAY_TAMANO"] = str(self.datos_overlay.get("tamano", 48))
             self.metadatos_ocultos["OVERLAY_FONT"] = str(self.datos_overlay.get("font", "Impact"))
+            self.metadatos_ocultos["OVERLAY_POS_X"] = f"{self.datos_overlay.get('pos_x', 50)}%"
             self.metadatos_ocultos["OVERLAY_POS_Y"] = f"{self.datos_overlay.get('pos_y', 25)}%"
+            self.metadatos_ocultos["OVERLAY_ANCHO_RENGLON"] = f"{self.datos_overlay.get('ancho_renglon', 85)}%"
             self.metadatos_ocultos["OVERLAY_ANCHO_COMPLETO"] = "si" if self.datos_overlay.get("ancho_completo") else "no"
         else:
-            for k_ov in ("OVERLAY_TEXTO", "OVERLAY_FONDO", "OVERLAY_COLOR", "OVERLAY_TAMANO", "OVERLAY_FONT", "OVERLAY_POS_Y", "OVERLAY_ANCHO_COMPLETO"):
+            for k_ov in (
+                "OVERLAY_TEXTO", "OVERLAY_FONDO", "OVERLAY_COLOR",
+                "OVERLAY_TAMANO", "OVERLAY_FONT", "OVERLAY_POS_X",
+                "OVERLAY_POS_Y", "OVERLAY_ANCHO_RENGLON", "OVERLAY_ANCHO_COMPLETO"
+            ):
                 self.metadatos_ocultos.pop(k_ov, None)
 
         lineas = [

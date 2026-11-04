@@ -412,7 +412,9 @@ def cargar_guion_video(ruta_guion: Path) -> ConfigGuion:
         "color": "blanco",
         "tamano": 48,
         "font": "Impact",
+        "pos_x": "50%",
         "pos_y": "25%",
+        "ancho_renglon": "85%",
         "ancho_completo": False,
     }
     for linea in contenido.splitlines():
@@ -504,8 +506,12 @@ def cargar_guion_video(ruta_guion: Path) -> ConfigGuion:
                         pass
                 elif k_up in ("OVERLAY_FONT", "OVERLAY_FUENTE", "FUENTE_OVERLAY"):
                     overlay_texto_dict["font"] = v_str
+                elif k_up in ("OVERLAY_POS_X", "OVERLAY_X", "POS_X_OVERLAY"):
+                    overlay_texto_dict["pos_x"] = v_str
                 elif k_up in ("OVERLAY_POS_Y", "OVERLAY_Y", "POS_Y_OVERLAY", "ALTURA_TEXTO_FIJO"):
                     overlay_texto_dict["pos_y"] = v_str
+                elif k_up in ("OVERLAY_ANCHO_RENGLON", "OVERLAY_ANCHO", "OVERLAY_MAX_ANCHO", "ANCHO_RENGLON"):
+                    overlay_texto_dict["ancho_renglon"] = v_str
                 elif k_up in ("OVERLAY_ANCHO_COMPLETO", "OVERLAY_FRANJA_COMPLETA"):
                     v_clean = _quitar_acentos(v_str.lower())
                     overlay_texto_dict["ancho_completo"] = v_clean in ("si", "true", "yes", "1", "completo")

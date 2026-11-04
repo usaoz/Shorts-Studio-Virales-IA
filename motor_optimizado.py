@@ -1210,15 +1210,47 @@ COLORES_FONDO_OVERLAY: Dict[str, Optional[Tuple[int, int, int]]] = {
 _CACHE_SPRITES_OVERLAY: Dict[Tuple, Tuple[Image.Image, np.ndarray, int, int]] = {}
 
 def _parsear_pos_y_overlay(val: Any) -> float:
+    return _parsear_coord_overlay(val, defecto=25.0)
+
+def _parsear_coord_overlay(val: Any, defecto: float = 50.0, minimo: float = 2.0, maximo: float = 98.0) -> float:
     if val is None:
-        return 25.0
+        return defecto
     if isinstance(val, (int, float)):
-        return max(3.0, min(97.0, float(val)))
+        return max(minimo, min(maximo, float(val)))
     s = str(val).strip().rstrip("%")
     try:
-        return max(3.0, min(97.0, float(s)))
+        return max(minimo, min(maximo, float(s)))
     except ValueError:
-        return 25.0
+        return defecto
+
+def dividir_lineas_ajustadas_overlay(texto: str, fnt: ImageFont.ImageFont, max_ancho: int) -> List[str]:
+    """Divide el texto respetando saltos de línea explícitos y envolviendo palabras (word-wrap) si superan max_ancho."""
+    lineas = []
+    for parrafo in str(texto or "").splitlines():
+        parrafo_s = parrafo.strip()
+        if not parrafo_s:
+            lineas.append("")
+            continue
+        palabras = parrafo_s.split()
+        if not palabras:
+            continue
+        linea_act = palabras[0]
+        for p in palabras[1:]:
+            prueba = f"{linea_act} {p}"
+            bb = fnt.getbbox(prueba)
+            if (bb[2] - bb[0]) <= max_ancho:
+                linea_act = prueba
+            else:
+                lineas.append(linea_act)
+                linea_act = p
+        if linea_act:
+            lineas.append(linea_act)
+    return lineas or [texto]
+
+def envolver_texto_overlay(texto: str, font_name: str, tamano: int, max_ancho: int) -> List[str]:
+    """Envuelve texto respetando el ancho maximo especificado usando la tipografia seleccionada."""
+    fnt = cargar_fuente_overlay(font_name, max(8, int(tamano)))
+    return dividir_lineas_ajustadas_overlay(texto, fnt, max_ancho)
 
 def _obtener_sprite_overlay(opciones: Dict[str, Any], target_w: int, target_h: int) -> Tuple[Image.Image, np.ndarray, int, int]:
     texto = str(opciones.get("texto", "") or "").strip()
@@ -1227,9 +1259,11 @@ def _obtener_sprite_overlay(opciones: Dict[str, Any], target_w: int, target_h: i
     fondo_raw = str(opciones.get("fondo", "negro") or "negro").strip().lower()
     color_raw = str(opciones.get("color", opciones.get("color_texto", "blanco")) or "blanco").strip().lower()
     ancho_completo = bool(opciones.get("ancho_completo", False))
-    pos_y_pct = _parsear_pos_y_overlay(opciones.get("pos_y", opciones.get("pos_y_pct", 25.0)))
+    pos_x_pct = _parsear_coord_overlay(opciones.get("pos_x", opciones.get("pos_x_pct", 50.0)), defecto=50.0)
+    pos_y_pct = _parsear_coord_overlay(opciones.get("pos_y", opciones.get("pos_y_pct", 25.0)), defecto=25.0)
+    ancho_renglon_pct = _parsear_coord_overlay(opciones.get("ancho_renglon", opciones.get("ancho_max", 85.0)), defecto=85.0, minimo=20.0, maximo=100.0)
 
-    cache_key = (texto, tamano, font_name, fondo_raw, color_raw, ancho_completo, pos_y_pct, target_w, target_h)
+    cache_key = (texto, tamano, font_name, fondo_raw, color_raw, ancho_completo, pos_x_pct, pos_y_pct, ancho_renglon_pct, target_w, target_h)
     cached = _CACHE_SPRITES_OVERLAY.get(cache_key)
     if cached is not None:
         return cached
@@ -1238,47 +1272,77 @@ def _obtener_sprite_overlay(opciones: Dict[str, Any], target_w: int, target_h: i
     tam_real = max(12, int(tamano * escala_lienzo))
     fnt = cargar_fuente_overlay(font_name, tam_real)
 
-    cy = int(target_h * (pos_y_pct / 100.0))
-    cx = target_w // 2
+    pad_x = max(16, int(tam_real * 0.45))
+    pad_y = max(10, int(tam_real * 0.30))
 
-    bbox = fnt.getbbox(texto)
-    tw = bbox[2] - bbox[0]
-    th = bbox[3] - bbox[1]
+    if ancho_completo:
+        max_text_w = target_w - pad_x * 2
+    else:
+        max_text_w = max(40, int(target_w * (ancho_renglon_pct / 100.0)) - pad_x * 2)
+
+    lineas = dividir_lineas_ajustadas_overlay(texto, fnt, max_text_w)
+
+    ref_bbox = fnt.getbbox("AyÁg")
+    h_linea_base = ref_bbox[3] - ref_bbox[1]
+
+    line_metrics = []
+    max_line_w = 0
+    for l in lineas:
+        if not l:
+            line_metrics.append((0, h_linea_base, 0, 0))
+            continue
+        bb = fnt.getbbox(l)
+        lw = bb[2] - bb[0]
+        lh = bb[3] - bb[1]
+        line_metrics.append((lw, max(lh, h_linea_base), bb[0], bb[1]))
+        if lw > max_line_w:
+            max_line_w = lw
+
+    espaciado_lineas = max(4, int(tam_real * 0.22))
+    total_text_h = sum(m[1] for m in line_metrics) + espaciado_lineas * max(0, len(lineas) - 1)
+
+    cy = int(target_h * (pos_y_pct / 100.0))
+    cx = int(target_w * (pos_x_pct / 100.0))
 
     c_fondo_rgb = COLORES_FONDO_OVERLAY.get(fondo_raw)
     c_txt_rgb = COLORES_TEXTO_OVERLAY.get(color_raw, (255, 255, 255))
-
-    pad_x = max(16, int(tam_real * 0.45))
-    pad_y = max(10, int(tam_real * 0.30))
 
     if c_fondo_rgb is not None:
         if ancho_completo:
             box_w = target_w
             bx0 = 0
         else:
-            box_w = max(20, tw + pad_x * 2)
-            bx0 = cx - (box_w // 2)
-        box_h = max(20, th + pad_y * 2)
-        by0 = cy - (box_h // 2)
+            box_w = max(20, max_line_w + pad_x * 2)
+            bx0 = max(0, min(target_w - box_w, cx - (box_w // 2)))
+        box_h = max(20, total_text_h + pad_y * 2)
+        by0 = max(0, min(target_h - box_h, cy - (box_h // 2)))
 
         patch = Image.new("RGBA", (box_w, box_h), (0, 0, 0, 0))
         draw_p = ImageDraw.Draw(patch)
         draw_p.rounded_rectangle([0, 0, box_w, box_h], radius=max(4, int(10 * escala_lienzo)), fill=(*c_fondo_rgb, 255))
-        tx = (box_w - tw) // 2 - bbox[0]
-        ty = (box_h - th) // 2 - bbox[1]
-        draw_p.text((tx, ty), texto, font=fnt, fill=c_txt_rgb)
+        y_cursor = pad_y
+        for l, (lw, lh, off_x, off_y) in zip(lineas, line_metrics):
+            if l:
+                tx = (box_w - lw) // 2 - off_x
+                ty = y_cursor - off_y
+                draw_p.text((tx, ty), l, font=fnt, fill=c_txt_rgb)
+            y_cursor += lh + espaciado_lineas
     else:
         stk = max(2, int(tam_real * 0.08))
-        box_w = max(20, tw + (pad_x + stk) * 2)
-        box_h = max(20, th + (pad_y + stk) * 2)
-        bx0 = cx - (box_w // 2)
-        by0 = cy - (box_h // 2)
+        box_w = max(20, max_line_w + (pad_x + stk) * 2)
+        box_h = max(20, total_text_h + (pad_y + stk) * 2)
+        bx0 = max(0, min(target_w - box_w, cx - (box_w // 2)))
+        by0 = max(0, min(target_h - box_h, cy - (box_h // 2)))
 
         patch = Image.new("RGBA", (box_w, box_h), (0, 0, 0, 0))
         draw_p = ImageDraw.Draw(patch)
-        tx = (box_w - tw) // 2 - bbox[0]
-        ty = (box_h - th) // 2 - bbox[1]
-        draw_p.text((tx, ty), texto, font=fnt, fill=c_txt_rgb, stroke_width=stk, stroke_fill=(0, 0, 0, 255))
+        y_cursor = pad_y + stk
+        for l, (lw, lh, off_x, off_y) in zip(lineas, line_metrics):
+            if l:
+                tx = (box_w - lw) // 2 - off_x
+                ty = y_cursor - off_y
+                draw_p.text((tx, ty), l, font=fnt, fill=c_txt_rgb, stroke_width=stk, stroke_fill=(0, 0, 0, 255))
+            y_cursor += lh + espaciado_lineas
 
     patch_np = np.array(patch, dtype=np.uint8)
 

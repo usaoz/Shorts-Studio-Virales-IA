@@ -4,6 +4,11 @@ Uso:  python tools/mapa.py                 -> secciones + funciones de Editor_Sh
       python tools/mapa.py widget <nombre> -> donde se crea / configura / empaqueta un widget
 Evita leer el archivo completo (4600+ lineas): pedi solo el rango que necesitas."""
 import os, re, sys, glob
+if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(RAIZ)

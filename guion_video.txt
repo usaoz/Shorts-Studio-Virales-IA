@@ -1,19 +1,15 @@
-TITULO_SUPERIOR: La abuela ms peligrosa del mundo destruy
-TITULO_YOUTUBE: ¡La abuela más peligrosa del mundo destruyó a su nieta! 👵💥 #shorts
-MODO_ENCUADRE: full
-VOLUMEN_VIDEO_ORIGINAL: 0
-ARCHIVO_SALIDA: auto
-OUTRO_LIKE: si
-DESCRIPCION_YOUTUBE: La nieta pensaba que podía burlarse de la abuela todo el día, pero terminó recibiendo la peor venganza con harina. ¿Quién es la verdadera reina del troleo familiar? #shorts #viral
+TITULO_SUPERIOR: El_Amigo_Indestructible_Roblox
+TITULO_YOUTUBE: ¡El amigo que sobrevivió a TODO trauma! 💀🔥 #shorts
+DESCRIPCION_YOUTUBE: No importa lo que le pase a este personaje, siempre mantiene una sonrisa indestructible. ¿Tienes un amigo que ha pasado de todo y sigue siendo la mejor persona? #shorts #viral #roblox
 ESTADO_PUBLICACION: privado
-SCHEDULE: 2026-11-03 20:00
+SCHEDULE: 2026-11-04 20:30
 PARA_NINOS: no
+MODO_ENCUADRE: full
 TONO_VIDEO: fondo
+ARCHIVO_SALIDA: auto
 
 [GUION]
 TIEMPO | EFECTO | SFX | EMOJI | FLECHA | CIRCULO | ALTURA | TEXTO
-00:00 - 00:05 | zoom_impacto | crowd_shocked | sorprendido:derecha | ninguna | ninguno | 70% | ¡Esta chica creía que podía trolear a su abuela en el ping pong sin pagar las consecuencias!
-00:05 - 00:11 | alerta_roja | riser_suction | diablo:izquierda | ninguna | ninguno | 70% | ¡Luego volvió a engañarla en el juego de piedras, pensando que esta anciana jamás se daría cuenta!
-00:11 - 00:16 | temblor | punch+xp_error | risa:derecha | derecha | ninguno | 70% | ¡Pero lo que esta nieta confiada no esperaba es que la abuela preparaba una venganza glacial!
-00:16 - 00:20 | flash | riser_suction | ojos:derecha | ninguna | ninguno | 70% | ¡Llegó la hora de comer y la dulce abuela levanta la tapa misteriosa en la mesa!
-00:20 - 00:25 | brillo_epico | cash_ting+party_horn | fiesta:derecha | ninguna | ninguno | 70% | ¡Y le revienta tremenda nube de harina en el rostro para demostrar quién manda en la familia!
+00:00 - 00:03 | zoom_impacto | crowd_shocked | sorprendido:derecha | ninguna | ninguno | 70% | ¡Ese amigo sobrevivió a todo tipo de trauma y sigue sonriendo!
+00:03 - 00:07 | alerta_roja | vine_boom+error | fuego:izquierda | ninguna | ninguno | 70% | ¡Le aplicaron mil voltios en la silla eléctrica y el tipo ni se inmutó!
+00:07 - 00:11 | temblor | kids_yeyy | fiesta:derecha | ninguna | ninguno | 70% | ¡Lo lanzaron desde un avión sin paracaídas pero sigue feliz!

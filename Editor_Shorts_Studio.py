@@ -77,6 +77,7 @@ from motor_optimizado import (
     completar_assets_automaticos_en_guion,
     comprobar_actualizacion_repo,
     ejecutar_actualizacion_repo,
+    envolver_texto_overlay,
 )
 from ui_editor_guion import VisualScriptEditor
 
@@ -5743,9 +5744,13 @@ def iniciar_aplicacion_gui() -> None:
                     return
                 try:
                     txt = str(cfg.get("texto", "")).strip()
+                    pos_x_pct = float(cfg.get("pos_x", 50.0) or 50.0)
                     pos_y_pct = float(cfg.get("pos_y", 25.0) or 25.0)
+                    ancho_renglon_pct = float(cfg.get("ancho_renglon", 85.0) or 85.0)
+                    ancho_comp = bool(cfg.get("ancho_completo", False))
+
+                    cx = (pos_x_pct / 100.0) * 270.0
                     cy = (pos_y_pct / 100.0) * 480.0
-                    cx = 135.0
 
                     font_name = str(cfg.get("font", "Impact") or "Impact")
                     tam_pt = int(cfg.get("tamano", 48) or 48)
@@ -5763,39 +5768,55 @@ def iniciar_aplicacion_gui() -> None:
                     c_txt = map_colores.get(str(cfg.get("color", "blanco")).lower(), "#ffffff")
                     fondo_raw = str(cfg.get("fondo", "negro")).lower()
                     c_bg = map_fondos.get(fondo_raw)
-                    ancho_comp = bool(cfg.get("ancho_completo", False))
 
-                    aprox_w = max(36, int(len(txt) * (tam_canvas * 0.58) + 16))
-                    aprox_h = max(16, int(tam_canvas * 1.35 + 8))
+                    pad_x = 8
+                    if ancho_comp:
+                        max_w_canvas = 270 - pad_x * 2
+                    else:
+                        max_w_canvas = max(30, int(270 * (ancho_renglon_pct / 100.0)) - pad_x * 2)
+
+                    lineas = envolver_texto_overlay(txt, font_name, tam_canvas, max_w_canvas)
+                    line_h = max(11, int(tam_canvas * 1.25))
+                    total_h = len(lineas) * line_h + 8
+
+                    char_w = max(4, int(tam_canvas * 0.58))
+                    max_line_w = max(len(l) for l in lineas) * char_w if lineas else 30
+                    box_w = 270 if ancho_comp else max(32, min(270, max_line_w + pad_x * 2))
+
+                    if ancho_comp:
+                        bx0 = 0
+                        bx1 = 270
+                    else:
+                        bx0 = max(0, min(270 - box_w, int(cx - (box_w // 2))))
+                        bx1 = bx0 + box_w
+
+                    by0 = max(0, min(480 - total_h, int(cy - (total_h // 2))))
+                    by1 = by0 + total_h
+                    center_y_start = by0 + 4 + (line_h // 2)
 
                     if c_bg is not None:
-                        if ancho_comp:
-                            bx0 = 0
-                            bx1 = 270
-                        else:
-                            bx0 = max(0, int(cx - (aprox_w // 2)))
-                            bx1 = min(270, int(cx + (aprox_w // 2)))
-                        by0 = max(0, int(cy - (aprox_h // 2)))
-                        by1 = min(480, int(cy + (aprox_h // 2)))
-
                         canvas_video.create_rectangle(
                             bx0, by0, bx1, by1,
                             fill=c_bg, outline="", tags="overlay_texto_fijo"
                         )
-                        canvas_video.create_text(
-                            cx, cy, text=txt, fill=c_txt,
-                            font=(font_name, tam_canvas, "bold"), tags="overlay_texto_fijo"
-                        )
-                    else:
-                        for ox, oy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                        for i, linea in enumerate(lineas):
+                            y_linea = center_y_start + i * line_h
                             canvas_video.create_text(
-                                cx + ox, cy + oy, text=txt, fill="#000000",
+                                cx, y_linea, text=linea, fill=c_txt,
                                 font=(font_name, tam_canvas, "bold"), tags="overlay_texto_fijo"
                             )
-                        canvas_video.create_text(
-                            cx, cy, text=txt, fill=c_txt,
-                            font=(font_name, tam_canvas, "bold"), tags="overlay_texto_fijo"
-                        )
+                    else:
+                        for i, linea in enumerate(lineas):
+                            y_linea = center_y_start + i * line_h
+                            for ox, oy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                                canvas_video.create_text(
+                                    cx + ox, y_linea + oy, text=linea, fill="#000000",
+                                    font=(font_name, tam_canvas, "bold"), tags="overlay_texto_fijo"
+                                )
+                            canvas_video.create_text(
+                                cx, y_linea, text=linea, fill=c_txt,
+                                font=(font_name, tam_canvas, "bold"), tags="overlay_texto_fijo"
+                            )
 
                     canvas_video.tag_raise("overlay_texto_fijo")
                 except Exception:
@@ -5865,6 +5886,37 @@ def iniciar_aplicacion_gui() -> None:
             on_preview_live=_overlay_pos_en_reproductor,
         )
         txt_guion_box.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 8))
+
+        _drag_overlay = {"activo": False}
+
+        def _on_overlay_press(event: Any) -> None:
+            if not hasattr(txt_guion_box, "datos_overlay") or not txt_guion_box.datos_overlay.get("activo"):
+                return
+            items = canvas_video.find_withtag("current")
+            es_ov = any("overlay_texto_fijo" in canvas_video.gettags(it) for it in items)
+            if not es_ov:
+                overlapping = canvas_video.find_overlapping(event.x - 4, event.y - 4, event.x + 4, event.y + 4)
+                es_ov = any("overlay_texto_fijo" in canvas_video.gettags(it) for it in overlapping)
+            if es_ov:
+                _drag_overlay["activo"] = True
+
+        def _on_overlay_drag(event: Any) -> None:
+            if not _drag_overlay["activo"]:
+                return
+            px = max(5.0, min(95.0, (event.x / 270.0) * 100.0))
+            py = max(5.0, min(95.0, (event.y / 480.0) * 100.0))
+            if hasattr(txt_guion_box, "mover_overlay_desde_canvas"):
+                txt_guion_box.mover_overlay_desde_canvas(px, py)
+
+        def _on_overlay_release(event: Any) -> None:
+            if _drag_overlay["activo"]:
+                _drag_overlay["activo"] = False
+                if hasattr(txt_guion_box, "_actualizar_raw_interno"):
+                    txt_guion_box._actualizar_raw_interno()
+
+        canvas_video.bind("<ButtonPress-1>", _on_overlay_press, add="+")
+        canvas_video.bind("<B1-Motion>", _on_overlay_drag, add="+")
+        canvas_video.bind("<ButtonRelease-1>", _on_overlay_release, add="+")
 
         if ruta_guion.exists():
             try:
