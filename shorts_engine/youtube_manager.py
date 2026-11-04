@@ -59,79 +59,137 @@ def descargar_video_youtube(url: str, cancelar_check: Optional[Callable[[], bool
     ULTIMA_INFO_YTDLP["titulo"] = ""
     ULTIMA_INFO_YTDLP["descripcion"] = ""
 
-    for existente in BASE_DIR.glob("video_input.*"):
+    import gc
+    gc.collect()
+
+    nombre_base_out = "video_input"
+    for existente in BASE_DIR.glob("video_input*.*"):
+        if not existente.name.endswith(".json"):
+            try:
+                existente.unlink()
+            except OSError:
+                pass
+
+    # Si video_input.mp4 sigue existiendo retenido en Windows (ej. reproductor previo):
+    if DEFAULT_VIDEO_INPUT.exists():
         try:
-            existente.unlink()
+            with open(DEFAULT_VIDEO_INPUT, "a"):
+                pass
         except OSError:
-            pass
+            nombre_base_out = f"video_input_{int(time.time())}"
+
+    m_id = re.search(r"(?:shorts/|v=|youtu\.be/)([A-Za-z0-9_-]{11})", url_limpia)
+    url_canonical = f"https://www.youtube.com/watch?v={m_id.group(1)}" if m_id else url_limpia
 
     ejecutable_ytdlp = shutil.which("yt-dlp")
-    if ejecutable_ytdlp:
-        cmd_base = [ejecutable_ytdlp]
-    else:
-        cmd_base = [sys.executable, "-m", "yt_dlp"]
-
+    cmd_base = [ejecutable_ytdlp] if ejecutable_ytdlp else [sys.executable, "-m", "yt_dlp"]
     args_js = ["--js-runtimes", "node"] if shutil.which("node") else []
 
-    cmd = [
-        *cmd_base,
-        *args_js,
-        "--remote-components", "ejs:github",
-        "--write-info-json",
-        "-f", "bv*+ba/best",
-        "--merge-output-format", "mp4",
-        "-S", "res:1080,fps:60,br",
-        "--concurrent-fragments", "8",
-        "--buffer-size", "64K",
-        "--socket-timeout", "12",
-        "-o", "video_input.%(ext)s",
-        url_limpia,
+    planes_intento = [
+        # Plan 1: Calidad 1080p con JS runtime si existe
+        [
+            *cmd_base,
+            *args_js,
+            "--write-info-json",
+            "-f", "bv*+ba/best",
+            "--merge-output-format", "mp4",
+            "-S", "res:1080,fps:60,br",
+            "--concurrent-fragments", "8",
+            "--buffer-size", "64K",
+            "--socket-timeout", "15",
+            "-o", f"{nombre_base_out}.%(ext)s",
+            url_limpia,
+        ],
+        # Plan 2: Compatibilidad universal sobre URL canónica
+        [
+            *cmd_base,
+            "--write-info-json",
+            "-f", "bestvideo+bestaudio/best",
+            "--merge-output-format", "mp4",
+            "--socket-timeout", "20",
+            "-o", f"{nombre_base_out}.%(ext)s",
+            url_canonical,
+        ],
+        # Plan 3: Single stream directo resiliente
+        [
+            *cmd_base,
+            "--no-check-certificates",
+            "-f", "b/best",
+            "--socket-timeout", "25",
+            "-o", f"{nombre_base_out}.%(ext)s",
+            url_canonical,
+        ],
     ]
 
     print("=" * 78)
     print(f"[*] Descargando video de YouTube con yt-dlp: {url_limpia}")
     print("=" * 78)
 
-    proc = subprocess.Popen(
-        cmd,
-        cwd=str(BASE_DIR),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        creationflags=WIN_NO_WINDOW,
-        startupinfo=WIN_STARTUPINFO,
-    )
+    descarga_exitosa = False
+    ultimo_err_code = 1
+    ultimas_lineas_err: List[str] = []
 
-    def _vigilante_descarga():
-        while proc.poll() is None:
-            if cancelar_check and cancelar_check():
-                _matar_arbol_proceso(proc)
-                break
-            time.sleep(0.1)
+    for idx_plan, cmd in enumerate(planes_intento):
+        if cancelar_check and cancelar_check():
+            raise InterruptedError("Descarga cancelada por el usuario.")
 
-    if cancelar_check:
-        threading.Thread(target=_vigilante_descarga, daemon=True).start()
+        if idx_plan > 0:
+            print(f"[*] Reintentando descarga de YouTube con plan #{idx_plan + 1}...")
 
-    if proc.stdout:
-        for linea in proc.stdout:
-            if cancelar_check and cancelar_check():
-                _matar_arbol_proceso(proc)
-                raise InterruptedError("Descarga cancelada por el usuario.")
-            linea_s = linea.rstrip()
-            if linea_s:
-                print(f"[yt-dlp] {linea_s}")
-    proc.wait()
+        proc = subprocess.Popen(
+            cmd,
+            cwd=str(BASE_DIR),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            creationflags=WIN_NO_WINDOW,
+            startupinfo=WIN_STARTUPINFO,
+        )
 
-    if cancelar_check and cancelar_check():
-        _matar_arbol_proceso(proc)
-        raise InterruptedError("Descarga cancelada por el usuario.")
+        def _vigilante_descarga():
+            while proc.poll() is None:
+                if cancelar_check and cancelar_check():
+                    _matar_arbol_proceso(proc)
+                    break
+                time.sleep(0.1)
 
-    if proc.returncode != 0:
-        raise RuntimeError(f"yt-dlp terminó con código {proc.returncode}. Verifica que el link de YouTube sea válido.")
+        if cancelar_check:
+            threading.Thread(target=_vigilante_descarga, daemon=True).start()
 
-    info_json_path = BASE_DIR / "video_input.info.json"
+        ultimas_lineas_err.clear()
+        if proc.stdout:
+            for linea in proc.stdout:
+                if cancelar_check and cancelar_check():
+                    _matar_arbol_proceso(proc)
+                    raise InterruptedError("Descarga cancelada por el usuario.")
+                linea_s = linea.rstrip()
+                if linea_s:
+                    ultimas_lineas_err.append(linea_s)
+                    if len(ultimas_lineas_err) > 30:
+                        ultimas_lineas_err.pop(0)
+                    print(f"[yt-dlp] {linea_s}")
+        proc.wait()
+
+        if cancelar_check and cancelar_check():
+            _matar_arbol_proceso(proc)
+            raise InterruptedError("Descarga cancelada por el usuario.")
+
+        if proc.returncode == 0:
+            descarga_exitosa = True
+            break
+        else:
+            ultimo_err_code = proc.returncode
+
+    if not descarga_exitosa:
+        lineas_clave = [l for l in ultimas_lineas_err if "ERROR" in l or "WARNING" in l]
+        err_msg = "\n".join(lineas_clave[-3:]) if lineas_clave else ("\n".join(ultimas_lineas_err[-3:]) if ultimas_lineas_err else "Error de conexión con YouTube.")
+        raise RuntimeError(f"yt-dlp terminó con código {ultimo_err_code}. Verifica que el link sea accesible en YouTube.\nDetalle: {err_msg}")
+
+    info_json_path = BASE_DIR / f"{nombre_base_out}.info.json"
+    if not info_json_path.exists():
+        info_json_path = BASE_DIR / "video_input.info.json"
     if info_json_path.exists():
         try:
             datos_info = json.loads(info_json_path.read_text(encoding="utf-8", errors="replace"))
@@ -141,10 +199,15 @@ def descargar_video_youtube(url: str, cancelar_check: Optional[Callable[[], bool
             pass
 
     ruta_res: Optional[Path] = None
-    if DEFAULT_VIDEO_INPUT.exists():
+    archivo_esperado = BASE_DIR / f"{nombre_base_out}.mp4"
+    if archivo_esperado.exists():
+        ruta_res = archivo_esperado
+    elif DEFAULT_VIDEO_INPUT.exists():
         ruta_res = DEFAULT_VIDEO_INPUT
     else:
-        descargados = [p for p in sorted(BASE_DIR.glob("video_input.*")) if not p.name.endswith(".json")]
+        descargados = [p for p in sorted(BASE_DIR.glob(f"{nombre_base_out}.*")) if not p.name.endswith(".json")]
+        if not descargados:
+            descargados = [p for p in sorted(BASE_DIR.glob("video_input*.*")) if not p.name.endswith(".json")]
         if descargados:
             ruta_res = descargados[0]
 

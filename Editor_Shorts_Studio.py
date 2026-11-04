@@ -6591,10 +6591,52 @@ def iniciar_aplicacion_gui() -> None:
                             if vistas_orig > 0
                             else f"{pref_lote}Descargando video de YouTube en máxima calidad...",
                         )
-                        ruta_video_usar = descargar_video_youtube(
-                            url_descargar,
-                            cancelar_check=lambda: evento_cancelar.is_set(),
-                        )
+                        max_intentos_dl = 4 if es_modo_canales else 1
+                        intento_dl = 0
+                        ruta_video_usar = None
+                        url_intento_actual = url_descargar
+
+                        while intento_dl < max_intentos_dl:
+                            try:
+                                ruta_video_usar = descargar_video_youtube(
+                                    url_intento_actual,
+                                    cancelar_check=lambda: evento_cancelar.is_set(),
+                                )
+                                break
+                            except InterruptedError:
+                                raise
+                            except Exception as e_dl:
+                                intento_dl += 1
+                                print(f"[!] Falló descarga de {url_intento_actual}: {e_dl}")
+                                if es_modo_canales and intento_dl < max_intentos_dl:
+                                    descartar_video_para_siempre(url_intento_actual, cuenta_id=info_sel.get("cuenta_id"))
+                                    canal_reintento = str(info_sel.get("canal") or "").strip() or (lista_canales[0] if lista_canales else "")
+                                    _set_subprogreso(
+                                        0.10,
+                                        f"{pref_lote}Short no disponible. Buscando otro en {etiqueta_corta_canal(canal_reintento)}...",
+                                        "#facc15",
+                                    )
+                                    reemplazo = buscar_short_viral_en_canal(
+                                        canal_reintento,
+                                        min_views=min_v,
+                                        estricto_min_views=False,
+                                        cuenta_id=info_sel.get("cuenta_id"),
+                                        ids_excluir=ids_reservados_sesion,
+                                        cancelar_check=lambda: evento_cancelar.is_set(),
+                                    )
+                                    if reemplazo:
+                                        url_intento_actual, titulo_orig, vistas_orig = reemplazo
+                                        ids_reservados_sesion.append(url_intento_actual)
+                                        info_sel["url"] = url_intento_actual
+                                        info_sel["titulo_orig"] = titulo_orig
+                                        info_sel["vistas"] = vistas_orig
+                                        _set_subprogreso(
+                                            0.12,
+                                            f"{pref_lote}Descargando '{titulo_orig[:38]}...' ({vistas_orig:,} vistas)",
+                                        )
+                                        continue
+                                raise
+
                         if evento_cancelar.is_set():
                             raise InterruptedError("Operación detenida por el usuario tras descargar el video.")
                         if ULTIMA_INFO_YTDLP.get("titulo"):
@@ -6892,10 +6934,42 @@ def iniciar_aplicacion_gui() -> None:
                                         _actualizar_milestone_actual("activo", f"Reel {num_actual}: Descargando...")
                                         _set_subprogreso(0.10, f"{pref_lote}Descargando nuevo Short: '{titulo_orig[:36]}...'")
                                         root.after(0, lambda p=pref_lote: btn_auto_1clic.configure(text=f"{p}DESCARGANDO NUEVO SHORT..."))
-                                        ruta_video_usar = descargar_video_youtube(
-                                            url_descargar,
-                                            cancelar_check=lambda: evento_cancelar.is_set(),
-                                        )
+                                        max_intentos_dl_otro = 3 if es_modo_canales else 1
+                                        intento_dl_otro = 0
+                                        ruta_video_usar = None
+                                        url_dl_otro = url_descargar
+                                        while intento_dl_otro < max_intentos_dl_otro:
+                                            try:
+                                                ruta_video_usar = descargar_video_youtube(
+                                                    url_dl_otro,
+                                                    cancelar_check=lambda: evento_cancelar.is_set(),
+                                                )
+                                                break
+                                            except InterruptedError:
+                                                raise
+                                            except Exception as e_dl_o:
+                                                intento_dl_otro += 1
+                                                print(f"[!] Falló descarga de {url_dl_otro}: {e_dl_o}")
+                                                if es_modo_canales and intento_dl_otro < max_intentos_dl_otro:
+                                                    descartar_video_para_siempre(url_dl_otro, cuenta_id=info_sel.get("cuenta_id"))
+                                                    c_reint = str(info_sel.get("canal") or "").strip() or (lista_canales[0] if lista_canales else "")
+                                                    remp = buscar_short_viral_en_canal(
+                                                        c_reint,
+                                                        min_views=min_v,
+                                                        estricto_min_views=False,
+                                                        cuenta_id=info_sel.get("cuenta_id"),
+                                                        ids_excluir=ids_reservados_sesion,
+                                                        cancelar_check=lambda: evento_cancelar.is_set(),
+                                                    )
+                                                    if remp:
+                                                        url_dl_otro, titulo_orig, vistas_orig = remp
+                                                        ids_reservados_sesion.append(url_dl_otro)
+                                                        info_sel["url"] = url_dl_otro
+                                                        info_sel["titulo_orig"] = titulo_orig
+                                                        info_sel["vistas"] = vistas_orig
+                                                        continue
+                                                raise
+
                                         if evento_cancelar.is_set():
                                             raise InterruptedError("Operación detenida por el usuario tras descargar el video.")
                                         if ULTIMA_INFO_YTDLP.get("titulo"):
