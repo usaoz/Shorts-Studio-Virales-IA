@@ -406,6 +406,15 @@ def cargar_guion_video(ruta_guion: Path) -> ConfigGuion:
     # Formato de texto estructurado separado por '|'
     en_guion = False
     tiene_col_altura = False
+    overlay_texto_dict = {
+        "texto": "",
+        "fondo": "negro",
+        "color": "blanco",
+        "tamano": 48,
+        "font": "Impact",
+        "pos_y": "25%",
+        "ancho_completo": False,
+    }
     for linea in contenido.splitlines():
         limpia = linea.strip()
         if not limpia or limpia.startswith("#") or limpia.startswith("//"):
@@ -478,6 +487,28 @@ def cargar_guion_video(ruta_guion: Path) -> ConfigGuion:
                     for w in v_str.split(","):
                         if w.strip():
                             config.palabras_rojas_extra.add(w.strip().upper())
+                elif k_up == "PALABRAS_CIAN":
+                    for w in v_str.split(","):
+                        if w.strip():
+                            config.palabras_cian_extra.add(w.strip().upper())
+                elif k_up in ("OVERLAY_TEXTO", "TEXTO_OVERLAY", "TEXTO_FIJO", "BANNER_TEXTO"):
+                    overlay_texto_dict["texto"] = v_str
+                elif k_up in ("OVERLAY_FONDO", "FONDO_OVERLAY", "FONDO_TEXTO_FIJO"):
+                    overlay_texto_dict["fondo"] = v_str
+                elif k_up in ("OVERLAY_COLOR", "COLOR_OVERLAY", "COLOR_TEXTO_FIJO"):
+                    overlay_texto_dict["color"] = v_str
+                elif k_up in ("OVERLAY_TAMANO", "OVERLAY_SIZE", "TAMANO_TEXTO_FIJO"):
+                    try:
+                        overlay_texto_dict["tamano"] = int(float(v_str))
+                    except ValueError:
+                        pass
+                elif k_up in ("OVERLAY_FONT", "OVERLAY_FUENTE", "FUENTE_OVERLAY"):
+                    overlay_texto_dict["font"] = v_str
+                elif k_up in ("OVERLAY_POS_Y", "OVERLAY_Y", "POS_Y_OVERLAY", "ALTURA_TEXTO_FIJO"):
+                    overlay_texto_dict["pos_y"] = v_str
+                elif k_up in ("OVERLAY_ANCHO_COMPLETO", "OVERLAY_FRANJA_COMPLETA"):
+                    v_clean = _quitar_acentos(v_str.lower())
+                    overlay_texto_dict["ancho_completo"] = v_clean in ("si", "true", "yes", "1", "completo")
             continue
 
         partes = [p.strip() for p in limpia.split("|")]
@@ -592,6 +623,9 @@ def cargar_guion_video(ruta_guion: Path) -> ConfigGuion:
                     y_subtitulos=y_sub_seg,
                 )
             )
+
+    if overlay_texto_dict.get("texto", "").strip():
+        config.overlay_texto_cfg = overlay_texto_dict
 
     return config
 

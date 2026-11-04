@@ -5728,13 +5728,80 @@ def iniciar_aplicacion_gui() -> None:
                 except Exception:
                     pass
 
-        def _overlay_pos_en_reproductor(x_pct, y_pct, tipo, tam, rot, alt_pct=None) -> None:
+        def _overlay_pos_en_reproductor(x_pct=None, y_pct=None, tipo=None, tam=None, rot=None, alt_pct=None) -> None:
             if x_pct == "seek":
                 try:
                     _seek_en_reproductor(float(y_pct))
                 except Exception:
                     pass
                 return
+
+            if x_pct == "overlay_texto":
+                canvas_video.delete("overlay_texto_fijo")
+                cfg = y_pct
+                if not cfg or not isinstance(cfg, dict) or not cfg.get("activo") or not str(cfg.get("texto", "")).strip():
+                    return
+                try:
+                    txt = str(cfg.get("texto", "")).strip()
+                    pos_y_pct = float(cfg.get("pos_y", 25.0) or 25.0)
+                    cy = (pos_y_pct / 100.0) * 480.0
+                    cx = 135.0
+
+                    font_name = str(cfg.get("font", "Impact") or "Impact")
+                    tam_pt = int(cfg.get("tamano", 48) or 48)
+                    tam_canvas = max(8, int(tam_pt * (270.0 / 1080.0)))
+
+                    map_colores = {
+                        "blanco": "#ffffff", "negro": "#0f0f0f", "amarillo": "#fde047",
+                        "rojo": "#ef4444", "cian": "#38bdf8", "verde": "#22c55e", "naranja": "#f97316"
+                    }
+                    map_fondos = {
+                        "negro": "#000000", "blanco": "#ffffff", "rojo": "#b91c1c",
+                        "azul": "#1d4ed8", "amarillo": "#eab308", "verde": "#15803d"
+                    }
+
+                    c_txt = map_colores.get(str(cfg.get("color", "blanco")).lower(), "#ffffff")
+                    fondo_raw = str(cfg.get("fondo", "negro")).lower()
+                    c_bg = map_fondos.get(fondo_raw)
+                    ancho_comp = bool(cfg.get("ancho_completo", False))
+
+                    aprox_w = max(36, int(len(txt) * (tam_canvas * 0.58) + 16))
+                    aprox_h = max(16, int(tam_canvas * 1.35 + 8))
+
+                    if c_bg is not None:
+                        if ancho_comp:
+                            bx0 = 0
+                            bx1 = 270
+                        else:
+                            bx0 = max(0, int(cx - (aprox_w // 2)))
+                            bx1 = min(270, int(cx + (aprox_w // 2)))
+                        by0 = max(0, int(cy - (aprox_h // 2)))
+                        by1 = min(480, int(cy + (aprox_h // 2)))
+
+                        canvas_video.create_rectangle(
+                            bx0, by0, bx1, by1,
+                            fill=c_bg, outline="", tags="overlay_texto_fijo"
+                        )
+                        canvas_video.create_text(
+                            cx, cy, text=txt, fill=c_txt,
+                            font=(font_name, tam_canvas, "bold"), tags="overlay_texto_fijo"
+                        )
+                    else:
+                        for ox, oy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                            canvas_video.create_text(
+                                cx + ox, cy + oy, text=txt, fill="#000000",
+                                font=(font_name, tam_canvas, "bold"), tags="overlay_texto_fijo"
+                            )
+                        canvas_video.create_text(
+                            cx, cy, text=txt, fill=c_txt,
+                            font=(font_name, tam_canvas, "bold"), tags="overlay_texto_fijo"
+                        )
+
+                    canvas_video.tag_raise("overlay_texto_fijo")
+                except Exception:
+                    pass
+                return
+
             canvas_video.delete("overlay_pos")
             if (x_pct is None and alt_pct is None) or (not tipo and alt_pct is None):
                 return
@@ -5803,6 +5870,7 @@ def iniciar_aplicacion_gui() -> None:
             try:
                 txt_guion_raw = ruta_guion.read_text(encoding="utf-8", errors="replace")
                 txt_guion_box.insert("1.0", txt_guion_raw)
+                txt_guion_box.notificar_overlay_live()
 
                 tono_leido = txt_guion_box.metadatos_ocultos.get("TONO_VIDEO", "").strip()
                 if tono_leido:
@@ -5962,6 +6030,7 @@ def iniciar_aplicacion_gui() -> None:
                         canvas_video.image = photo
                         canvas_video.tag_lower("frame_video")
                         canvas_video.tag_raise("overlay_pos")
+                        canvas_video.tag_raise("overlay_texto_fijo")
                     except Exception:
                         pass
 

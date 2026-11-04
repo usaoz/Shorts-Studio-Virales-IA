@@ -173,6 +173,7 @@ class ConfigGuion:
     palabras_verdes_extra: Set[str] = field(default_factory=set)
     palabras_rojas_extra: Set[str] = field(default_factory=set)
     palabras_cian_extra: Set[str] = field(default_factory=set)
+    overlay_texto_cfg: Optional[Dict[str, Any]] = None
     segmentos: List[SegmentoVideoGuion] = field(default_factory=list)
 
 @dataclass

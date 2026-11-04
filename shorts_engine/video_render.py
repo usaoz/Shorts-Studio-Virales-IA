@@ -42,6 +42,7 @@ from motor_optimizado import (
     realzar_frame_viral,
     parsear_directiva_asset_manual,
     sincronizar_guion_renderizado_en_disco,
+    renderizar_overlay_texto_fijo,
 )
 
 # ==============================================================================
@@ -1906,6 +1907,10 @@ async def editar_video_con_guion(
                         estilo_subtitulos=estilo_subtitulos,
                     )
 
+                    # 5) Texto superpuesto permanente (tapar marcas/texto o cartel fijo)
+                    if getattr(config, "overlay_texto_cfg", None):
+                        renderizar_overlay_texto_fijo(lienzo, config.overlay_texto_cfg)
+
                     if proceso_ffmpeg.poll() is not None:
                         try:
                             if proceso_ffmpeg.stdin:
@@ -2001,6 +2006,10 @@ async def editar_video_con_guion(
                         palabras_verdes_extra={"LIKE!", "LIKE"},
                         estilo_subtitulos=estilo_subtitulos,
                     )
+
+                    # Texto superpuesto permanente durante todo el video
+                    if getattr(config, "overlay_texto_cfg", None):
+                        renderizar_overlay_texto_fijo(lienzo_out, config.overlay_texto_cfg)
 
                     if proceso_ffmpeg.poll() is not None:
                         try:

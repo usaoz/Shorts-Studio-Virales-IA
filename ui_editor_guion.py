@@ -1433,18 +1433,33 @@ class VisualScriptEditor(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
+        self.grid_rowconfigure(1, weight=0)
+        self.grid_rowconfigure(2, weight=1)
+
         self.metadatos_ocultos: Dict[str, str] = {
             "MODO_ENCUADRE": "full",
             "VOLUMEN_VIDEO_ORIGINAL": "0",
             "ARCHIVO_SALIDA": "auto",
             "OUTRO_LIKE": "si",
         }
+        self.datos_overlay: Dict[str, Any] = {
+            "activo": False,
+            "texto": "",
+            "fondo": "Negro",
+            "color": "Blanco",
+            "font": "Impact",
+            "tamano": 48,
+            "pos_y": 25,
+            "ancho_completo": False,
+        }
+        self.panel_overlay_visible = False
         self.bloques: List[Dict] = []
         self.cards: List[BloqueGuionCard] = []
         self._modo_raw = False
         self.modo_profundo = True
 
         self._build_header()
+        self._build_overlay_panel()
         self._build_body()
 
     def _build_header(self):
@@ -1459,13 +1474,22 @@ class VisualScriptEditor(ctk.CTkFrame):
         self.entry_titulo.grid(row=0, column=0, padx=(10, 6), pady=8, sticky="ew")
         self.entry_titulo.bind("<KeyRelease>", lambda _: self._actualizar_raw_interno())
 
+        self.btn_toggle_overlay = ctk.CTkButton(
+            header, text="🏷️ Texto Video", width=120, height=28,
+            fg_color="#1e293b", hover_color="#334155",
+            border_width=1, border_color="#252B3D",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            command=self._toggle_panel_overlay
+        )
+        self.btn_toggle_overlay.grid(row=0, column=1, padx=4, pady=8)
+
         btn_add = ctk.CTkButton(
             header, text="＋ Nuevo Bloque", width=120, height=28,
             fg_color="#0284c7", hover_color="#0369a1",
             font=ctk.CTkFont(size=11, weight="bold"),
             command=self._agregar_bloque_arriba
         )
-        btn_add.grid(row=0, column=1, padx=4, pady=8)
+        btn_add.grid(row=0, column=2, padx=4, pady=8)
 
         self.btn_toggle_raw = ctk.CTkButton(
             header, text="📝 Texto Crudo", width=105, height=28,
@@ -1473,11 +1497,318 @@ class VisualScriptEditor(ctk.CTkFrame):
             font=ctk.CTkFont(size=11),
             command=self._toggle_vista
         )
-        self.btn_toggle_raw.grid(row=0, column=2, padx=8, pady=8)
+        self.btn_toggle_raw.grid(row=0, column=3, padx=8, pady=8)
+
+    def _build_overlay_panel(self):
+        self.frame_overlay = ctk.CTkFrame(
+            self, fg_color="#101522", corner_radius=10, border_width=1, border_color="#1f293d"
+        )
+        self.frame_overlay.grid_columnconfigure(1, weight=1)
+
+        # Fila 0: Switch de activación, título y botón cerrar
+        row0 = ctk.CTkFrame(self.frame_overlay, fg_color="transparent")
+        row0.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(8, 4))
+        row0.grid_columnconfigure(1, weight=1)
+
+        self.sw_overlay_activo = ctk.CTkSwitch(
+            row0,
+            text="Activar texto permanente en el video",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            progress_color="#10b981",
+            command=self._on_overlay_control_changed,
+        )
+        self.sw_overlay_activo.grid(row=0, column=0, sticky="w")
+
+        lbl_hint = ctk.CTkLabel(
+            row0,
+            text="(Dura todo el video · Ideal para tapar texto previo, marcas o carteles)",
+            font=ctk.CTkFont(size=11),
+            text_color="#94a3b8",
+        )
+        lbl_hint.grid(row=0, column=1, sticky="w", padx=8)
+
+        btn_cerrar = ctk.CTkButton(
+            row0,
+            text="▲ Ocultar panel",
+            width=90,
+            height=24,
+            fg_color="#1e2538",
+            hover_color="#2b354f",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            command=self._toggle_panel_overlay,
+        )
+        btn_cerrar.grid(row=0, column=2, sticky="e")
+
+        # Fila 1: Entry de texto + Checkbox franja 100% ancho
+        row1 = ctk.CTkFrame(self.frame_overlay, fg_color="transparent")
+        row1.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=4)
+        row1.grid_columnconfigure(1, weight=1)
+
+        lbl_txt = ctk.CTkLabel(
+            row1, text="Texto:", font=ctk.CTkFont(size=11, weight="bold"), text_color="#cbd5e1"
+        )
+        lbl_txt.grid(row=0, column=0, sticky="w", padx=(0, 6))
+
+        self.entry_overlay_texto = ctk.CTkEntry(
+            row1,
+            height=28,
+            font=ctk.CTkFont(size=12),
+            placeholder_text="Escribí acá el texto para tapar o mostrar durante todo el video...",
+        )
+        self.entry_overlay_texto.grid(row=0, column=1, sticky="ew", padx=(0, 10))
+        self.entry_overlay_texto.bind("<KeyRelease>", lambda _: self._on_overlay_control_changed())
+
+        self.chk_overlay_ancho = ctk.CTkCheckBox(
+            row1,
+            text="Franja completa (100% ancho)",
+            font=ctk.CTkFont(size=11),
+            command=self._on_overlay_control_changed,
+        )
+        self.chk_overlay_ancho.grid(row=0, column=2, sticky="e")
+
+        # Fila 2: Controles visuales (Fondo, Color texto, Fuente, Tamaño, Posición Y)
+        row2 = ctk.CTkFrame(self.frame_overlay, fg_color="transparent")
+        row2.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(4, 8))
+
+        ctk.CTkLabel(row2, text="Fondo:", font=ctk.CTkFont(size=11, weight="bold"), text_color="#94a3b8").pack(
+            side="left", padx=(0, 4)
+        )
+        self.opt_overlay_fondo = ctk.CTkOptionMenu(
+            row2,
+            values=["Negro", "Blanco", "Rojo", "Azul", "Amarillo", "Verde", "Sin Fondo"],
+            width=95,
+            height=26,
+            font=ctk.CTkFont(size=11),
+            command=lambda _: self._on_overlay_control_changed(),
+        )
+        self.opt_overlay_fondo.set("Negro")
+        self.opt_overlay_fondo.pack(side="left", padx=(0, 10))
+
+        ctk.CTkLabel(row2, text="Color:", font=ctk.CTkFont(size=11, weight="bold"), text_color="#94a3b8").pack(
+            side="left", padx=(0, 4)
+        )
+        self.opt_overlay_color = ctk.CTkOptionMenu(
+            row2,
+            values=["Blanco", "Amarillo", "Negro", "Rojo", "Cian", "Verde"],
+            width=95,
+            height=26,
+            font=ctk.CTkFont(size=11),
+            command=lambda _: self._on_overlay_control_changed(),
+        )
+        self.opt_overlay_color.set("Blanco")
+        self.opt_overlay_color.pack(side="left", padx=(0, 10))
+
+        ctk.CTkLabel(row2, text="Fuente:", font=ctk.CTkFont(size=11, weight="bold"), text_color="#94a3b8").pack(
+            side="left", padx=(0, 4)
+        )
+        self.opt_overlay_font = ctk.CTkOptionMenu(
+            row2,
+            values=["Impact", "MrBeast", "Arial", "Segoe UI", "Trebuchet MS"],
+            width=105,
+            height=26,
+            font=ctk.CTkFont(size=11),
+            command=lambda _: self._on_overlay_control_changed(),
+        )
+        self.opt_overlay_font.set("Impact")
+        self.opt_overlay_font.pack(side="left", padx=(0, 10))
+
+        ctk.CTkLabel(row2, text="Tamaño:", font=ctk.CTkFont(size=11, weight="bold"), text_color="#94a3b8").pack(
+            side="left", padx=(0, 4)
+        )
+        self.lbl_tam_overlay_val = ctk.CTkLabel(
+            row2, text="48 pt", width=36, font=ctk.CTkFont(size=11, weight="bold"), text_color="#38bdf8"
+        )
+        self.lbl_tam_overlay_val.pack(side="left", padx=(0, 4))
+        self.slider_overlay_tamano = ctk.CTkSlider(
+            row2,
+            from_=20,
+            to=110,
+            number_of_steps=90,
+            width=85,
+            height=16,
+            command=self._on_slider_tamano_overlay,
+        )
+        self.slider_overlay_tamano.set(48)
+        self.slider_overlay_tamano.pack(side="left", padx=(0, 12))
+
+        ctk.CTkLabel(row2, text="Pos Y:", font=ctk.CTkFont(size=11, weight="bold"), text_color="#94a3b8").pack(
+            side="left", padx=(0, 4)
+        )
+        self.lbl_pos_overlay_val = ctk.CTkLabel(
+            row2, text="25%", width=32, font=ctk.CTkFont(size=11, weight="bold"), text_color="#fde047"
+        )
+        self.lbl_pos_overlay_val.pack(side="left", padx=(0, 4))
+        self.slider_overlay_pos_y = ctk.CTkSlider(
+            row2,
+            from_=5,
+            to=95,
+            number_of_steps=90,
+            width=85,
+            height=16,
+            command=self._on_slider_pos_overlay,
+        )
+        self.slider_overlay_pos_y.set(25)
+        self.slider_overlay_pos_y.pack(side="left", padx=(0, 8))
+
+        f_presets = ctk.CTkFrame(row2, fg_color="transparent")
+        f_presets.pack(side="left", padx=(0, 4))
+        ctk.CTkButton(
+            f_presets,
+            text="Arriba",
+            width=46,
+            height=22,
+            fg_color="#1b2234",
+            hover_color="#28324e",
+            font=ctk.CTkFont(size=10),
+            command=lambda: self._set_pos_y_preset(15),
+        ).pack(side="left", padx=1)
+        ctk.CTkButton(
+            f_presets,
+            text="Centro",
+            width=48,
+            height=22,
+            fg_color="#1b2234",
+            hover_color="#28324e",
+            font=ctk.CTkFont(size=10),
+            command=lambda: self._set_pos_y_preset(50),
+        ).pack(side="left", padx=1)
+        ctk.CTkButton(
+            f_presets,
+            text="Abajo",
+            width=46,
+            height=22,
+            fg_color="#1b2234",
+            hover_color="#28324e",
+            font=ctk.CTkFont(size=10),
+            command=lambda: self._set_pos_y_preset(80),
+        ).pack(side="left", padx=1)
+
+    def _toggle_panel_overlay(self, forzar: Optional[bool] = None):
+        if forzar is not None:
+            self.panel_overlay_visible = forzar
+        else:
+            self.panel_overlay_visible = not self.panel_overlay_visible
+
+        if self.panel_overlay_visible:
+            self.frame_overlay.grid(row=1, column=0, sticky="ew", padx=4, pady=(0, 6))
+            self.btn_toggle_overlay.configure(
+                text="🏷️ Texto Video ▲",
+                fg_color="#065f46" if self.datos_overlay.get("activo") else "#1e293b",
+                border_color="#10b981" if self.datos_overlay.get("activo") else "#252B3D",
+            )
+        else:
+            self.frame_overlay.grid_remove()
+            self._refrescar_estilo_btn_overlay()
+
+    def _refrescar_estilo_btn_overlay(self):
+        if self.datos_overlay.get("activo") and self.datos_overlay.get("texto", "").strip():
+            self.btn_toggle_overlay.configure(
+                text="🏷️ Texto Video (ON)",
+                fg_color="#065f46",
+                hover_color="#047857",
+                border_color="#10b981",
+                border_width=1,
+            )
+        else:
+            self.btn_toggle_overlay.configure(
+                text="🏷️ Texto Video",
+                fg_color="#1e293b",
+                hover_color="#334155",
+                border_color="#252B3D",
+                border_width=1,
+            )
+
+    def _set_pos_y_preset(self, val: int):
+        self.slider_overlay_pos_y.set(val)
+        self._on_slider_pos_overlay(val)
+
+    def _on_slider_tamano_overlay(self, val):
+        val_int = int(round(float(val)))
+        self.lbl_tam_overlay_val.configure(text=f"{val_int} pt")
+        self._on_overlay_control_changed()
+
+    def _on_slider_pos_overlay(self, val):
+        val_int = int(round(float(val)))
+        self.lbl_pos_overlay_val.configure(text=f"{val_int}%")
+        self._on_overlay_control_changed()
+
+    def _on_overlay_control_changed(self):
+        txt = self.entry_overlay_texto.get().strip()
+        activo = bool(self.sw_overlay_activo.get())
+        fondo = self.opt_overlay_fondo.get()
+        color = self.opt_overlay_color.get()
+        font_n = self.opt_overlay_font.get()
+        tamano = int(round(self.slider_overlay_tamano.get()))
+        pos_y = int(round(self.slider_overlay_pos_y.get()))
+        ancho_comp = bool(self.chk_overlay_ancho.get())
+
+        self.datos_overlay["activo"] = activo
+        self.datos_overlay["texto"] = txt
+        self.datos_overlay["fondo"] = fondo
+        self.datos_overlay["color"] = color
+        self.datos_overlay["font"] = font_n
+        self.datos_overlay["tamano"] = tamano
+        self.datos_overlay["pos_y"] = pos_y
+        self.datos_overlay["ancho_completo"] = ancho_comp
+
+        self._refrescar_estilo_btn_overlay()
+        self.notificar_overlay_live()
+        self._actualizar_raw_interno()
+
+    def _sincronizar_ui_overlay(self):
+        if not hasattr(self, "sw_overlay_activo"):
+            return
+        if self.datos_overlay.get("activo"):
+            self.sw_overlay_activo.select()
+        else:
+            self.sw_overlay_activo.deselect()
+
+        txt = self.datos_overlay.get("texto", "")
+        self.entry_overlay_texto.delete(0, "end")
+        self.entry_overlay_texto.insert(0, txt)
+
+        if self.datos_overlay.get("ancho_completo"):
+            self.chk_overlay_ancho.select()
+        else:
+            self.chk_overlay_ancho.deselect()
+
+        fondo = str(self.datos_overlay.get("fondo", "Negro")).capitalize()
+        if fondo.lower() in ("sin fondo", "ninguno", "transparente"):
+            fondo = "Sin Fondo"
+        self.opt_overlay_fondo.set(fondo)
+
+        color = str(self.datos_overlay.get("color", "Blanco")).capitalize()
+        self.opt_overlay_color.set(color)
+
+        font_n = str(self.datos_overlay.get("font", "Impact"))
+        self.opt_overlay_font.set(font_n)
+
+        tam = int(self.datos_overlay.get("tamano", 48) or 48)
+        self.slider_overlay_tamano.set(tam)
+        self.lbl_tam_overlay_val.configure(text=f"{tam} pt")
+
+        pos_y = int(self.datos_overlay.get("pos_y", 25) or 25)
+        self.slider_overlay_pos_y.set(pos_y)
+        self.lbl_pos_overlay_val.configure(text=f"{pos_y}%")
+
+        self._refrescar_estilo_btn_overlay()
+        self.notificar_overlay_live()
+
+    def obtener_datos_overlay(self) -> Optional[Dict[str, Any]]:
+        if not self.datos_overlay.get("activo") or not self.datos_overlay.get("texto", "").strip():
+            return None
+        return dict(self.datos_overlay)
+
+    def notificar_overlay_live(self):
+        if self.on_preview_live is not None:
+            try:
+                self.on_preview_live("overlay_texto", self.obtener_datos_overlay(), "", "", 0)
+            except Exception:
+                pass
 
     def _build_body(self):
         self.scroll_cards = ctk.CTkScrollableFrame(self, fg_color="#0e111a", corner_radius=8)
-        self.scroll_cards.grid(row=1, column=0, sticky="nsew", padx=4, pady=2)
+        self.scroll_cards.grid(row=2, column=0, sticky="nsew", padx=4, pady=2)
         self.scroll_cards.grid_columnconfigure(0, weight=1)
 
         self.raw_textbox = ctk.CTkTextbox(self, font=ctk.CTkFont(family="Consolas", size=12))
@@ -1506,13 +1837,13 @@ class VisualScriptEditor(ctk.CTkFrame):
         if self._modo_raw:
             self._actualizar_raw_interno()
             self.scroll_cards.grid_remove()
-            self.raw_textbox.grid(row=1, column=0, sticky="nsew", padx=4, pady=2)
+            self.raw_textbox.grid(row=2, column=0, sticky="nsew", padx=4, pady=2)
             self.btn_toggle_raw.configure(text="🎛️ Vista Tarjetas")
         else:
             texto_actual = self.raw_textbox.get("1.0", "end").strip()
             self.cargar_desde_texto(texto_actual)
             self.raw_textbox.grid_remove()
-            self.scroll_cards.grid(row=1, column=0, sticky="nsew", padx=4, pady=2)
+            self.scroll_cards.grid(row=2, column=0, sticky="nsew", padx=4, pady=2)
             self.btn_toggle_raw.configure(text="📝 Texto Crudo")
 
     def _on_raw_edited_manually(self, _event=None):
@@ -1543,6 +1874,27 @@ class VisualScriptEditor(ctk.CTkFrame):
                         titulo_yt = v_clean
                     elif k_clean == "TITULO_SUPERIOR":
                         titulo_sup = v_clean
+                    elif k_clean in ("OVERLAY_TEXTO", "TEXTO_OVERLAY", "TEXTO_FIJO"):
+                        self.datos_overlay["texto"] = v_clean
+                        self.datos_overlay["activo"] = bool(v_clean.strip())
+                    elif k_clean in ("OVERLAY_FONDO", "FONDO_OVERLAY"):
+                        self.datos_overlay["fondo"] = v_clean.capitalize()
+                    elif k_clean in ("OVERLAY_COLOR", "COLOR_OVERLAY"):
+                        self.datos_overlay["color"] = v_clean.capitalize()
+                    elif k_clean in ("OVERLAY_TAMANO", "OVERLAY_SIZE"):
+                        try:
+                            self.datos_overlay["tamano"] = int(float(v_clean))
+                        except ValueError:
+                            pass
+                    elif k_clean in ("OVERLAY_FONT", "OVERLAY_FUENTE"):
+                        self.datos_overlay["font"] = v_clean
+                    elif k_clean in ("OVERLAY_POS_Y", "OVERLAY_Y"):
+                        try:
+                            self.datos_overlay["pos_y"] = int(float(v_clean.rstrip("%")))
+                        except ValueError:
+                            pass
+                    elif k_clean in ("OVERLAY_ANCHO_COMPLETO", "OVERLAY_FRANJA_COMPLETA"):
+                        self.datos_overlay["ancho_completo"] = _quitar_acentos(v_clean.lower()) in ("si", "true", "yes", "1")
                     else:
                         self.metadatos_ocultos[k_clean] = v_clean
                 continue
@@ -1611,6 +1963,9 @@ class VisualScriptEditor(ctk.CTkFrame):
             })
 
         self._renderizar_tarjetas()
+        self._sincronizar_ui_overlay()
+        if self.datos_overlay.get("activo") and not self.panel_overlay_visible:
+            self._toggle_panel_overlay(forzar=True)
         self._actualizar_raw_interno()
 
     def exportar_a_texto(self) -> str:
@@ -1629,6 +1984,18 @@ class VisualScriptEditor(ctk.CTkFrame):
 
         titulo_editado = self.entry_titulo.get().strip() or "Short Viral"
         tit_sup_limpio = re.sub(r'[^A-Za-z0-9_ -]', '', titulo_editado).strip()[:40] or "Short_Viral"
+
+        if self.datos_overlay.get("activo") and self.datos_overlay.get("texto", "").strip():
+            self.metadatos_ocultos["OVERLAY_TEXTO"] = self.datos_overlay["texto"].strip()
+            self.metadatos_ocultos["OVERLAY_FONDO"] = str(self.datos_overlay.get("fondo", "negro")).lower()
+            self.metadatos_ocultos["OVERLAY_COLOR"] = str(self.datos_overlay.get("color", "blanco")).lower()
+            self.metadatos_ocultos["OVERLAY_TAMANO"] = str(self.datos_overlay.get("tamano", 48))
+            self.metadatos_ocultos["OVERLAY_FONT"] = str(self.datos_overlay.get("font", "Impact"))
+            self.metadatos_ocultos["OVERLAY_POS_Y"] = f"{self.datos_overlay.get('pos_y', 25)}%"
+            self.metadatos_ocultos["OVERLAY_ANCHO_COMPLETO"] = "si" if self.datos_overlay.get("ancho_completo") else "no"
+        else:
+            for k_ov in ("OVERLAY_TEXTO", "OVERLAY_FONDO", "OVERLAY_COLOR", "OVERLAY_TAMANO", "OVERLAY_FONT", "OVERLAY_POS_Y", "OVERLAY_ANCHO_COMPLETO"):
+                self.metadatos_ocultos.pop(k_ov, None)
 
         lineas = [
             f"TITULO_SUPERIOR: {tit_sup_limpio}",

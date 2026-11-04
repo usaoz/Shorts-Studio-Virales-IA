@@ -10,7 +10,7 @@ import re
 import sys
 import subprocess
 from pathlib import Path
-from typing import Union, Optional, List, Tuple
+from typing import Union, Optional, List, Tuple, Dict, Any
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
@@ -1141,5 +1141,199 @@ def sincronizar_guion_renderizado_en_disco(ruta_guion: Union[str, Path], segment
         pass
 
 
+# =====================================================================
+# 10. TEXTO SUPERPUESTO FIJO EN VIDEO (TAPAR TEXTO / BANNER PERMANENTE)
+# =====================================================================
 
+MAPA_FUENTES_OVERLAY: Dict[str, str] = {
+    "Impact": "C:/Windows/Fonts/impact.ttf",
+    "Arial": "C:/Windows/Fonts/arialbd.ttf",
+    "Segoe UI": "C:/Windows/Fonts/segoeuib.ttf",
+    "Trebuchet MS": "C:/Windows/Fonts/trebucbd.ttf",
+    "MrBeast": str(Path(__file__).resolve().parent / "assets" / "fonts" / "MrBeast_Gaming_Font.ttf"),
+}
+
+_CACHE_FUENTES_OVERLAY: Dict[Tuple[str, int], ImageFont.FreeTypeFont] = {}
+
+
+def cargar_fuente_overlay(nombre_fuente: str, tamano: int) -> ImageFont.FreeTypeFont:
+    """Carga y cachea la fuente especificada con su tamaño en píxeles."""
+    clave = (str(nombre_fuente or "").strip(), int(tamano))
+    if clave in _CACHE_FUENTES_OVERLAY:
+        return _CACHE_FUENTES_OVERLAY[clave]
+
+    nom = clave[0]
+    p_fuente = MAPA_FUENTES_OVERLAY.get(nom)
+    if not p_fuente or not os.path.exists(p_fuente):
+        for alt in ("Impact", "Arial", "Segoe UI"):
+            cand = MAPA_FUENTES_OVERLAY.get(alt, "")
+            if cand and os.path.exists(cand):
+                p_fuente = cand
+                break
+
+    if p_fuente and os.path.exists(p_fuente):
+        try:
+            fnt = ImageFont.truetype(p_fuente, max(12, int(tamano)))
+            _CACHE_FUENTES_OVERLAY[clave] = fnt
+            return fnt
+        except Exception:
+            pass
+
+    fnt_def = ImageFont.load_default()
+    _CACHE_FUENTES_OVERLAY[clave] = fnt_def
+    return fnt_def
+
+
+COLORES_TEXTO_OVERLAY: Dict[str, Tuple[int, int, int]] = {
+    "blanco": (255, 255, 255),
+    "negro": (15, 15, 15),
+    "amarillo": (253, 224, 71),
+    "rojo": (239, 68, 68),
+    "cian": (56, 189, 248),
+    "verde": (34, 197, 94),
+    "naranja": (249, 115, 22),
+}
+
+COLORES_FONDO_OVERLAY: Dict[str, Optional[Tuple[int, int, int]]] = {
+    "negro": (0, 0, 0),
+    "blanco": (255, 255, 255),
+    "rojo": (185, 28, 28),
+    "azul": (29, 78, 216),
+    "amarillo": (234, 179, 8),
+    "verde": (21, 128, 61),
+    "ninguno": None,
+    "sin fondo": None,
+    "transparente": None,
+}
+
+
+_CACHE_SPRITES_OVERLAY: Dict[Tuple, Tuple[Image.Image, np.ndarray, int, int]] = {}
+
+def _parsear_pos_y_overlay(val: Any) -> float:
+    if val is None:
+        return 25.0
+    if isinstance(val, (int, float)):
+        return max(3.0, min(97.0, float(val)))
+    s = str(val).strip().rstrip("%")
+    try:
+        return max(3.0, min(97.0, float(s)))
+    except ValueError:
+        return 25.0
+
+def _obtener_sprite_overlay(opciones: Dict[str, Any], target_w: int, target_h: int) -> Tuple[Image.Image, np.ndarray, int, int]:
+    texto = str(opciones.get("texto", "") or "").strip()
+    tamano = max(18, min(140, int(opciones.get("tamano", 48) or 48)))
+    font_name = str(opciones.get("font", "Impact") or "Impact").strip()
+    fondo_raw = str(opciones.get("fondo", "negro") or "negro").strip().lower()
+    color_raw = str(opciones.get("color", opciones.get("color_texto", "blanco")) or "blanco").strip().lower()
+    ancho_completo = bool(opciones.get("ancho_completo", False))
+    pos_y_pct = _parsear_pos_y_overlay(opciones.get("pos_y", opciones.get("pos_y_pct", 25.0)))
+
+    cache_key = (texto, tamano, font_name, fondo_raw, color_raw, ancho_completo, pos_y_pct, target_w, target_h)
+    cached = _CACHE_SPRITES_OVERLAY.get(cache_key)
+    if cached is not None:
+        return cached
+
+    escala_lienzo = target_w / 1080.0
+    tam_real = max(12, int(tamano * escala_lienzo))
+    fnt = cargar_fuente_overlay(font_name, tam_real)
+
+    cy = int(target_h * (pos_y_pct / 100.0))
+    cx = target_w // 2
+
+    bbox = fnt.getbbox(texto)
+    tw = bbox[2] - bbox[0]
+    th = bbox[3] - bbox[1]
+
+    c_fondo_rgb = COLORES_FONDO_OVERLAY.get(fondo_raw)
+    c_txt_rgb = COLORES_TEXTO_OVERLAY.get(color_raw, (255, 255, 255))
+
+    pad_x = max(16, int(tam_real * 0.45))
+    pad_y = max(10, int(tam_real * 0.30))
+
+    if c_fondo_rgb is not None:
+        if ancho_completo:
+            box_w = target_w
+            bx0 = 0
+        else:
+            box_w = max(20, tw + pad_x * 2)
+            bx0 = cx - (box_w // 2)
+        box_h = max(20, th + pad_y * 2)
+        by0 = cy - (box_h // 2)
+
+        patch = Image.new("RGBA", (box_w, box_h), (0, 0, 0, 0))
+        draw_p = ImageDraw.Draw(patch)
+        draw_p.rounded_rectangle([0, 0, box_w, box_h], radius=max(4, int(10 * escala_lienzo)), fill=(*c_fondo_rgb, 255))
+        tx = (box_w - tw) // 2 - bbox[0]
+        ty = (box_h - th) // 2 - bbox[1]
+        draw_p.text((tx, ty), texto, font=fnt, fill=c_txt_rgb)
+    else:
+        stk = max(2, int(tam_real * 0.08))
+        box_w = max(20, tw + (pad_x + stk) * 2)
+        box_h = max(20, th + (pad_y + stk) * 2)
+        bx0 = cx - (box_w // 2)
+        by0 = cy - (box_h // 2)
+
+        patch = Image.new("RGBA", (box_w, box_h), (0, 0, 0, 0))
+        draw_p = ImageDraw.Draw(patch)
+        tx = (box_w - tw) // 2 - bbox[0]
+        ty = (box_h - th) // 2 - bbox[1]
+        draw_p.text((tx, ty), texto, font=fnt, fill=c_txt_rgb, stroke_width=stk, stroke_fill=(0, 0, 0, 255))
+
+    patch_np = np.array(patch, dtype=np.uint8)
+
+    if len(_CACHE_SPRITES_OVERLAY) > 100:
+        _CACHE_SPRITES_OVERLAY.clear()
+
+    res = (patch, patch_np, bx0, by0)
+    _CACHE_SPRITES_OVERLAY[cache_key] = res
+    return res
+
+def renderizar_overlay_texto_fijo(lienzo: Any, opciones: Optional[Dict[str, Any]]) -> None:
+    """
+    Dibuja un texto superpuesto permanente con o sin fondo sobre el fotograma `lienzo`
+    (soporta NumPy RGB o PIL Image de forma ultrarrápida con caché).
+    Ideal para tapar textos existentes, marcas de agua, o agregar carteles visibles todo el video.
+    """
+    if not opciones or not isinstance(opciones, dict):
+        return
+    texto = str(opciones.get("texto", "") or "").strip()
+    if not texto:
+        return
+
+    es_numpy = isinstance(lienzo, np.ndarray)
+    if es_numpy:
+        h, w = lienzo.shape[:2]
+    elif hasattr(lienzo, "width") and hasattr(lienzo, "height"):
+        w, h = lienzo.width, lienzo.height
+    else:
+        return
+
+    patch_pil, patch_np, bx0, by0 = _obtener_sprite_overlay(opciones, w, h)
+
+    if es_numpy:
+        h_sp, w_sp = patch_np.shape[:2]
+        x1_c = max(0, bx0)
+        y1_c = max(0, by0)
+        x2_c = min(w, bx0 + w_sp)
+        y2_c = min(h, by0 + h_sp)
+        if x1_c >= x2_c or y1_c >= y2_c:
+            return
+        sp_x1 = x1_c - bx0
+        sp_y1 = y1_c - by0
+        sp_x2 = sp_x1 + (x2_c - x1_c)
+        sp_y2 = sp_y1 + (y2_c - y1_c)
+        sub_sp = patch_np[sp_y1:sp_y2, sp_x1:sp_x2]
+        alpha = sub_sp[:, :, 3:4].astype(np.float32) / 255.0
+        if not np.any(alpha > 0):
+            return
+        rgb_sp = sub_sp[:, :, :3].astype(np.float32)
+        roi = lienzo[y1_c:y2_c, x1_c:x2_c].astype(np.float32)
+        roi[:] = roi * (1.0 - alpha) + rgb_sp * alpha
+        lienzo[y1_c:y2_c, x1_c:x2_c] = roi.astype(np.uint8)
+    else:
+        try:
+            lienzo.alpha_composite(patch_pil, dest=(bx0, by0))
+        except Exception:
+            lienzo.paste(patch_pil, (bx0, by0), patch_pil)
 
