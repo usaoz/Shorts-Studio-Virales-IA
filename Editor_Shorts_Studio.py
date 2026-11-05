@@ -106,19 +106,36 @@ def iniciar_aplicacion_gui() -> None:
 
     root = ctk.CTk()
     root.title("Shorts Studio")
-    root.minsize(840, 320)
-    root.configure(fg_color="#0b0d13")
+    root.minsize(920, 480)
+    root.configure(fg_color="#121212")
 
-    def autoajustar_tamano_ventana() -> None:
-        """
-        Amolda dinámicamente la altura de la ventana para que calce exactamente
-        con el contenido actual (sin dejar espacios vacíos abajo).
-        """
+    _resize_after_id: List[Optional[str]] = [None]
+    _ultimo_req_h: List[int] = [0]
+
+    def _ejecutar_autoajuste_ventana() -> None:
+        _resize_after_id[0] = None
         try:
             root.update_idletasks()
             req_h = root.winfo_reqheight() + 8
-            cur_w = max(860, root.winfo_width())
-            root.geometry(f"{cur_w}x{req_h}")
+            cur_w = max(920, root.winfo_width())
+            if abs(req_h - _ultimo_req_h[0]) >= 3 or _ultimo_req_h[0] == 0:
+                _ultimo_req_h[0] = req_h
+                root.geometry(f"{cur_w}x{req_h}")
+        except Exception:
+            pass
+
+    def autoajustar_tamano_ventana() -> None:
+        """
+        Amolda dinámicamente la altura de la ventana con debounce (1 sola pasada por frame)
+        para evitar parpadeos o saltos de geometría al cambiar de modo.
+        """
+        try:
+            if _resize_after_id[0] is not None:
+                try:
+                    root.after_cancel(_resize_after_id[0])
+                except Exception:
+                    pass
+            _resize_after_id[0] = root.after_idle(_ejecutar_autoajuste_ventana)
         except Exception:
             pass
 
@@ -272,15 +289,15 @@ def iniciar_aplicacion_gui() -> None:
     editando_lock = threading.Lock()
     ultimo_video_generado: List[Optional[Path]] = [None]
 
-    BG_DARK = "#0b0d13"
-    CARD_BG = "#141824"
-    CARD_BORDER = "#252b3d"
-    INPUT_BG = "#0e111a"
-    TEXT_MAIN = "#f8fafc"
-    TEXT_MUTED = "#94a3b8"
-    TEXT_DIM = "#64748b"
-    PURPLE_MAIN = "#7c3aed"
-    PURPLE_HOVER = "#6d28d9"
+    BG_DARK = "#121212"
+    CARD_BG = "#1c1c1e"
+    CARD_BORDER = "#2c2c30"
+    INPUT_BG = "#141416"
+    TEXT_MAIN = "#EDEDED"
+    TEXT_MUTED = "#A0A0A5"
+    TEXT_DIM = "#707075"
+    PURPLE_MAIN = "#242426"
+    PURPLE_HOVER = "#2e2e32"
     CYAN_ACCENT = "#38bdf8"
     GREEN_ACCENT = "#10b981"
 
@@ -518,7 +535,10 @@ def iniciar_aplicacion_gui() -> None:
         "Cada 12h": 12,
     }
 
-    def _guardar_memoria(*_args: object) -> None:
+    _guardar_mem_after_id: List[Optional[str]] = [None]
+
+    def _escribir_memoria_disco() -> None:
+        _guardar_mem_after_id[0] = None
         try:
             cid_act = str(estado_seleccion_cuentas.get("cuenta_id") or "")
             if cid_act and str(estado_seleccion_cuentas.get("modo") or "una") == "una":
@@ -568,6 +588,17 @@ def iniciar_aplicacion_gui() -> None:
         except Exception:
             pass
 
+    def _guardar_memoria(*_args: object) -> None:
+        try:
+            if _guardar_mem_after_id[0] is not None:
+                try:
+                    root.after_cancel(_guardar_mem_after_id[0])
+                except Exception:
+                    pass
+            _guardar_mem_after_id[0] = root.after(80, _escribir_memoria_disco)
+        except Exception:
+            _escribir_memoria_disco()
+
     def _formatear_boton_fecha(iso_str: str) -> str:
         try:
             d = _dt.date.fromisoformat(iso_str)
@@ -577,41 +608,53 @@ def iniciar_aplicacion_gui() -> None:
 
 
     # ==========================================================================
-    # ENCABEZADO SUPERIOR + BARRA DE CUOTA DIARIA REAL DE GOOGLE + BOTÓN AJUSTES
+    # ENCABEZADO SUPERIOR ESTILO MAQUETA (LOGO + AJUSTES + CANAL + CANALES)
     # ==========================================================================
-    header = ctk.CTkFrame(root, fg_color="transparent")
-    header.pack(fill="x", padx=28, pady=(16, 8))
+    header = ctk.CTkFrame(root, fg_color="#18181a", corner_radius=0, height=56)
+    header.pack(fill="x", padx=0, pady=(0, 8))
+    ctk.CTkFrame(root, fg_color="#29292c", height=1, corner_radius=0).pack(fill="x", pady=(0, 6))
 
-    title_box = ctk.CTkFrame(header, fg_color="transparent")
+    header_inner = ctk.CTkFrame(header, fg_color="transparent")
+    header_inner.pack(fill="x", padx=28, pady=10)
+
+    title_box = ctk.CTkFrame(header_inner, fg_color="transparent")
     title_box.pack(side="left")
 
-    ctk.CTkLabel(
+    logo_badge = ctk.CTkFrame(
         title_box,
-        text="Shorts Studio",
-        font=ctk.CTkFont(family="Segoe UI", size=25, weight="bold"),
-        text_color=TEXT_MAIN,
-    ).pack(anchor="w")
-
-    # Contenedor superior derecho ordenado:
-    # [pers_pill] -> [btn_cuenta_top] -> [btn_ajustes] (en la esquina superior derecha)
-    header_right = ctk.CTkFrame(header, fg_color="transparent")
-    header_right.pack(side="right")
-
-    # Botón Personalizar Video de Canal (Sin Emojis en pestaña principal)
-    btn_personalidad_canal = ctk.CTkButton(
-        header_right,
-        text="Personalizar Video de Canal",
-        command=lambda: abrir_modal_personalidad_canal(),
-        height=40,
-        corner_radius=20,
-        fg_color=CARD_BG,
-        hover_color="#1f2637",
+        fg_color="#262628",
+        corner_radius=10,
         border_width=1,
-        border_color=CARD_BORDER,
-        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-        text_color=TEXT_MAIN,
+        border_color="#38383c",
+        width=32,
+        height=32,
     )
-    btn_personalidad_canal.pack(side="left", padx=(0, 8), pady=4)
+    logo_badge.pack(side="left", padx=(0, 12))
+    logo_badge.pack_propagate(False)
+    ctk.CTkLabel(
+        logo_badge,
+        text="SS",
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        text_color="#ffffff",
+    ).pack(expand=True)
+
+    header_right = ctk.CTkFrame(header_inner, fg_color="transparent")
+    header_right.pack(side="left")
+
+    btn_personalidad_canal = ctk.CTkButton(
+        header_inner,
+        text="Estilo del Canal",
+        command=lambda: abrir_modal_personalidad_canal(),
+        height=32,
+        corner_radius=12,
+        fg_color="#1c1c1e",
+        hover_color="#242426",
+        border_width=1,
+        border_color="#333336",
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        text_color=TEXT_MUTED,
+    )
+    btn_personalidad_canal.pack(side="right", padx=(8, 0))
 
     def agregar_api_json_gui(parent_win: Optional[tk.Misc] = None) -> None:
         from tkinter import filedialog
@@ -773,12 +816,156 @@ def iniciar_aplicacion_gui() -> None:
 
     root.after(1500, _comprobar_actualizacion_background)
 
-    # Contenedor dinámico del Paso 1 (alterna entre Modo Canales y Modo Link según Ajustes)
-    contenedor_paso1 = ctk.CTkFrame(root, fg_color="transparent")
-    contenedor_paso1.pack(fill="x", padx=28, pady=(0, 10))
+    # ==========================================================================
+    # SECCIÓN 1: SELECCIÓN DEL MATERIAL DE ENTRADA (3 TARJETAS DE MODO + CONTEXTO)
+    # ==========================================================================
+    sec_entrada_wrap = ctk.CTkFrame(root, fg_color="transparent")
+    sec_entrada_wrap.pack(fill="x", padx=28, pady=(0, 12))
+
+    ctk.CTkLabel(
+        sec_entrada_wrap,
+        text="SELECCIÓN DEL MATERIAL DE ENTRADA",
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        text_color="#707075",
+    ).pack(anchor="w", pady=(0, 8))
+
+    card_entrada_outer = ctk.CTkFrame(
+        sec_entrada_wrap,
+        fg_color="#1c1c1e",
+        corner_radius=16,
+        border_width=1,
+        border_color="#2c2c30",
+    )
+    card_entrada_outer.pack(fill="x")
+
+    row_3_fuentes = ctk.CTkFrame(card_entrada_outer, fg_color="transparent")
+    row_3_fuentes.pack(fill="x", padx=16, pady=(16, 10))
+    row_3_fuentes.grid_columnconfigure((0, 1, 2), weight=1, uniform="fuente_col")
+
+    tarjetas_fuente_refs: Dict[str, Dict[str, Any]] = {}
+
+    def _seleccionar_fuente_tarjeta(modo_val: str) -> None:
+        if modo_fuente_var.get() == modo_val:
+            return
+        modo_fuente_var.set(modo_val)
+        actualizar_modo_vista()
+
+    def _crear_tarjeta_fuente(col_idx: int, modo_val: str, titulo: str, desc: str) -> None:
+        f_card = ctk.CTkFrame(
+            row_3_fuentes,
+            fg_color="#171719",
+            corner_radius=12,
+            border_width=1,
+            border_color="#2c2c30",
+            cursor="hand2",
+        )
+        f_card.grid(row=0, column=col_idx, sticky="nsew", padx=(0 if col_idx == 0 else 6, 0 if col_idx == 2 else 6))
+
+        row_t = ctk.CTkFrame(f_card, fg_color="transparent")
+        row_t.pack(fill="x", padx=14, pady=(12, 4))
+
+        lbl_dot = ctk.CTkLabel(
+            row_t,
+            text="◉",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text_color="#707075",
+            cursor="hand2",
+        )
+        lbl_dot.pack(side="left", padx=(0, 6))
+
+        lbl_tit = ctk.CTkLabel(
+            row_t,
+            text=titulo,
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text_color="#ffffff",
+            anchor="w",
+            cursor="hand2",
+        )
+        lbl_tit.pack(side="left", fill="x", expand=True)
+
+        lbl_desc = ctk.CTkLabel(
+            f_card,
+            text=desc,
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color="#707075",
+            justify="left",
+            anchor="w",
+            wraplength=250,
+            cursor="hand2",
+        )
+        lbl_desc.pack(fill="x", padx=14, pady=(0, 12))
+
+        def _on_enter_f(_e: Any = None, m: str = modo_val) -> None:
+            if modo_fuente_var.get() != m:
+                try:
+                    f_card.configure(fg_color="#1e1e22", border_color="#3f3f46")
+                except Exception:
+                    pass
+
+        def _on_leave_f(_e: Any = None, m: str = modo_val) -> None:
+            if modo_fuente_var.get() != m:
+                try:
+                    f_card.configure(fg_color="#171719", border_color="#2c2c30")
+                except Exception:
+                    pass
+
+        for w in (f_card, row_t, lbl_dot, lbl_tit, lbl_desc):
+            w.bind("<Button-1>", lambda _e, m=modo_val: _seleccionar_fuente_tarjeta(m))
+            w.bind("<Enter>", _on_enter_f)
+            w.bind("<Leave>", _on_leave_f)
+
+        tarjetas_fuente_refs[modo_val] = {
+            "frame": f_card,
+            "dot": lbl_dot,
+            "tit": lbl_tit,
+            "desc": lbl_desc,
+        }
+
+    _crear_tarjeta_fuente(
+        0,
+        "Canales Seleccionados",
+        "La IA elige sola el video viral",
+        "El algoritmo busca en las fuentes configuradas los clips con mayor retención promedio y temas virales del nicho.",
+    )
+    _crear_tarjeta_fuente(
+        1,
+        "Link de Video",
+        "Pegar enlace manual",
+        "Vos decidís el video base ingresando el enlace de YouTube o archivo directo; la IA se encarga de todo lo demás.",
+    )
+    _crear_tarjeta_fuente(
+        2,
+        "Subir Video Editado",
+        "Subir archivo",
+        "Seleccioná directamente tu archivo de video desde tu computadora (formatos MP4, MOV o MKV).",
+    )
+
+    def _refrescar_estilo_tarjetas_fuente() -> None:
+        mf_actual = modo_fuente_var.get()
+        for m_k, refs in tarjetas_fuente_refs.items():
+            activo = (m_k == mf_actual) or (
+                "Canales" in m_k and "Canales" in mf_actual
+            ) or (
+                "Link" in m_k and "Link" in mf_actual
+            ) or (
+                "Editado" in m_k and "Editado" in mf_actual
+            )
+            try:
+                refs["frame"].configure(
+                    fg_color="#242428" if activo else "#171719",
+                    border_color="#e4e4e7" if activo else "#2c2c30",
+                )
+                refs["dot"].configure(text_color="#ffffff" if activo else "#707075")
+            except Exception:
+                pass
+
+    # Contenedor contextual dentro de la caja de Selección del Material de Entrada (grid fijo para cambio instantáneo sin parpadeo)
+    contenedor_paso1 = ctk.CTkFrame(card_entrada_outer, fg_color="transparent")
+    contenedor_paso1.pack(fill="x", padx=16, pady=(0, 16))
+    contenedor_paso1.grid_columnconfigure(0, weight=1)
 
     # --- TARJETA MODO A: POOL DE CANALES FUENTE ---
-    card_canales = ctk.CTkFrame(contenedor_paso1, fg_color=CARD_BG, corner_radius=22, border_width=1, border_color=CARD_BORDER)
+    card_canales = ctk.CTkFrame(contenedor_paso1, fg_color="#141416", corner_radius=12, border_width=1, border_color="#28282b")
 
     top_canales = ctk.CTkFrame(card_canales, fg_color="transparent")
     top_canales.pack(fill="x", padx=20, pady=(12, 6))
@@ -806,12 +993,13 @@ def iniciar_aplicacion_gui() -> None:
         variable=orden_canales_var,
         values=["Rotación (En fila)", "Aleatorio", "Canal único (Clic para elegir)"],
         command=lambda _: (_guardar_memoria(), renderizar_chips_canales()),
-        corner_radius=12,
+        corner_radius=8,
         height=28,
         width=195,
         font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-        fg_color="#1e2436",
-        button_color="#2d354d",
+        fg_color="#1c1c1e",
+        button_color="#2e2e32",
+        button_hover_color="#38383e",
     ).pack(side="left", padx=(0, 14))
 
     ctk.CTkLabel(
@@ -826,12 +1014,13 @@ def iniciar_aplicacion_gui() -> None:
         variable=min_views_var,
         values=list(MAPA_MIN_VIEWS.keys()),
         command=lambda _: (_guardar_memoria(), renderizar_chips_canales()),
-        corner_radius=12,
+        corner_radius=8,
         height=28,
         width=128,
         font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-        fg_color="#1e2436",
-        button_color="#2d354d",
+        fg_color="#1c1c1e",
+        button_color="#2e2e32",
+        button_hover_color="#38383e",
     ).pack(side="left")
 
     canales_body_row = ctk.CTkFrame(card_canales, fg_color="transparent")
@@ -839,10 +1028,10 @@ def iniciar_aplicacion_gui() -> None:
 
     chips_container = ctk.CTkFrame(
         canales_body_row,
-        corner_radius=14,
-        fg_color=INPUT_BG,
+        corner_radius=12,
+        fg_color="#101012",
         border_width=1,
-        border_color="#1f2537",
+        border_color="#222225",
     )
     chips_container.pack(side="left", fill="both", expand=True, padx=(0, 10))
 
@@ -870,19 +1059,35 @@ def iniciar_aplicacion_gui() -> None:
         canales_body_row,
         text="+ Agregar Canal",
         command=agregar_canal_gui,
-        corner_radius=16,
-        height=40,
+        corner_radius=12,
+        height=36,
         width=135,
-        fg_color=INPUT_BG,
-        hover_color="#1e2538",
+        fg_color="#222225",
+        hover_color="#2c2c30",
         border_width=1,
-        border_color="#2a3147",
+        border_color="#38383e",
         text_color="#ffffff",
-        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
     btn_add_canal.pack(side="right", anchor="center")
 
-    def renderizar_chips_canales() -> None:
+    _firma_chips_canales: List[Any] = [None]
+
+    def renderizar_chips_canales(forzar: bool = False) -> None:
+        modo_ord = orden_canales_var.get()
+        es_modo_fijo = ("Único" in modo_ord or "fijo" in modo_ord.lower())
+        if es_modo_fijo and not canal_fijo_var.get() and lista_canales:
+            canal_fijo_var.set(lista_canales[0])
+        firma_actual = (
+            tuple(lista_canales),
+            modo_ord,
+            canal_fijo_var.get(),
+            estado_rotacion["idx"] % max(1, len(lista_canales)),
+        )
+        if not forzar and _firma_chips_canales[0] == firma_actual and chips_container.winfo_children():
+            return
+        _firma_chips_canales[0] = firma_actual
+
         for w in chips_container.winfo_children():
             w.destroy()
         if not lista_canales:
@@ -897,11 +1102,6 @@ def iniciar_aplicacion_gui() -> None:
 
         row_frame = None
         MAX_POR_FILA = 3
-        modo_ord = orden_canales_var.get()
-        es_modo_fijo = ("Único" in modo_ord or "fijo" in modo_ord.lower())
-
-        if es_modo_fijo and not canal_fijo_var.get() and lista_canales:
-            canal_fijo_var.set(lista_canales[0])
 
         for idx_c, c_url in enumerate(lista_canales):
             if idx_c % MAX_POR_FILA == 0:
@@ -911,9 +1111,9 @@ def iniciar_aplicacion_gui() -> None:
             es_fijo = es_modo_fijo and (c_url == canal_fijo_var.get())
             es_turno = (not es_modo_fijo) and (idx_c == (estado_rotacion["idx"] % len(lista_canales))) and ("Rotación" in modo_ord)
 
-            bg_chip = "#143828" if es_fijo else ("#251d42" if es_turno else "#1b2234")
-            borde_chip = GREEN_ACCENT if es_fijo else (PURPLE_MAIN if es_turno else "#2c3652")
-            borde_w = 2 if (es_fijo or es_turno) else 1
+            bg_chip = "#143828" if es_fijo else ("#26262a" if es_turno else "#1c1c1e")
+            borde_chip = GREEN_ACCENT if es_fijo else ("#ffffff" if es_turno else "#2e2e32")
+            borde_w = 1
 
             chip = ctk.CTkFrame(
                 row_frame,
@@ -967,32 +1167,32 @@ def iniciar_aplicacion_gui() -> None:
         autoajustar_tamano_ventana()
 
     # --- TARJETA MODO B: LINK DE VIDEO (INDIVIDUAL O MÚLTIPLES LINKS) ---
-    card_link = ctk.CTkFrame(contenedor_paso1, fg_color=CARD_BG, corner_radius=22, border_width=1, border_color=CARD_BORDER)
+    card_link = ctk.CTkFrame(contenedor_paso1, fg_color="#141416", corner_radius=12, border_width=1, border_color="#28282b")
 
     top_link_row = ctk.CTkFrame(card_link, fg_color="transparent")
-    top_link_row.pack(fill="x", padx=22, pady=(14, 8))
+    top_link_row.pack(fill="x", padx=18, pady=(12, 6))
 
     ctk.CTkLabel(
         top_link_row,
-        text="Links de Videos de YouTube",
-        font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
+        text="Enlace de YouTube o video fuente",
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         text_color=TEXT_MAIN,
     ).pack(side="left")
 
     lbl_contador_links = ctk.CTkLabel(
         top_link_row,
         text="1 Video",
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-        text_color=CYAN_ACCENT,
-        fg_color="#0e2a3a",
-        corner_radius=10,
+        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        text_color="#ffffff",
+        fg_color="#222225",
+        corner_radius=8,
         padx=10,
         pady=2,
     )
     lbl_contador_links.pack(side="right")
 
     filas_links_container = ctk.CTkFrame(card_link, fg_color="transparent")
-    filas_links_container.pack(fill="x", padx=22, pady=(0, 14))
+    filas_links_container.pack(fill="x", padx=18, pady=(0, 12))
 
     lista_filas_links: List[Dict[str, object]] = []
 
@@ -1030,15 +1230,15 @@ def iniciar_aplicacion_gui() -> None:
         autoajustar_tamano_ventana()
 
     # --- TARJETA MODO C: SUBIR VIDEO YA EDITADO (DESDE CARPETA / DISCO) ---
-    card_video_editado = ctk.CTkFrame(contenedor_paso1, fg_color=CARD_BG, corner_radius=22, border_width=1, border_color=CARD_BORDER)
+    card_video_editado = ctk.CTkFrame(contenedor_paso1, fg_color="#141416", corner_radius=12, border_width=1, border_color="#28282b")
 
     top_editado_row = ctk.CTkFrame(card_video_editado, fg_color="transparent")
-    top_editado_row.pack(fill="x", padx=20, pady=(12, 6))
+    top_editado_row.pack(fill="x", padx=18, pady=(12, 6))
 
     ctk.CTkLabel(
         top_editado_row,
-        text="Videos Editados para Subir",
-        font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
+        text="Archivos de Video Seleccionados",
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         text_color=TEXT_MAIN,
     ).pack(side="left")
 
@@ -1048,10 +1248,10 @@ def iniciar_aplicacion_gui() -> None:
     lbl_contador_editados = ctk.CTkLabel(
         editado_header_right,
         text="0 Videos",
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-        text_color=CYAN_ACCENT,
-        fg_color="#0e2a3a",
-        corner_radius=10,
+        font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+        text_color="#ffffff",
+        fg_color="#222225",
+        corner_radius=8,
         padx=10,
         pady=2,
     )
@@ -1059,7 +1259,14 @@ def iniciar_aplicacion_gui() -> None:
 
 
 
-    def _renderizar_lista_videos_editados() -> None:
+    _firma_videos_editados: List[Any] = [None]
+
+    def _renderizar_lista_videos_editados(forzar: bool = False) -> None:
+        firma_act = tuple(str(p) for p in lista_videos_editados_locales)
+        if not forzar and _firma_videos_editados[0] == firma_act and filas_editados_container.winfo_children():
+            return
+        _firma_videos_editados[0] = firma_act
+
         for w in filas_editados_container.winfo_children():
             w.destroy()
 
@@ -1067,32 +1274,32 @@ def iniciar_aplicacion_gui() -> None:
         lbl_contador_editados.configure(text=f"{cant_e} {'Video' if cant_e == 1 else 'Videos'}")
 
         if not lista_videos_editados_locales:
-            empty_row = ctk.CTkFrame(filas_editados_container, fg_color="transparent")
-            empty_row.pack(fill="x", pady=6)
+            empty_row = ctk.CTkFrame(filas_editados_container, fg_color="#101012", corner_radius=12, border_width=1, border_color="#222225")
+            empty_row.pack(fill="x", pady=4)
             ctk.CTkLabel(
                 empty_row,
-                text="Ningún video seleccionado. Toca '+ Seleccionar Video(s) MP4' para elegir videos ya terminados de tu disco.",
+                text="Ningún archivo seleccionado. Toca 'Examinar en PC' para elegir tu video (MP4, MOV o MKV).",
                 font=ctk.CTkFont(family="Segoe UI", size=12),
                 text_color=TEXT_MUTED,
-            ).pack(anchor="w", padx=6)
+            ).pack(padx=12, pady=12)
             return
 
         for idx_ev, p_ev in enumerate(lista_videos_editados_locales):
-            f_row = ctk.CTkFrame(filas_editados_container, fg_color="#101522", corner_radius=12, border_width=1, border_color="#1c2538")
+            f_row = ctk.CTkFrame(filas_editados_container, fg_color="#1c1c1e", corner_radius=10, border_width=1, border_color="#2e2e32")
             f_row.pack(fill="x", pady=2)
 
             t_mb = ""
             try:
                 sz = p_ev.stat().st_size / (1024 * 1024)
-                t_mb = f" · {sz:.1f} MB"
+                t_mb = f" ({sz:.1f} MB)"
             except Exception:
                 pass
 
             ctk.CTkLabel(
                 f_row,
-                text=f"{idx_ev + 1}.  {p_ev.name}{t_mb}",
+                text=f"✓ {p_ev.name}{t_mb}",
                 font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-                text_color=TEXT_MAIN,
+                text_color="#34d399",
             ).pack(side="left", padx=12, pady=6)
 
             def _remover_video_editado(idx_borrar: int = idx_ev) -> None:
@@ -1145,18 +1352,21 @@ def iniciar_aplicacion_gui() -> None:
 
     btn_seleccionar_editados = ctk.CTkButton(
         editado_header_right,
-        text="+ Seleccionar Video(s) MP4",
+        text="Examinar en PC",
         command=_seleccionar_videos_editados_dialog,
         height=30,
-        corner_radius=12,
-        fg_color=PURPLE_MAIN,
-        hover_color=PURPLE_HOVER,
+        corner_radius=10,
+        fg_color="#242426",
+        hover_color="#2c2c30",
+        border_width=1,
+        border_color="#38383e",
+        text_color="#ffffff",
         font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
     btn_seleccionar_editados.pack(side="right")
 
     filas_editados_container = ctk.CTkFrame(card_video_editado, fg_color="transparent")
-    filas_editados_container.pack(fill="x", padx=20, pady=(4, 12))
+    filas_editados_container.pack(fill="x", padx=18, pady=(4, 12))
 
     def _agregar_fila_link(valor_inicial: str = "") -> None:
         if len(lista_filas_links) >= 12:
@@ -1165,19 +1375,19 @@ def iniciar_aplicacion_gui() -> None:
 
         idx_f = len(lista_filas_links)
         row_f = ctk.CTkFrame(filas_links_container, fg_color="transparent")
-        row_f.pack(fill="x", pady=(0, 8))
+        row_f.pack(fill="x", pady=(0, 6))
 
-        ph = "https://www.youtube.com/shorts/..." if idx_f == 0 else f"Link #{idx_f + 1} (https://www.youtube.com/shorts/...)"
+        ph = "https://www.youtube.com/watch?v=..." if idx_f == 0 else f"Link #{idx_f + 1} (https://www.youtube.com/shorts/...)"
         ent = ctk.CTkEntry(
             row_f,
             placeholder_text=ph,
-            corner_radius=18,
-            height=42,
-            fg_color=INPUT_BG,
+            corner_radius=12,
+            height=38,
+            fg_color="#1c1c1e",
             border_width=1,
-            border_color="#2a3147",
+            border_color="#2e2e32",
             text_color="#ffffff",
-            font=ctk.CTkFont(family="Consolas", size=14),
+            font=ctk.CTkFont(family="Consolas", size=13),
         )
         ent.pack(side="left", fill="x", expand=True, padx=(0, 8))
         if valor_inicial:
@@ -1202,13 +1412,15 @@ def iniciar_aplicacion_gui() -> None:
             row_f,
             text="Pegar",
             command=_pegar_en_este,
-            corner_radius=18,
-            height=42,
-            width=90,
-            fg_color="#1e2538",
-            hover_color="#2b3550",
-            text_color=TEXT_MAIN,
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            corner_radius=12,
+            height=38,
+            width=82,
+            fg_color="#222225",
+            hover_color="#2c2c30",
+            border_width=1,
+            border_color="#38383e",
+            text_color="#ffffff",
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         )
         btn_peg.pack(side="left", padx=(0, 4))
 
@@ -1216,15 +1428,15 @@ def iniciar_aplicacion_gui() -> None:
             row_f,
             text="+",
             command=lambda: _agregar_fila_link(),
-            corner_radius=18,
-            height=42,
-            width=42,
-            fg_color=INPUT_BG,
-            hover_color="#1e2538",
+            corner_radius=12,
+            height=38,
+            width=38,
+            fg_color="#1c1c1e",
+            hover_color="#28282c",
             border_width=1,
-            border_color="#2a3147",
+            border_color="#2e2e32",
             text_color="#ffffff",
-            font=ctk.CTkFont(size=15, weight="bold"),
+            font=ctk.CTkFont(size=14, weight="bold"),
         )
         btn_add.pack(side="left")
 
@@ -1249,13 +1461,13 @@ def iniciar_aplicacion_gui() -> None:
             row_f,
             text="X",
             command=_quitar_este,
-            corner_radius=18,
-            height=42,
-            width=42,
-            fg_color="#261b23",
+            corner_radius=12,
+            height=38,
+            width=38,
+            fg_color="#2a1719",
             hover_color="#dc2626",
             text_color="#f87171",
-            font=ctk.CTkFont(size=15, weight="bold"),
+            font=ctk.CTkFont(size=14, weight="bold"),
         )
         fila_record["btn_del"] = btn_del
 
@@ -1266,11 +1478,212 @@ def iniciar_aplicacion_gui() -> None:
     _agregar_fila_link()
 
     # ==========================================================================
-    # PASO 2 UNIFICADO: PLAN DE SUBIDA, CANTIDAD POR DÍA Y HORARIOS INTELIGENTES
-    # (Sin hueco vacío entre Canales/Link y Programación; la personalización manual
-    #  se abre en una ventana emergente DESPUÉS de elegir los videos reales)
+    # SECCIÓN 2: SELECCIÓN DEL MODO DE EDICIÓN (3 TARJETAS COMO EN LA MAQUETA)
     # ==========================================================================
-    card_pub = ctk.CTkFrame(root, fg_color=CARD_BG, corner_radius=22, border_width=1, border_color=CARD_BORDER)
+    sec_modos_wrap = ctk.CTkFrame(root, fg_color="transparent")
+    sec_modos_wrap.pack(fill="x", padx=28, pady=(0, 12))
+
+    ctk.CTkLabel(
+        sec_modos_wrap,
+        text="SELECCIONA EL MODO DE EDICIÓN",
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        text_color="#707075",
+    ).pack(anchor="w", pady=(0, 8))
+
+    row_3_modos = ctk.CTkFrame(sec_modos_wrap, fg_color="transparent")
+    row_3_modos.pack(fill="x")
+    row_3_modos.grid_columnconfigure((0, 1, 2), weight=1, uniform="modo_col")
+
+    tarjetas_modo_refs: Dict[str, Dict[str, Any]] = {}
+
+    def _refrescar_estilo_tarjetas_modo() -> None:
+        ms_act = modo_subida_var.get()
+        for m_k, refs in tarjetas_modo_refs.items():
+            activo = (m_k == ms_act) or (
+                "Manual" in m_k and "Manual" in ms_act
+            ) or (
+                "Revisión" in m_k and ("Revisión" in ms_act or "Revision" in ms_act)
+            ) or (
+                "Automática" in m_k and "Automática" in ms_act
+            )
+            try:
+                refs["frame"].configure(
+                    fg_color="#222225" if activo else "#1c1c1e",
+                    border_color="#e4e4e7" if activo else "#2c2c30",
+                )
+            except Exception:
+                pass
+
+    def _activar_modo_edicion_card(modo_val: str, iniciar_inmediato: bool = False) -> None:
+        modo_subida_var.set(modo_val)
+        _guardar_memoria()
+        _refrescar_estilo_tarjetas_modo()
+        refrescar_texto_boton_accion()
+        if iniciar_inmediato:
+            if "Manual" in modo_val or "Revisión" in modo_val:
+                cantidad_total_var.set("1 Short")
+                refrescar_plan_ui()
+            ejecutar_flujo_1_clic(solo_guardar_override=False)
+
+    def _crear_tarjeta_modo_edicion(
+        col_idx: int,
+        modo_val: str,
+        icono_txt: str,
+        tag_sup: str,
+        titulo: str,
+        desc: str,
+        cta_txt: str,
+        iniciar_al_clic: bool,
+    ) -> None:
+        m_card = ctk.CTkFrame(
+            row_3_modos,
+            fg_color="#1c1c1e",
+            corner_radius=16,
+            border_width=1,
+            border_color="#2c2c30",
+            cursor="hand2",
+        )
+        m_card.grid(row=0, column=col_idx, sticky="nsew", padx=(0 if col_idx == 0 else 8, 0 if col_idx == 2 else 8))
+
+        ico_box = ctk.CTkFrame(
+            m_card,
+            fg_color="#26262a",
+            corner_radius=10,
+            border_width=1,
+            border_color="#36363c",
+            width=36,
+            height=36,
+        )
+        ico_box.pack(anchor="w", padx=16, pady=(14, 8))
+        ico_box.pack_propagate(False)
+        lbl_ico = ctk.CTkLabel(
+            ico_box,
+            text=icono_txt,
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text_color="#ffffff",
+            cursor="hand2",
+        )
+        lbl_ico.pack(expand=True)
+
+        lbl_tag = ctk.CTkLabel(
+            m_card,
+            text=tag_sup.upper(),
+            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+            text_color="#A0A0A5",
+            anchor="w",
+            cursor="hand2",
+        )
+        lbl_tag.pack(fill="x", padx=16, pady=(0, 2))
+
+        lbl_tit = ctk.CTkLabel(
+            m_card,
+            text=titulo,
+            font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
+            text_color="#ffffff",
+            anchor="w",
+            cursor="hand2",
+        )
+        lbl_tit.pack(fill="x", padx=16, pady=(0, 4))
+
+        lbl_desc = ctk.CTkLabel(
+            m_card,
+            text=desc,
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color="#A0A0A5",
+            justify="left",
+            anchor="w",
+            wraplength=255,
+            cursor="hand2",
+        )
+        lbl_desc.pack(fill="x", padx=16, pady=(0, 10))
+
+        sep = ctk.CTkFrame(m_card, fg_color="#29292d", height=1)
+        sep.pack(fill="x", padx=16, pady=(2, 8))
+
+        cta_row = ctk.CTkFrame(m_card, fg_color="transparent")
+        cta_row.pack(fill="x", padx=16, pady=(0, 12))
+
+        lbl_cta = ctk.CTkLabel(
+            cta_row,
+            text=cta_txt,
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            text_color="#ffffff",
+            cursor="hand2",
+        )
+        lbl_cta.pack(side="left")
+
+        lbl_arr = ctk.CTkLabel(
+            cta_row,
+            text="›",
+            font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold"),
+            text_color="#707075",
+            cursor="hand2",
+        )
+        lbl_arr.pack(side="right")
+
+        def _on_enter_m(_e: Any = None, mv: str = modo_val) -> None:
+            ms_act = modo_subida_var.get()
+            activo = (mv == ms_act) or ("Manual" in mv and "Manual" in ms_act) or ("Revisión" in mv and ("Revisión" in ms_act or "Revision" in ms_act)) or ("Automática" in mv and "Automática" in ms_act)
+            if not activo:
+                try:
+                    m_card.configure(fg_color="#202024", border_color="#3f3f46")
+                except Exception:
+                    pass
+
+        def _on_leave_m(_e: Any = None, mv: str = modo_val) -> None:
+            ms_act = modo_subida_var.get()
+            activo = (mv == ms_act) or ("Manual" in mv and "Manual" in ms_act) or ("Revisión" in mv and ("Revisión" in ms_act or "Revision" in ms_act)) or ("Automática" in mv and "Automática" in ms_act)
+            if not activo:
+                try:
+                    m_card.configure(fg_color="#1c1c1e", border_color="#2c2c30")
+                except Exception:
+                    pass
+
+        for w in (m_card, ico_box, lbl_ico, lbl_tag, lbl_tit, lbl_desc, cta_row, lbl_cta, lbl_arr):
+            w.bind("<Button-1>", lambda _e, mv=modo_val, ini=iniciar_al_clic: _activar_modo_edicion_card(mv, ini))
+            w.bind("<Enter>", _on_enter_m)
+            w.bind("<Leave>", _on_leave_m)
+
+        tarjetas_modo_refs[modo_val] = {
+            "frame": m_card,
+            "cta": lbl_cta,
+        }
+
+    _crear_tarjeta_modo_edicion(
+        0,
+        "Edición Manual",
+        "M",
+        "Control Total",
+        "Edición Manual",
+        "Abre el editor completo con todos los efectos vacíos para que añadas manualmente tus timestamps, emojis, SFX y guiones.",
+        "Abrir Editor en Blanco",
+        True,
+    )
+    _crear_tarjeta_modo_edicion(
+        1,
+        "Revisión Previa",
+        "IA",
+        "Asistencia IA",
+        "Automática Con Revisión",
+        "La IA analiza el video y abre el editor con el clip listo y todos los efectos ya aplicados para que los revises y edites.",
+        "Procesar y Abrir Editor",
+        True,
+    )
+    _crear_tarjeta_modo_edicion(
+        2,
+        "Subida Automática",
+        "100%",
+        "Producción Autónoma",
+        "Edición 100% Automática",
+        "Automatización total sin abrir el editor: genera y programa lotes de shorts directamente a la cola de YouTube.",
+        "Consola de Lotes",
+        False,
+    )
+
+    # ==========================================================================
+    # PASO 2 UNIFICADO: PLAN DE SUBIDA, CANTIDAD POR DÍA Y HORARIOS INTELIGENTES
+    # ==========================================================================
+    card_pub = ctk.CTkFrame(root, fg_color=CARD_BG, corner_radius=16, border_width=1, border_color=CARD_BORDER)
     card_pub.pack(fill="x", padx=28, pady=(0, 12))
 
     pub_header = ctk.CTkFrame(card_pub, fg_color="transparent")
@@ -1291,14 +1704,14 @@ def iniciar_aplicacion_gui() -> None:
         pub_fixed_controls,
         variable=cantidad_total_var,
         values=list(MAPA_CANTIDAD_TOTAL.keys()),
-        corner_radius=12,
+        corner_radius=8,
         height=30,
         width=110,
-        fg_color=PURPLE_MAIN,
-        button_color=PURPLE_HOVER,
-        button_hover_color="#5b21b6",
-        text_color="#ffffff",
-        dropdown_hover_color=PURPLE_MAIN,
+        fg_color="#242426",
+        button_color="#2e2e32",
+        button_hover_color="#38383e",
+        text_color="#EDEDED",
+        dropdown_hover_color="#2e2e32",
         font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
     opt_cantidad_total.pack(side="left", padx=(0, 8))
@@ -1307,12 +1720,13 @@ def iniciar_aplicacion_gui() -> None:
         pub_fixed_controls,
         variable=shorts_por_dia_var,
         values=list(MAPA_POR_DIA.keys()),
-        corner_radius=12,
+        corner_radius=8,
         height=30,
         width=105,
         fg_color=INPUT_BG,
-        button_color="#252d42",
-        button_hover_color="#333e5a",
+        button_color="#242426",
+        button_hover_color="#34343a",
+        text_color="#EDEDED",
         font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
     opt_por_dia.pack(side="left")
@@ -1481,13 +1895,13 @@ def iniciar_aplicacion_gui() -> None:
         pers_actual = obtener_personalidad_canal_activo()
 
         win_p = ctk.CTkToplevel(parent_win or root)
+        win_p.withdraw()
         win_p.title("Personalidad Visual y Estilo por Canal")
         win_p.geometry("540x630")
         win_p.resizable(False, False)
         win_p.configure(fg_color=BG_DARK)
         win_p.transient(parent_win or root)
         aplicar_icono_ventana(win_p)
-        win_p.grab_set()
 
         card_p = ctk.CTkFrame(win_p, fg_color=CARD_BG, corner_radius=18, border_width=1, border_color=CARD_BORDER)
         card_p.pack(fill="both", expand=True, padx=20, pady=20)
@@ -1607,18 +2021,41 @@ def iniciar_aplicacion_gui() -> None:
             height=32,
             corner_radius=12,
             fg_color=INPUT_BG,
-            hover_color="#1d2334",
+            hover_color="#242428",
             border_width=1,
             border_color=CARD_BORDER,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         ).pack(side="right")
 
-    def refrescar_selector_cuentas_ui() -> None:
+        win_p.update_idletasks()
+        try:
+            rx = root.winfo_x() + (root.winfo_width() // 2) - 270
+            ry = root.winfo_y() + (root.winfo_height() // 2) - 315
+            win_p.geometry(f"540x630+{max(0, rx)}+{max(0, ry)}")
+        except Exception:
+            pass
+        win_p.deiconify()
+        win_p.lift()
+        win_p.focus_force()
+        win_p.grab_set()
+
+    _cache_cuentas_mem: Dict[str, Any] = {"ts": 0.0, "data": []}
+
+    def _obtener_cuentas_vinculadas_fast(forzar: bool = False) -> List[Dict[str, Any]]:
+        ahora_t = time.time()
+        if not forzar and _cache_cuentas_mem["data"] and (ahora_t - float(_cache_cuentas_mem["ts"])) < 3.0:
+            return list(_cache_cuentas_mem["data"])
         try:
             from subir_a_youtube import listar_cuentas_vinculadas
-            cuentas = listar_cuentas_vinculadas()
+            c_list = listar_cuentas_vinculadas() or [{"id": "principal", "nombre": "Canal Principal", "avatar_path": ""}]
         except Exception:
-            cuentas = [{"id": "principal", "nombre": "Canal Principal", "avatar_path": ""}]
+            c_list = [{"id": "principal", "nombre": "Canal Principal", "avatar_path": ""}]
+        _cache_cuentas_mem["ts"] = ahora_t
+        _cache_cuentas_mem["data"] = c_list
+        return list(c_list)
+
+    def refrescar_selector_cuentas_ui(forzar_disco: bool = False) -> None:
+        cuentas = _obtener_cuentas_vinculadas_fast(forzar=forzar_disco)
         if not cuentas:
             cuentas = [{"id": "principal", "nombre": "Canal Principal", "avatar_path": ""}]
 
@@ -1728,13 +2165,13 @@ def iniciar_aplicacion_gui() -> None:
         row_plan2,
         values=["Horarios Pico", "Cada X hs", "Horario Específico"],
         variable=modo_horario_var,
-        corner_radius=14,
+        corner_radius=8,
         height=34,
         width=150,
         fg_color=INPUT_BG,
-        button_color="#252d42",
-        button_hover_color="#333e5a",
-        text_color="#ffffff",
+        button_color="#242426",
+        button_hover_color="#34343a",
+        text_color="#EDEDED",
         font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
     opt_estrategia.pack(side="left", padx=(0, 8))
@@ -1742,19 +2179,19 @@ def iniciar_aplicacion_gui() -> None:
     btn_calendario = ctk.CTkButton(
         row_plan2,
         text=_formatear_boton_fecha(fecha_elegida_var.get()),
-        corner_radius=14,
+        corner_radius=8,
         height=34,
         width=80,
         fg_color=INPUT_BG,
-        hover_color="#1c2233",
+        hover_color="#242426",
         border_width=1,
-        border_color="#2e3852",
-        text_color="#ffffff",
+        border_color=CARD_BORDER,
+        text_color="#EDEDED",
         font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
     )
     btn_calendario.pack(side="left", padx=(0, 8))
 
-    preview_box = ctk.CTkFrame(row_plan2, fg_color=INPUT_BG, corner_radius=14, border_width=1, border_color="#1f263a")
+    preview_box = ctk.CTkFrame(row_plan2, fg_color=INPUT_BG, corner_radius=8, border_width=1, border_color=CARD_BORDER)
     preview_box.pack(side="left", fill="x", expand=True)
 
     lbl_preview_horarios = ctk.CTkLabel(
@@ -1835,9 +2272,8 @@ def iniciar_aplicacion_gui() -> None:
         modo_c_act = str(estado_seleccion_cuentas.get("modo") or "una")
         strat_c_act = str(estado_seleccion_cuentas.get("estrategia") or "cross_posting")
 
-        from subir_a_youtube import listar_cuentas_vinculadas
         try:
-            cuentas_v_plan = listar_cuentas_vinculadas() or [{"id": "principal", "nombre": "Canal Principal"}]
+            cuentas_v_plan = _obtener_cuentas_vinculadas_fast()
         except Exception:
             cuentas_v_plan = [{"id": "principal", "nombre": "Canal Principal"}]
         dict_cv = {str(c.get("id") or "principal"): c for c in cuentas_v_plan}
@@ -1971,75 +2407,103 @@ def iniciar_aplicacion_gui() -> None:
     def refrescar_texto_boton_accion() -> None:
         """Actualiza el texto y estilo de los botones de acción para todas las combinaciones de Fuente, Contenido y Subida/Guardado."""
         try:
+            _refrescar_estilo_tarjetas_modo()
+        except Exception:
+            pass
+        try:
             mf = modo_fuente_var.get()
             es_editado = "Editado" in mf
             es_canales = "Canales" in mf
             es_link = not es_editado and not es_canales
             es_manual = "Manual" in modo_subida_var.get()
+            es_rev = "Revisión" in modo_subida_var.get() or "Revision" in modo_subida_var.get()
 
             # 1. TEXTO PARA EL BOTÓN PRINCIPAL (SUBIR A YOUTUBE)
             if es_manual:
-                txt_subir = "ELEGIR VIDEO Y EDITAR GUION" if not es_editado else "IMPORTAR Y EDITAR GUION"
+                txt_subir = "ABRIR EDITOR EN BLANCO" if not es_editado else "IMPORTAR Y EDITAR GUION"
+            elif es_rev:
+                txt_subir = "PROCESAR Y ABRIR EDITOR"
             elif es_editado:
                 txt_subir = "IMPORTAR Y SUBIR A YOUTUBE"
             elif es_canales:
-                txt_subir = "CREAR Y SUBIR EN 1 CLIC"
+                txt_subir = "CREAR Y SUBIR LOTE AUTOMÁTICO"
             else:
                 txt_subir = "CREAR Y SUBIR DESDE LINK"
 
             if btn_auto_1clic is not None:
                 btn_auto_1clic.configure(
                     text=txt_subir,
-                    fg_color=PURPLE_MAIN,
-                    hover_color=PURPLE_HOVER,
+                    fg_color="#242426",
+                    hover_color="#2e2e32",
                     text_color="#ffffff",
                 )
 
             # 2. TEXTO PARA EL BOTÓN SECUNDARIO (GUARDAR EN CARPETA DIRECTAMENTE)
             if not es_editado:
-                txt_guardar = "EDITAR Y GUARDAR EN CARPETA" if es_manual else "CREAR Y GUARDAR EN CARPETA"
+                txt_guardar = "EDITAR Y GUARDAR EN CARPETA" if es_manual else "GUARDAR EN CARPETA"
 
                 if btn_guardar_carpeta is not None:
                     btn_guardar_carpeta.configure(
                         text=txt_guardar,
-                        fg_color="#182235",
-                        hover_color="#23324f",
+                        fg_color="#1c1c1e",
+                        hover_color="#242426",
                         text_color="#ffffff",
                     )
         except Exception:
             pass
 
+    _modo_fuente_mostrado: List[str] = [""]
+
     def actualizar_modo_vista(*_args: object) -> None:
         _guardar_memoria()
-        renderizar_chips_canales()
-        _renderizar_lista_videos_editados()
-        card_canales.pack_forget()
-        card_link.pack_forget()
-        card_video_editado.pack_forget()
+        try:
+            _refrescar_estilo_tarjetas_fuente()
+            _refrescar_estilo_tarjetas_modo()
+        except Exception:
+            pass
 
         mf = modo_fuente_var.get()
         es_editado = "Editado" in mf
-        if "Canales" in mf:
-            card_canales.pack(fill="x")
+        es_canales = "Canales" in mf
+
+        # Solo reconstruir la sub-vista activa si cambió o no está creada
+        if es_canales:
+            renderizar_chips_canales()
+        elif es_editado:
+            _renderizar_lista_videos_editados()
+
+        # Intercambio atómico en celda grid(0, 0) para evitar colapso a 0px y parpadeos
+        if es_canales:
+            target_card = card_canales
+            otros = (card_link, card_video_editado)
         elif "Link" in mf:
-            card_link.pack(fill="x")
+            target_card = card_link
+            otros = (card_canales, card_video_editado)
         else:
-            card_video_editado.pack(fill="x")
+            target_card = card_video_editado
+            otros = (card_canales, card_link)
+
+        if _modo_fuente_mostrado[0] != mf or not target_card.winfo_ismapped():
+            target_card.grid(row=0, column=0, sticky="ew")
+            target_card.tkraise()
+            for o_card in otros:
+                o_card.grid_remove()
+            _modo_fuente_mostrado[0] = mf
 
         if btn_guardar_carpeta is not None and row_botones_accion is not None and btn_auto_1clic is not None:
             if es_editado:
-                btn_guardar_carpeta.grid_remove()
-                row_botones_accion.grid_columnconfigure(1, weight=0)
-                btn_auto_1clic.grid_configure(padx=0)
+                if btn_guardar_carpeta.winfo_ismapped():
+                    btn_guardar_carpeta.grid_remove()
+                    row_botones_accion.grid_columnconfigure(1, weight=0)
+                    btn_auto_1clic.grid_configure(padx=0)
             else:
-                row_botones_accion.grid_columnconfigure(0, weight=8)
-                row_botones_accion.grid_columnconfigure(1, weight=2)
-                btn_auto_1clic.grid_configure(padx=(0, 8))
-                btn_guardar_carpeta.grid(row=0, column=1, sticky="nsew")
+                if not btn_guardar_carpeta.winfo_ismapped():
+                    row_botones_accion.grid_columnconfigure(0, weight=8)
+                    row_botones_accion.grid_columnconfigure(1, weight=2)
+                    btn_auto_1clic.grid_configure(padx=(0, 8))
+                    btn_guardar_carpeta.grid(row=0, column=1, sticky="nsew")
 
         refrescar_plan_ui()
-        refrescar_texto_boton_accion()
-        autoajustar_tamano_ventana()
 
     # ==========================================================================
     # VENTANA DE AJUSTES (CON TOGGLE DE MODO, CONTENIDO IA/MANUAL Y MODELO ARGON 4)
@@ -2210,7 +2674,7 @@ def iniciar_aplicacion_gui() -> None:
         card_api.pack(fill="x", padx=24, pady=(0, 10))
 
         # Fila de Cuota Diaria de YouTube dentro de card_api
-        row_cuota_ajustes = ctk.CTkFrame(card_api, fg_color="#101524", corner_radius=14, border_width=1, border_color="#222b42")
+        row_cuota_ajustes = ctk.CTkFrame(card_api, fg_color="#141416", corner_radius=12, border_width=1, border_color="#29292d")
         row_cuota_ajustes.pack(fill="x", padx=18, pady=(14, 10))
 
         top_cuota_aj = ctk.CTkFrame(row_cuota_ajustes, fg_color="transparent")
@@ -2284,12 +2748,12 @@ def iniciar_aplicacion_gui() -> None:
             corner_radius=11,
             width=22,
             height=22,
-            fg_color="#1e293b",
-            hover_color="#334155",
+            fg_color="#242426",
+            hover_color="#34343a",
             border_width=1,
-            border_color="#334155",
+            border_color="#38383e",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            text_color=CYAN_ACCENT,
+            text_color="#EDEDED",
         )
         btn_ayuda_cuota_yt.pack(side="left", padx=(8, 0))
 
@@ -2297,16 +2761,18 @@ def iniciar_aplicacion_gui() -> None:
             top_cuota_aj,
             text="+ Agregar API (+6 Shorts/día)",
             command=lambda: abrir_dialogo_explicativo_api_json(win),
-            corner_radius=12,
+            corner_radius=8,
             height=28,
-            fg_color="#1e293b",
-            hover_color="#334155",
-            text_color=CYAN_ACCENT,
+            fg_color="#242426",
+            hover_color="#34343a",
+            border_width=1,
+            border_color="#38383e",
+            text_color="#EDEDED",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
         ).pack(side="right")
 
         # Estado en vivo de Shorts disponibles y reset
-        quota_live_box = ctk.CTkFrame(row_cuota_ajustes, fg_color="#0b0e17", corner_radius=10)
+        quota_live_box = ctk.CTkFrame(row_cuota_ajustes, fg_color="#101012", corner_radius=8, border_width=1, border_color="#222225")
         quota_live_box.pack(fill="x", padx=14, pady=(4, 6))
 
         lbl_yt_restantes = ctk.CTkLabel(
@@ -2339,7 +2805,7 @@ def iniciar_aplicacion_gui() -> None:
         refrescar_barra_cuota()
 
         # Monitor de cuotas y estado en vivo de Gemini / Argon
-        frame_probe = ctk.CTkFrame(card_api, fg_color="#101524", corner_radius=14, border_width=1, border_color="#222b42")
+        frame_probe = ctk.CTkFrame(card_api, fg_color="#141416", corner_radius=12, border_width=1, border_color="#29292d")
         frame_probe.pack(fill="x", padx=18, pady=(0, 10))
 
         row_probe_top = ctk.CTkFrame(frame_probe, fg_color="transparent")
@@ -2427,12 +2893,12 @@ def iniciar_aplicacion_gui() -> None:
             corner_radius=11,
             width=22,
             height=22,
-            fg_color="#1e293b",
-            hover_color="#334155",
+            fg_color="#242426",
+            hover_color="#34343a",
             border_width=1,
-            border_color="#334155",
+            border_color="#38383e",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            text_color=CYAN_ACCENT,
+            text_color="#EDEDED",
         )
         btn_ayuda.pack(side="left", padx=(8, 0))
 
@@ -2495,15 +2961,15 @@ def iniciar_aplicacion_gui() -> None:
             row_probe_top,
             text="Refrescar",
             command=_ejecutar_diagnostico_ia,
-            corner_radius=10,
+            corner_radius=8,
             height=28,
             width=90,
-            fg_color="#1e293b",
-            hover_color="#334155",
+            fg_color="#242426",
+            hover_color="#34343a",
             border_width=1,
-            border_color="#334155",
+            border_color="#38383e",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            text_color="#e2e8f0",
+            text_color="#EDEDED",
         )
         btn_probe_ia.pack(side="right")
 
@@ -2512,7 +2978,7 @@ def iniciar_aplicacion_gui() -> None:
         _render_resultado_modelos(obtener_modelos_plantilla())
 
         # Contenedor de Claves API dentro de card_api (encuadre propio)
-        frame_claves = ctk.CTkFrame(card_api, fg_color="#101524", corner_radius=14, border_width=1, border_color="#222b42")
+        frame_claves = ctk.CTkFrame(card_api, fg_color="#141416", corner_radius=12, border_width=1, border_color="#29292d")
         frame_claves.pack(fill="x", padx=18, pady=(0, 14))
 
         top_api = ctk.CTkFrame(frame_claves, fg_color="transparent")
@@ -2585,12 +3051,12 @@ def iniciar_aplicacion_gui() -> None:
             corner_radius=11,
             width=22,
             height=22,
-            fg_color="#1e293b",
-            hover_color="#334155",
+            fg_color="#242426",
+            hover_color="#34343a",
             border_width=1,
-            border_color="#334155",
+            border_color="#38383e",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            text_color=CYAN_ACCENT,
+            text_color="#EDEDED",
         )
         btn_ayuda_api.pack(side="left", padx=(8, 0))
 
@@ -2598,12 +3064,14 @@ def iniciar_aplicacion_gui() -> None:
             top_api,
             text="Obtener Clave Gratis",
             command=lambda: webbrowser.open("https://aistudio.google.com/apikey"),
-            corner_radius=14,
+            corner_radius=8,
             height=28,
             width=140,
-            fg_color="#1e293b",
-            hover_color="#334155",
-            text_color=CYAN_ACCENT,
+            fg_color="#242426",
+            hover_color="#34343a",
+            border_width=1,
+            border_color="#38383e",
+            text_color="#EDEDED",
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         ).pack(side="right")
 
@@ -2720,12 +3188,14 @@ def iniciar_aplicacion_gui() -> None:
             top_api,
             text="Editar Lista",
             command=_abrir_dialogo_editar_claves,
-            corner_radius=14,
+            corner_radius=8,
             height=28,
             width=105,
-            fg_color="#1e293b",
-            hover_color="#334155",
-            text_color="#e2e8f0",
+            fg_color="#242426",
+            hover_color="#34343a",
+            border_width=1,
+            border_color="#38383e",
+            text_color="#EDEDED",
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         ).pack(side="right", padx=(0, 8))
 
@@ -2775,12 +3245,14 @@ def iniciar_aplicacion_gui() -> None:
             row_k_bottom,
             text="Pegar desde Portapapeles",
             command=_pegar_desde_portapapeles,
-            corner_radius=14,
+            corner_radius=8,
             height=30,
             width=180,
-            fg_color=GREEN_ACCENT,
-            hover_color="#059669",
-            text_color="#052e16",
+            fg_color="#2a2a2e",
+            hover_color="#34343a",
+            border_width=1,
+            border_color="#3e3e44",
+            text_color="#EDEDED",
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         ).pack(side="right")
         # 4. Carpetas Output y Assets (estilo píldoras inferiores lado a lado)
@@ -2791,13 +3263,13 @@ def iniciar_aplicacion_gui() -> None:
             row_pildoras_carpetas,
             text="Carpeta Assets",
             command=abrir_carpeta_assets,
-            corner_radius=14,
+            corner_radius=10,
             height=38,
-            fg_color=INPUT_BG,
-            hover_color="#1e2538",
+            fg_color="#1c1c1e",
+            hover_color="#26262a",
             border_width=1,
-            border_color="#2a3147",
-            text_color="#ffffff",
+            border_color="#2c2c30",
+            text_color="#EDEDED",
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         ).pack(side="left", fill="both", expand=True, padx=(0, 6))
 
@@ -2805,13 +3277,13 @@ def iniciar_aplicacion_gui() -> None:
             row_pildoras_carpetas,
             text="Carpeta Output",
             command=abrir_carpeta_salida,
-            corner_radius=14,
+            corner_radius=10,
             height=38,
-            fg_color=INPUT_BG,
-            hover_color="#1e2538",
+            fg_color="#1c1c1e",
+            hover_color="#26262a",
             border_width=1,
-            border_color="#2a3147",
-            text_color="#ffffff",
+            border_color="#2c2c30",
+            text_color="#EDEDED",
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         ).pack(side="right", fill="both", expand=True, padx=(6, 0))
 
@@ -2961,13 +3433,13 @@ def iniciar_aplicacion_gui() -> None:
         btn_accion_act = ctk.CTkButton(
             row_act_inner,
             text="Buscar Actualizaciones",
-            corner_radius=12,
+            corner_radius=8,
             height=32,
-            fg_color=INPUT_BG,
-            hover_color="#1e2538",
+            fg_color="#242426",
+            hover_color="#34343a",
             border_width=1,
-            border_color="#2a3147",
-            text_color="#ffffff",
+            border_color="#38383e",
+            text_color="#EDEDED",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
             command=lambda: _verificar_en_ajustes(forzar=True),
         )
@@ -3029,13 +3501,13 @@ def iniciar_aplicacion_gui() -> None:
 
     def abrir_selector_cuentas_popup() -> None:
         pop = ctk.CTkToplevel(root)
+        pop.withdraw()
         pop.title("Elegir Cuenta o Grupo de Subida")
         pop.geometry("560x580")
         pop.resizable(False, False)
         pop.configure(fg_color=BG_DARK)
         pop.transient(root)
         aplicar_icono_ventana(pop)
-        pop.grab_set()
 
         pop.grid_columnconfigure(0, weight=1)
         pop.grid_rowconfigure(3, weight=1)
@@ -3459,15 +3931,28 @@ def iniciar_aplicacion_gui() -> None:
             bot_bar,
             text="Listo",
             command=pop.destroy,
-            corner_radius=14,
+            corner_radius=12,
             height=36,
-            fg_color="#1e2436",
-            hover_color="#2d354d",
-            text_color="#ffffff",
+            fg_color="#242426",
+            hover_color="#2e2e32",
+            border_width=1,
+            border_color="#38383e",
+            text_color="#EDEDED",
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         ).pack(fill="x")
 
         _render_lista_popup()
+        pop.update_idletasks()
+        try:
+            rx = root.winfo_x() + (root.winfo_width() // 2) - 280
+            ry = root.winfo_y() + (root.winfo_height() // 2) - 290
+            pop.geometry(f"560x580+{max(0, rx)}+{max(0, ry)}")
+        except Exception:
+            pass
+        pop.deiconify()
+        pop.lift()
+        pop.focus_force()
+        pop.grab_set()
 
     _CACHE_SHORTS_PROGRAMADOS: List[Dict[str, Any]] = []
 
@@ -3650,6 +4135,7 @@ def iniciar_aplicacion_gui() -> None:
             return
 
         win_p = ctk.CTkToplevel(root)
+        win_p.withdraw()
         _ventana_programados_ref = win_p
         win_p.title("Shorts Programados en Cola")
         win_p.geometry("740x630")
@@ -3657,7 +4143,6 @@ def iniciar_aplicacion_gui() -> None:
         win_p.configure(fg_color=BG_DARK)
         win_p.transient(root)
         aplicar_icono_ventana(win_p)
-        win_p.grab_set()
 
         scroll_f = ctk.CTkScrollableFrame(
             win_p,
@@ -3900,6 +4385,18 @@ def iniciar_aplicacion_gui() -> None:
             ).pack(pady=16)
             _sync_silencioso_programados(forzar_render=True)
 
+        win_p.update_idletasks()
+        try:
+            rx = root.winfo_x() + (root.winfo_width() // 2) - 370
+            ry = root.winfo_y() + (root.winfo_height() // 2) - 315
+            win_p.geometry(f"740x630+{max(0, rx)}+{max(0, ry)}")
+        except Exception:
+            pass
+        win_p.deiconify()
+        win_p.lift()
+        win_p.focus_force()
+        win_p.grab_set()
+
     def abrir_ventana_overview_rendimiento() -> None:
         nonlocal _ventana_overview_ref
         if _ventana_overview_ref and _ventana_overview_ref.winfo_exists():
@@ -3908,6 +4405,7 @@ def iniciar_aplicacion_gui() -> None:
             return
 
         win_o = ctk.CTkToplevel(root)
+        win_o.withdraw()
         _ventana_overview_ref = win_o
         win_o.title("Overview de Rendimiento")
         win_o.geometry("820x680")
@@ -3915,7 +4413,6 @@ def iniciar_aplicacion_gui() -> None:
         win_o.configure(fg_color=BG_DARK)
         win_o.transient(root)
         aplicar_icono_ventana(win_o)
-        win_o.grab_set()
 
         # Barra de ordenamiento superior
         sort_bar = ctk.CTkFrame(win_o, fg_color="transparent")
@@ -4224,6 +4721,18 @@ def iniciar_aplicacion_gui() -> None:
             ).pack(pady=16)
             _sync_silencioso_overview(forzar_render=True)
 
+        win_o.update_idletasks()
+        try:
+            rx = root.winfo_x() + (root.winfo_width() // 2) - 410
+            ry = root.winfo_y() + (root.winfo_height() // 2) - 340
+            win_o.geometry(f"820x680+{max(0, rx)}+{max(0, ry)}")
+        except Exception:
+            pass
+        win_o.deiconify()
+        win_o.lift()
+        win_o.focus_force()
+        win_o.grab_set()
+
     def _ciclo_auto_refresco_silencioso() -> None:
         if not editando_lock.locked():
             def _worker_bg() -> None:
@@ -4280,39 +4789,55 @@ def iniciar_aplicacion_gui() -> None:
 
     root.after(60000, _ciclo_auto_refresco_silencioso)
 
+    btn_ajustes = ctk.CTkButton(
+        header_right,
+        text="Ajustes",
+        command=abrir_ventana_ajustes,
+        corner_radius=12,
+        height=32,
+        width=92,
+        fg_color="#1c1c1e",
+        hover_color="#242426",
+        border_width=1,
+        border_color="#333336",
+        text_color=TEXT_MUTED,
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+    )
+    btn_ajustes.pack(side="left", padx=(0, 8), pady=2)
+
     btn_cuenta_top = ctk.CTkButton(
         header_right,
         text="Mi Cuenta ▾",
         command=abrir_selector_cuentas_popup,
         compound="left",
-        corner_radius=20,
-        height=40,
-        fg_color=CARD_BG,
-        hover_color="#1f2637",
+        corner_radius=12,
+        height=32,
+        fg_color="#1c1c1e",
+        hover_color="#242426",
         border_width=1,
-        border_color=PURPLE_MAIN,
-        text_color=TEXT_MAIN,
-        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+        border_color="#333336",
+        text_color="#ffffff",
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
-    btn_cuenta_top.pack(side="left", padx=(0, 8), pady=4)
+    btn_cuenta_top.pack(side="left", padx=(0, 8), pady=2)
+
+    btn_canales_top = ctk.CTkButton(
+        header_right,
+        text="Canales",
+        command=abrir_selector_cuentas_popup,
+        corner_radius=12,
+        height=32,
+        width=88,
+        fg_color="#1c1c1e",
+        hover_color="#242426",
+        border_width=1,
+        border_color="#333336",
+        text_color=TEXT_MUTED,
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+    )
+    btn_canales_top.pack(side="left", pady=2)
 
     refrescar_selector_cuentas_ui()
-
-    btn_ajustes = ctk.CTkButton(
-        header_right,
-        text="Ajustes",
-        command=abrir_ventana_ajustes,
-        corner_radius=20,
-        height=40,
-        width=115,
-        fg_color=CARD_BG,
-        hover_color="#1f2637",
-        border_width=1,
-        border_color=CARD_BORDER,
-        text_color=TEXT_MAIN,
-        font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-    )
-    btn_ajustes.pack(side="left", pady=4)
 
     actualizar_modo_vista()
 
@@ -4472,12 +4997,14 @@ def iniciar_aplicacion_gui() -> None:
     btn_auto_1clic = ctk.CTkButton(
         row_botones_accion,
         text="CREAR Y SUBIR SHORT EN 1 CLIC",
-        corner_radius=24,
-        height=58,
-        fg_color=PURPLE_MAIN,
-        hover_color=PURPLE_HOVER,
-        text_color="#ffffff",
-        font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
+        corner_radius=12,
+        height=54,
+        fg_color="#242426",
+        hover_color="#2e2e32",
+        border_width=1,
+        border_color="#38383e",
+        text_color="#EDEDED",
+        font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
         command=lambda: ejecutar_flujo_1_clic(solo_guardar_override=False),
     )
     btn_auto_1clic.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
@@ -4485,13 +5012,13 @@ def iniciar_aplicacion_gui() -> None:
     btn_guardar_carpeta = ctk.CTkButton(
         row_botones_accion,
         text="GUARDAR EN CARPETA",
-        corner_radius=24,
-        height=58,
-        fg_color="#182235",
-        hover_color="#23324f",
+        corner_radius=12,
+        height=54,
+        fg_color="#1c1c1e",
+        hover_color="#26262a",
         border_width=1,
-        border_color="#334668",
-        text_color="#ffffff",
+        border_color="#2e2e32",
+        text_color="#EDEDED",
         font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
         command=lambda: ejecutar_flujo_1_clic(solo_guardar_override=True),
     )
@@ -4506,14 +5033,14 @@ def iniciar_aplicacion_gui() -> None:
         row_pildoras_inferiores,
         text="Consultando cola de Shorts...",
         command=lambda: abrir_ventana_shorts_programados(),
-        corner_radius=14,
+        corner_radius=10,
         height=38,
         fg_color=INPUT_BG,
-        hover_color="#1e2538",
+        hover_color="#242426",
         border_width=1,
-        border_color="#2a3147",
-        text_color="#ffffff",
-        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+        border_color=CARD_BORDER,
+        text_color="#EDEDED",
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
     btn_cola_programados.pack(side="left", fill="both", expand=True, padx=(0, 6))
     _actualizar_pildora_cola()
@@ -4522,14 +5049,14 @@ def iniciar_aplicacion_gui() -> None:
         row_pildoras_inferiores,
         text="Consultando métricas de Shorts...",
         command=lambda: abrir_ventana_overview_rendimiento(),
-        corner_radius=14,
+        corner_radius=10,
         height=38,
         fg_color=INPUT_BG,
-        hover_color="#1e2538",
+        hover_color="#242426",
         border_width=1,
-        border_color="#2a3147",
-        text_color="#ffffff",
-        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+        border_color=CARD_BORDER,
+        text_color="#EDEDED",
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
     )
     btn_rendimiento_videos.pack(side="right", fill="both", expand=True, padx=(6, 0))
     _actualizar_pildora_rendimiento()
@@ -5238,6 +5765,7 @@ def iniciar_aplicacion_gui() -> None:
         ruta_video_origen: Optional[Path] = None,
     ) -> None:
         win_r = ctk.CTkToplevel(root)
+        win_r.withdraw()
         win_r.title("Shorts Studio · Edición Manual" if es_modo_manual_inicial else "Shorts Studio · Revisión Previa")
         win_r.geometry("1080x700")
         win_r.minsize(980, 640)
@@ -5245,9 +5773,6 @@ def iniciar_aplicacion_gui() -> None:
         win_r.configure(fg_color=BG_DARK)
         win_r.transient(root)
         aplicar_icono_ventana(win_r)
-        win_r.lift()
-        win_r.focus_force()
-        win_r.grab_set()
 
         player = None
         reproduciendo = False
@@ -5313,10 +5838,10 @@ def iniciar_aplicacion_gui() -> None:
         # ── Columna izquierda: reproductor 9:16 ───────────────────────────
         col_izq = ctk.CTkFrame(
             panel_principal,
-            fg_color=CARD_BG,
-            corner_radius=18,
+            fg_color="#18181b",
+            corner_radius=16,
             border_width=1,
-            border_color=CARD_BORDER,
+            border_color="#28282d",
             width=308,
         )
         col_izq.grid(row=0, column=0, sticky="nsew", padx=(0, 16))
@@ -5335,10 +5860,10 @@ def iniciar_aplicacion_gui() -> None:
             col_izq,
             from_=0.0,
             to=1.0,
-            height=12,
-            progress_color=PURPLE_MAIN,
-            button_color=CYAN_ACCENT,
-            button_hover_color="#38bdf8",
+            height=10,
+            progress_color="#d4d4d8",
+            button_color="#EDEDED",
+            button_hover_color="#ffffff",
         )
         slider_seek.set(0.0)
         slider_seek.pack(fill="x", padx=18, pady=(0, 6))
@@ -5378,21 +5903,23 @@ def iniciar_aplicacion_gui() -> None:
         row_ctrl.pack(fill="x", padx=18, pady=(0, 10))
 
         btn_play = ctk.CTkButton(
-            row_ctrl, text="▶", width=36, height=30, corner_radius=8,
-            fg_color=INPUT_BG, hover_color="#2a3147",
-            font=ctk.CTkFont(size=14, weight="bold"),
+            row_ctrl, text="▶", width=34, height=28, corner_radius=8,
+            fg_color="#242426", hover_color="#2e2e32",
+            border_width=1, border_color="#38383e",
+            text_color="#EDEDED",
+            font=ctk.CTkFont(size=13, weight="bold"),
         )
         lbl_tiempo = ctk.CTkLabel(
             row_ctrl, text="00:00 / 00:00",
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            font=ctk.CTkFont(family="Consolas", size=11, weight="bold"),
             text_color=TEXT_MUTED,
         )
         btn_play.pack(side="left", padx=(0, 8))
         lbl_tiempo.pack(side="left")
 
         slider_vol = ctk.CTkSlider(
-            row_ctrl, from_=0.0, to=1.0, width=54, height=12,
-            number_of_steps=20, progress_color=CYAN_ACCENT, button_color=CYAN_ACCENT,
+            row_ctrl, from_=0.0, to=1.0, width=54, height=10,
+            number_of_steps=20, progress_color="#d4d4d8", button_color="#EDEDED",
         )
         slider_vol.set(1.0)
         lbl_vol = ctk.CTkLabel(row_ctrl, text="Vol", font=ctk.CTkFont(family="Segoe UI", size=10), text_color=TEXT_DIM)
@@ -5424,14 +5951,14 @@ def iniciar_aplicacion_gui() -> None:
 
         # Enlace original y botón de Prompt para Argon por debajo del reproductor de video
         outro_like_var = ctk.BooleanVar(value=True)
-        row_url = ctk.CTkFrame(col_izq, fg_color="#101524", corner_radius=10, border_width=1, border_color="#1e2538")
+        row_url = ctk.CTkFrame(col_izq, fg_color="#141416", corner_radius=8, border_width=1, border_color="#2a2a2e")
         row_url.pack(fill="x", padx=16, pady=(0, 6))
 
         ent_url_disp = ctk.CTkEntry(
             row_url, height=24,
-            font=ctk.CTkFont(family="Segoe UI", size=10),
+            font=ctk.CTkFont(family="Consolas", size=10),
             fg_color="transparent", border_width=0,
-            text_color=CYAN_ACCENT,
+            text_color="#A0A0A5",
             placeholder_text="Pegá acá el link del video...",
         )
         if url_video_orig and url_video_orig.strip():
@@ -5466,14 +5993,16 @@ def iniciar_aplicacion_gui() -> None:
 
         ctk.CTkButton(
             row_url, text="Abrir", width=42, height=22, corner_radius=6,
-            fg_color="#1e2538", hover_color="#2d3752",
+            fg_color="#242426", hover_color="#2e2e32",
+            text_color="#EDEDED",
             font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
             command=_abrir_url_navegador,
         ).pack(side="right", padx=(2, 4), pady=3)
 
         btn_copiar_url = ctk.CTkButton(
             row_url, text="Copiar", width=46, height=22, corner_radius=6,
-            fg_color="#1e2538", hover_color="#2d3752",
+            fg_color="#242426", hover_color="#2e2e32",
+            text_color="#EDEDED",
             font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
             command=_copiar_url_clip,
         )
@@ -5494,20 +6023,20 @@ def iniciar_aplicacion_gui() -> None:
                 btn_prompt_argon.configure(text="✓ Prompt Copiado para Argon", text_color="#10b981")
                 root.after(
                     1800,
-                    lambda: btn_prompt_argon.configure(text="📋 Copiar Prompt para Argon", text_color=CYAN_ACCENT),
+                    lambda: btn_prompt_argon.configure(text="Copiar Prompt para Argon", text_color="#EDEDED"),
                 )
             except Exception:
                 pass
 
         btn_prompt_argon = ctk.CTkButton(
             col_izq,
-            text="📋 Copiar Prompt para Argon",
+            text="Copiar Prompt para Argon",
             command=_copiar_prompt_argon,
             height=28, corner_radius=8,
-            fg_color="#121a2d", hover_color="#1c2947",
-            border_width=1, border_color="#26385e",
+            fg_color="#222225", hover_color="#2c2c30",
+            border_width=1, border_color="#323236",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            text_color=CYAN_ACCENT,
+            text_color="#EDEDED",
         )
         btn_prompt_argon.pack(fill="x", padx=16, pady=(0, 6))
 
@@ -5523,11 +6052,11 @@ def iniciar_aplicacion_gui() -> None:
 
             btn_descartar_perm = ctk.CTkButton(
                 col_izq,
-                text="🗑 Descartar short para siempre",
+                text="Descartar short para siempre",
                 command=_descartar_para_siempre,
                 height=28, corner_radius=8,
-                fg_color="#1f1418", hover_color="#7f1d1d",
-                border_width=1, border_color="#451a22",
+                fg_color="#2a1719", hover_color="#381d20",
+                border_width=1, border_color="#4a2328",
                 font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
                 text_color="#f87171",
             )
@@ -5593,7 +6122,7 @@ def iniciar_aplicacion_gui() -> None:
 
         lbl_musica = ctk.CTkLabel(
             f_musica,
-            text="🎵 Canción:",
+            text="Canción:",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
             text_color=TEXT_MUTED,
         )
@@ -5605,9 +6134,10 @@ def iniciar_aplicacion_gui() -> None:
             command=_al_cambiar_musica,
             width=125,
             height=26,
-            fg_color="#182032",
-            button_color="#25304a",
-            button_hover_color="#334166",
+            fg_color="#141416",
+            button_color="#242426",
+            button_hover_color="#34343a",
+            text_color="#EDEDED",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
             dropdown_font=ctk.CTkFont(family="Segoe UI", size=11),
         )
@@ -5623,7 +6153,7 @@ def iniciar_aplicacion_gui() -> None:
                 except Exception:
                     pass
 
-        f_outro = ctk.CTkFrame(f_top_ctrls, fg_color="#141a29", corner_radius=8, border_width=1, border_color="#222b40")
+        f_outro = ctk.CTkFrame(f_top_ctrls, fg_color="#141416", corner_radius=8, border_width=1, border_color="#2c2c30")
         f_outro.pack(side="left", padx=(10, 0))
 
         sw_outro_like = ctk.CTkSwitch(
@@ -5633,9 +6163,9 @@ def iniciar_aplicacion_gui() -> None:
             command=_al_cambiar_outro_like,
             switch_width=34,
             switch_height=18,
-            progress_color=PURPLE_MAIN,
+            progress_color="#52525b",
             button_color="#ffffff",
-            button_hover_color="#e2e8f0",
+            button_hover_color="#e4e4e7",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
             text_color=TEXT_MAIN,
         )
@@ -5663,14 +6193,14 @@ def iniciar_aplicacion_gui() -> None:
         lbl_guion_tit.pack(side="left")
 
         if not es_modo_editado:
-            f_auto_bar = ctk.CTkFrame(row_top_guion, fg_color="#121624", corner_radius=8, border_width=1, border_color="#232b42")
+            f_auto_bar = ctk.CTkFrame(row_top_guion, fg_color="#141416", corner_radius=8, border_width=1, border_color="#2c2c30")
             f_auto_bar.pack(side="right")
 
             ctk.CTkLabel(
                 f_auto_bar,
-                text="✨ Auto al renderizar:",
+                text="Auto al renderizar:",
                 font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
-                text_color="#94a3b8",
+                text_color="#A0A0A5",
             ).pack(side="left", padx=(8, 4), pady=3)
 
             def _crear_chip_auto(parent_f, texto_chip: str, var_b: tk.BooleanVar):
@@ -5680,29 +6210,29 @@ def iniciar_aplicacion_gui() -> None:
                     width=54,
                     height=22,
                     corner_radius=6,
-                    fg_color="#1b2234",
-                    hover_color="#28324e",
+                    fg_color="#18181b",
+                    hover_color="#242428",
                     border_width=1,
-                    border_color="#2d3753",
+                    border_color="#2c2c30",
                     font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
-                    text_color="#94a3b8",
+                    text_color="#A0A0A5",
                 )
 
                 def _refrescar_chip():
                     if var_b.get():
                         btn_c.configure(
-                            fg_color=PURPLE_MAIN,
-                            hover_color=PURPLE_HOVER,
-                            border_color="#a855f7",
-                            text_color="#ffffff",
+                            fg_color="#2a2a2e",
+                            hover_color="#34343a",
+                            border_color="#52525b",
+                            text_color="#EDEDED",
                             text=f"✓ {texto_chip}",
                         )
                     else:
                         btn_c.configure(
-                            fg_color="#1b2234",
-                            hover_color="#28324e",
-                            border_color="#2d3753",
-                            text_color="#94a3b8",
+                            fg_color="#18181b",
+                            hover_color="#242428",
+                            border_color="#2c2c30",
+                            text_color="#A0A0A5",
                             text=texto_chip,
                         )
 
@@ -5936,10 +6466,11 @@ def iniciar_aplicacion_gui() -> None:
                 card_guion,
                 text="Re-renderizar con guion editado",
                 command=lambda: _responder("reeditar"),
-                height=34, corner_radius=10,
-                fg_color=PURPLE_MAIN, hover_color=PURPLE_HOVER,
+                height=34, corner_radius=8,
+                fg_color="#242426", hover_color="#2e2e32",
+                border_width=1, border_color="#38383e",
                 font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-                text_color="#ffffff",
+                text_color="#EDEDED",
             ).grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 12))
         else:
             tam_mb = ""
@@ -5964,12 +6495,13 @@ def iniciar_aplicacion_gui() -> None:
         if es_modo_manual_inicial:
             btn_subir = ctk.CTkButton(
                 card_acciones,
-                text="🎬 Renderizar Short con este Guion",
+                text="Renderizar Short con este Guion",
                 command=lambda: _responder("reeditar"),
-                height=40, corner_radius=12,
-                fg_color=PURPLE_MAIN, hover_color=PURPLE_HOVER,
+                height=40, corner_radius=8,
+                fg_color="#242426", hover_color="#2e2e32",
+                border_width=1, border_color="#38383e",
                 font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-                text_color="#ffffff",
+                text_color="#EDEDED",
             )
             btn_subir.pack(fill="x", padx=16, pady=(12, 8))
         else:
@@ -5977,10 +6509,11 @@ def iniciar_aplicacion_gui() -> None:
                 card_acciones,
                 text="Guardar en Carpeta" if solo_guardar else "Subir a YouTube",
                 command=lambda: _responder("subir"),
-                height=40, corner_radius=12,
-                fg_color=GREEN_ACCENT, hover_color="#059669",
+                height=40, corner_radius=8,
+                fg_color="#242426", hover_color="#2e2e32",
+                border_width=1, border_color="#38383e",
                 font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-                text_color="#ffffff",
+                text_color="#EDEDED",
             )
             btn_subir.pack(fill="x", padx=16, pady=(12, 8))
 
@@ -5992,23 +6525,35 @@ def iniciar_aplicacion_gui() -> None:
             row_sec,
             text="Siguiente Video" if es_modo_editado else "Buscar Otro Video",
             command=lambda: _responder("buscar_otro"),
-            height=32, corner_radius=10,
-            fg_color=INPUT_BG, hover_color="#1e2538",
-            border_width=1, border_color="#2a3147",
+            height=32, corner_radius=8,
+            fg_color="#18181b", hover_color="#242428",
+            border_width=1, border_color="#2e2e34",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            text_color="#ffffff",
+            text_color="#EDEDED",
         ).grid(row=0, column=0, padx=(0, 4), sticky="ew")
 
         ctk.CTkButton(
             row_sec,
             text="Cancelar Proceso",
             command=lambda: _responder("descartar"),
-            height=32, corner_radius=10,
-            fg_color="#1c2030", hover_color="#7f1d1d",
-            border_width=1, border_color="#3b4252",
+            height=32, corner_radius=8,
+            fg_color="#2a1719", hover_color="#381d20",
+            border_width=1, border_color="#4a2328",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
             text_color="#f87171",
         ).grid(row=0, column=1, padx=(4, 0), sticky="ew")
+
+        win_r.update_idletasks()
+        try:
+            rx = root.winfo_x() + (root.winfo_width() // 2) - 540
+            ry = root.winfo_y() + (root.winfo_height() // 2) - 350
+            win_r.geometry(f"1080x700+{max(0, rx)}+{max(0, ry)}")
+        except Exception:
+            pass
+        win_r.deiconify()
+        win_r.lift()
+        win_r.focus_force()
+        win_r.grab_set()
 
         # Inicialización del reproductor ffpyplayer (inicia pausado)
         try:
