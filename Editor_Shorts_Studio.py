@@ -314,6 +314,7 @@ def iniciar_aplicacion_gui() -> None:
     }
 
     MAPA_MODELOS_IA = {
+        "Hydrogen 4 · Máxima calidad (primer intento en API)": "gemini-4-hydrogen",
         "Gemini 3.5 Flash Lite · Recomendado (rápido, cuota amplia, ideal para video)": "gemini-3.5-flash-lite",
         "Gemini 3.6 Flash · Alta calidad (cuota diaria limitada a 20/día en Free Tier)": "gemini-3.6-flash",
         "Gemini 3.8 Flash · Razonamiento extra (sujeto a disponibilidad)": "gemini-3.8-flash",
