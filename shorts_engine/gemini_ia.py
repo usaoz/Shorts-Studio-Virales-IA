@@ -77,7 +77,6 @@ GEMINI_KEY_FILE = BASE_DIR / "gemini_api_key.txt"
 # =====================================================================
 MODEL_HIERARCHY = [
     "gemini-4-hydrogen",     # Prioridad 1: Hydrogen 4
-    "gemini-4-argon",        # Prioridad 2: Cuentas con facturación / Tier superior
     "gemini-3.8-flash",      # Prioridad 2: Razonamiento top
     "gemini-3.6-flash",      # Prioridad 3: Fallback ultra-estable
     "gemini-3.5-flash-lite", # Prioridad 4: Cuota muy amplia
@@ -87,7 +86,6 @@ MODEL_HIERARCHY = [
 
 NOMBRES_UI = {
     "gemini-4-hydrogen": "Hydrogen 4",
-    "gemini-4-argon": "Argon 4",
     "gemini-3.8-flash": "Gemini 3.8 Flash",
     "gemini-3.6-flash": "Gemini 3.6 Flash",
     "gemini-3.5-flash-lite": "Gemini 3.5 Flash Lite",
@@ -618,8 +616,7 @@ class GeminiPoolOrchestrator:
         self.last_probe_cache.clear()
 
         modelos_test = [
-            ("gemini-4-hydrogen", "Hydrogen 4", "Hydrogen"),
-            ("gemini-4-argon", "Argon 4", "Argon"),
+            ("gemini-4-hydrogen", "Hydrogen 4", "H4"),
             ("gemini-3.8-flash", "Gemini 3.8 Flash", "3.8"),
             ("gemini-3.6-flash", "Gemini 3.6 Flash", "3.6"),
             ("gemini-3.5-flash-lite", "Gemini 3.5 Flash Lite", "3.5"),
@@ -1255,8 +1252,7 @@ def obtener_modelos_plantilla() -> List[Dict[str, Any]]:
             "color_texto": "#94a3b8",
         }
         for m_id, m_nombre, m_corto in [
-            ("gemini-4-hydrogen", "Hydrogen 4", "Hydrogen"),
-            ("gemini-4-argon", "Argon 4", "Argon"),
+            ("gemini-4-hydrogen", "Hydrogen 4", "H4"),
             ("gemini-3.8-flash", "Gemini 3.8 Flash", "3.8"),
             ("gemini-3.6-flash", "Gemini 3.6 Flash", "3.6"),
             ("gemini-3.5-flash-lite", "Gemini 3.5 Flash Lite", "3.5"),
