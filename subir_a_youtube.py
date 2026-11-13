@@ -490,6 +490,29 @@ def obtener_servicio_youtube(
             flow = InstalledAppFlow.from_client_secrets_file(str(secret_path), SCOPES)
             creds = flow.run_local_server(port=0, prompt="select_account")
 
+            if cuenta_id and cuenta_id.strip():
+                try:
+                    cuentas_reg = listar_cuentas_vinculadas()
+                    reg_match = next((c for c in cuentas_reg if c.get("id") == _sanitizar_id_cuenta(cuenta_id.strip())), None)
+                    ch_esperado = (reg_match or {}).get("channel_id", "")
+                    if ch_esperado:
+                        yt_chk = build("youtube", "v3", credentials=creds)
+                        resp_chk = yt_chk.channels().list(mine=True, part="snippet").execute()
+                        items_chk = resp_chk.get("items", [])
+                        if items_chk:
+                            ch_real = items_chk[0].get("id") or ""
+                            tit_real = (items_chk[0].get("snippet") or {}).get("title") or ch_real
+                            if ch_real and ch_real != ch_esperado:
+                                nom_esp = (reg_match or {}).get("nombre") or cuenta_id
+                                raise RuntimeError(
+                                    f"Elegiste el canal '{tit_real}' en Google, pero esta cuenta corresponde a '{nom_esp}'. "
+                                    "Por favor volvé a autorizar y seleccioná el canal correcto."
+                                )
+                except RuntimeError:
+                    raise
+                except Exception:
+                    pass
+
         # Guardar token en la ruta específica de esta cuenta + proyecto API
         destino_guardar = candidatos_token[0] if candidatos_token else TOKEN_FILE
         with open(destino_guardar, "w", encoding="utf-8") as token_out:
